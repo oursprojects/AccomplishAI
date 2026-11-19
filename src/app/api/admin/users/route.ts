@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { getManilaDayStartIso, isAdminEmail } from "@/lib/admin";
+import { publicEnv } from "@/lib/env";
+import type { Database } from "@/lib/supabase/database.types";
 
 export interface AdminMember {
   userId: string;
@@ -17,6 +20,12 @@ export interface AdminMember {
   reportsCount: number;
   createdAt: string;
 }
+
+const createMemberSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address."),
+  password: z.string().min(6, "Password must be at least 6 characters.").max(128),
+  customDailyLimit: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+});
 
 const patchSchema = z.discriminatedUnion("action", [
   z.object({
@@ -107,6 +116,68 @@ export async function GET() {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load admin data." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  const { supabase, user } = await getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminEmail(user.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const parsed = createMemberSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid account details." }, { status: 400 });
+  }
+
+  const { email, password, customDailyLimit } = parsed.data;
+
+  try {
+    let createdUserId: string | null = null;
+    let needsConfirmWarning = false;
+
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (serviceKey) {
+      const adminClient = createSupabaseClient<Database>(publicEnv.supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+      if (createErr) return NextResponse.json({ error: createErr.message }, { status: 400 });
+      createdUserId = created.user?.id ?? null;
+    } else {
+      // Stateless anon client so admin's own session cookies are untouched
+      const anonClient = createSupabaseClient<Database>(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: signed, error: signErr } = await anonClient.auth.signUp({ email, password });
+      if (signErr) return NextResponse.json({ error: signErr.message }, { status: 400 });
+      createdUserId = signed.user?.id ?? null;
+      needsConfirmWarning = !signed.session;
+    }
+
+    if (createdUserId) {
+      await supabase
+        .from("user_quotas")
+        .upsert(
+          {
+            user_id: createdUserId,
+            email,
+            custom_daily_limit: customDailyLimit ?? null,
+          },
+          { onConflict: "user_id" },
+        );
+    }
+
+    const data = await loadAdminData(supabase);
+    return NextResponse.json({ ...data, needsConfirmWarning }, { status: 201 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to create intern account." },
       { status: 500 },
     );
   }

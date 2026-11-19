@@ -52,26 +52,14 @@ function buildWelcomeMessage(
     };
   }
 
-  const missingProfile: string[] = [];
-  if (!profile.name_last_first.trim() || !profile.name_first_last.trim()) {
-    missingProfile.push("**Full name**");
-  }
   const intro = profile.name_first_last
-    ? `Hi **${profile.name_first_last}**! I pre-filled your name and office (**${profile.office || "YML"}**).`
-    : `Hi! Tell me what you accomplished this week *(or tap Voice to speak)*.`;
-
-  const askList = [
-    ...missingProfile,
-    "**Week dates** (*From – To*)",
-    "**Daily tasks** (*Mon–Fri*)",
-    "**Hours worked** (*this week & total*)",
-    "**New trainings, problems, or solutions**",
-  ];
+    ? `Hi **${profile.name_first_last}**! Your name and office (**${profile.office || "YML"}**) are pre-filled.`
+    : `Hi! Paste or speak your weekly notes *(English or Tagalog)* and I'll put them straight into your **2026 Weekly Accomplishment Report**.`;
 
   return {
     id: "welcome",
     role: "assistant",
-    content: `${intro}\n\nShare what you have for your **Weekly Accomplishment Report** — if anything is still needed, I'll ask:\n- ${askList.join("\n- ")}`,
+    content: `${intro}\n\nYou only need to share what you have — any remaining fields can be left blank or edited manually in **Edit**.`,
   };
 }
 

@@ -62,19 +62,33 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data }: 
     };
   }, [templateId, targetKey]);
 
-  // Fit preview width cleanly to any mobile or desktop viewport
+  // Fit preview width cleanly to any mobile or desktop viewport (including tab switches)
   useEffect(() => {
     const updateZoom = () => {
       if (manualZoom) return;
-      const stageWidth = stageRef.current?.clientWidth ?? window.innerWidth;
+      const stageWidth = stageRef.current?.clientWidth || window.innerWidth;
+      if (stageWidth <= 0) return;
       // 612pt ~= 816px + 32px wrapper padding = 848px
       const fit = Math.min(0.85, Math.max(0.34, (stageWidth - 24) / 848));
       setZoom(Number(fit.toFixed(2)));
     };
     updateZoom();
     window.addEventListener("resize", updateZoom);
-    return () => window.removeEventListener("resize", updateZoom);
-  }, [manualZoom]);
+    let observer: ResizeObserver | undefined;
+    if (stageRef.current && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => {
+        updateZoom();
+        if (containerRef.current && latestFilledRef.current && stageRef.current && stageRef.current.clientWidth > 0) {
+          enhanceCsuPreviewChrome(containerRef.current, latestFilledRef.current, paperSize);
+        }
+      });
+      observer.observe(stageRef.current);
+    }
+    return () => {
+      window.removeEventListener("resize", updateZoom);
+      observer?.disconnect();
+    };
+  }, [manualZoom, paperSize]);
 
   // Dynamic @page size and physical print dimensions (never depend on vh)
   useEffect(() => {

@@ -39,9 +39,9 @@ function getMissingSummary(data: ReportData): string[] {
 }
 
 const QUICK_REPLIES = [
-  "No new trainings, problems, or solutions this week.",
-  "Total hours worked is the same as this week.",
-  "Leave the remaining empty days blank.",
+  "Translate my notes to formal past-tense English & apply",
+  "Summarize shorter so it fits cleanly",
+  "No trainings, problems, or solutions",
 ];
 
 export function ReportChat({
@@ -132,8 +132,8 @@ export function ReportChat({
             <h2 className="text-sm font-semibold text-slate-900 leading-tight">Report Assistant</h2>
             <p className="text-[11px] text-slate-500">
               {missing.length === 0
-                ? "All required fields filled — ready to print or save"
-                : `Missing: ${missing.join(", ")}`}
+                ? "All main fields filled — ready to print or save"
+                : "Put what you have — edit any blank fields manually anytime"}
             </p>
           </div>
         </div>
@@ -195,6 +195,13 @@ export function ReportChat({
                     ✓ {act}
                   </span>
                 ))}
+                <button
+                  type="button"
+                  onClick={onOpenPreview}
+                  className="lg:hidden inline-flex items-center rounded-full bg-slate-900 px-2.5 py-0.5 text-[11px] font-medium text-white cursor-pointer"
+                >
+                  View Preview →
+                </button>
               </div>
             )}
           </div>

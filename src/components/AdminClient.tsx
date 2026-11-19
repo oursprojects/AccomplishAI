@@ -16,6 +16,10 @@ export function AdminClient({ initialDefaultLimit, initialMembers }: AdminClient
   );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [savingDefault, setSavingDefault] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newLimit, setNewLimit] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -25,6 +29,46 @@ export function AdminClient({ initialDefaultLimit, initialMembers }: AdminClient
     setDraftLimits(
       Object.fromEntries(json.members.map((m) => [m.userId, m.customDailyLimit === null ? "" : String(m.customDailyLimit)])),
     );
+  }
+
+  async function handleCreateAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    setCreating(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: newEmail.trim(),
+          password: newPassword,
+          customDailyLimit: newLimit.trim() === "" ? null : Number(newLimit),
+        }),
+      });
+      const json = (await res.json()) as {
+        defaultDailyLimit?: number;
+        members?: AdminMember[];
+        needsConfirmWarning?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !json.members || json.defaultDailyLimit === undefined) {
+        throw new Error(json.error ?? "Failed to create intern account.");
+      }
+      syncResponse({ defaultDailyLimit: json.defaultDailyLimit, members: json.members });
+      setNotice(
+        json.needsConfirmWarning
+          ? `Account created for ${newEmail.trim()}. Note: disable 'Confirm email' in Supabase Auth -> Providers -> Email so they can sign in without email confirmation.`
+          : `Intern account created for ${newEmail.trim()}.`,
+      );
+      setNewEmail("");
+      setNewPassword("");
+      setNewLimit("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create account.");
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function handleSaveDefault(e: React.FormEvent) {
@@ -148,6 +192,56 @@ export function AdminClient({ initialDefaultLimit, initialMembers }: AdminClient
           {notice}
         </div>
       )}
+
+      {/* Create Intern Account (Admin Only) */}
+      <form
+        onSubmit={handleCreateAccount}
+        className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs space-y-3"
+      >
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Create Intern Account</h2>
+          <p className="text-xs text-slate-500">
+            Public sign-up is disabled. Only you (<span className="font-medium">mikorynosantiago@gmail.com</span>) can
+            create accounts for your intern members.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+          <input
+            type="email"
+            required
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="intern@email.com"
+            className="sm:col-span-4 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+          />
+          <input
+            type="password"
+            required
+            minLength={6}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Temporary password (min 6 chars)"
+            className="sm:col-span-4 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+          />
+          <input
+            type="number"
+            min={0}
+            max={1000}
+            value={newLimit}
+            onChange={(e) => setNewLimit(e.target.value)}
+            placeholder={`Limit (${defaultLimit}/day)`}
+            className="sm:col-span-2 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+          />
+          <button
+            type="submit"
+            disabled={creating}
+            className="sm:col-span-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60 transition cursor-pointer"
+          >
+            {creating ? "Creating..." : "Create"}
+          </button>
+        </div>
+      </form>
 
       {/* Global default limit */}
       <form
