@@ -12,6 +12,7 @@ create extension if not exists "pgcrypto";
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -59,6 +60,8 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+revoke all on function public.handle_new_user() from public, anon, authenticated;
+
 -- -----------------------------------------------------------------------------
 -- templates: the user's tagged copy of 2026-Weekly-Accomplishment-Report.docx
 -- -----------------------------------------------------------------------------
@@ -104,6 +107,8 @@ create table if not exists public.reports (
 
 create index if not exists reports_user_created_idx
   on public.reports (user_id, created_at desc);
+create index if not exists reports_template_id_idx
+  on public.reports (template_id);
 
 drop trigger if exists reports_set_updated_at on public.reports;
 create trigger reports_set_updated_at
@@ -171,7 +176,17 @@ create policy "reports_insert_own" on public.reports
 drop policy if exists "reports_update_own" on public.reports;
 create policy "reports_update_own" on public.reports
   for update to authenticated
-  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+  using ((select auth.uid()) = user_id)
+  with check (
+    (select auth.uid()) = user_id
+    and (
+      template_id is null
+      or exists (
+        select 1 from public.templates t
+        where t.id = template_id and t.user_id = (select auth.uid())
+      )
+    )
+  );
 
 drop policy if exists "reports_delete_own" on public.reports;
 create policy "reports_delete_own" on public.reports
