@@ -63,6 +63,8 @@ body {
     box-shadow: none !important;
     overflow: visible !important;
     background: #ffffff !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
   }
 
   .docx-preview-stage {

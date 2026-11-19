@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
+import { enhanceCsuPreviewChrome } from "@/lib/docx/csu-template-chrome";
 import type { DetectedField } from "@/lib/docx/types";
 import type { ReportData } from "@/lib/report-schema";
 
@@ -97,6 +98,9 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data }: 
           breakPages: true,
           useBase64URL: true,
         });
+        if (!cancelled && containerRef.current) {
+          enhanceCsuPreviewChrome(containerRef.current, filled);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Could not render document preview.");

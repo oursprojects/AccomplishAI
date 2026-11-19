@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
-import { loadActiveTemplateReview } from "@/lib/templates/pipeline";
+import { ensureActiveTemplateReview } from "@/lib/templates/pipeline";
 import { reportDataSchema, type ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
 import { WorkspaceClient } from "@/components/WorkspaceClient";
@@ -22,7 +22,7 @@ async function WorkspaceContent({
       .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours")
       .eq("id", user.id)
       .maybeSingle(),
-    loadActiveTemplateReview(supabase, user.id),
+    ensureActiveTemplateReview(supabase, user.id).catch(() => null),
     reportId
       ? supabase
           .from("reports")

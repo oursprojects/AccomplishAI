@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   reactCompiler: true,
   outputFileTracingIncludes: {
+    "/": ["./templates/**/*"],
     "/api/scan-template": ["./templates/**/*"],
   },
   turbopack: {

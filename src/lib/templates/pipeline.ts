@@ -1,4 +1,6 @@
 import "server-only";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json, TemplateRow } from "@/lib/supabase/database.types";
 import { scanDocx } from "@/lib/docx/scanner";
@@ -158,4 +160,22 @@ export async function loadActiveTemplateReview(
     aiUsed: false,
     warnings: scan.warnings,
   };
+}
+
+const DEFAULT_TEMPLATE_NAME = "2026-Weekly-Accomplishment-Report.docx";
+const DEFAULT_TEMPLATE_PATH = join(process.cwd(), "templates", DEFAULT_TEMPLATE_NAME);
+
+/**
+ * First-open auto-scanner: returns the user's active template, or automatically
+ * scans, tags, and stores 2026-Weekly-Accomplishment-Report.docx on first visit.
+ */
+export async function ensureActiveTemplateReview(
+  supabase: Supabase,
+  userId: string,
+): Promise<TemplateReview | null> {
+  const existing = await loadActiveTemplateReview(supabase, userId);
+  if (existing) return existing;
+
+  const original = await readFile(DEFAULT_TEMPLATE_PATH);
+  return await scanAndStoreTemplate(supabase, userId, original, DEFAULT_TEMPLATE_NAME);
 }

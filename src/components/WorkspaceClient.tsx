@@ -44,10 +44,32 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
 
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const needsTemplateSetup = !review || review.template.status !== "confirmed";
+  async function handleQuickConfirm() {
+    if (!review) return;
+    setConfirming(true);
+    try {
+      const res = await fetch("/api/scan-template", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateId: review.template.id,
+          assignments: review.fields.map((f) => ({
+            candidateId: f.candidateId,
+            key: f.key,
+            label: f.label,
+          })),
+        }),
+      });
+      const json = (await res.json()) as { review?: TemplateReview };
+      if (res.ok && json.review) setReview(json.review);
+    } finally {
+      setConfirming(false);
+    }
+  }
 
   async function handleGenerate() {
     if (!rawNotes.trim()) {
@@ -115,18 +137,17 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
     setTab("notes");
   }
 
-  if (needsTemplateSetup) {
+  if (!review) {
     return (
       <div className="mx-auto max-w-3xl space-y-4">
         <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 text-sm text-indigo-950">
-          <p className="font-semibold">Step 1 (One-Time Setup): Auto-Scan Your Official Template</p>
+          <p className="font-semibold">Template Setup</p>
           <p className="mt-1 text-xs sm:text-sm text-indigo-900/80">
-            Accomplish AI preserves your exact{" "}
-            <code className="font-mono text-xs">2026-Weekly-Accomplishment-Report.docx</code> layout. Click{" "}
-            <strong>Auto-Scan 2026 Template</strong>, review the detected fields, and confirm to start generating reports.
+            Click <strong>Auto-Scan 2026 Template</strong> to initialize your personal{" "}
+            <code className="font-mono text-xs">2026-Weekly-Accomplishment-Report.docx</code>.
           </p>
         </div>
-        <TemplateScannerCard initialReview={review} onConfirmed={(confirmed) => setReview(confirmed)} />
+        <TemplateScannerCard initialReview={null} onConfirmed={(confirmed) => setReview(confirmed)} />
       </div>
     );
   }
@@ -135,6 +156,27 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
 
   return (
     <div className="space-y-4">
+      {review.template.status === "pending_review" && (
+        <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs sm:text-sm text-indigo-950">
+          <span>
+            Auto-detected <strong>{review.fields.length} fields</strong> from{" "}
+            <code className="font-mono text-xs">{review.template.name}</code> — layout &amp; signatories preserved.
+          </span>
+          <div className="flex items-center gap-3 shrink-0">
+            <Link href="/template" className="font-medium underline underline-offset-4">
+              Review Fields
+            </Link>
+            <button
+              type="button"
+              disabled={confirming}
+              onClick={handleQuickConfirm}
+              className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60 cursor-pointer"
+            >
+              {confirming ? "Saving..." : "Looks Good"}
+            </button>
+          </div>
+        </div>
+      )}
       {profileMissingName && (
         <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs sm:text-sm text-amber-900">
           <span>Set your default intern name & verifier so every report auto-fills automatically.</span>

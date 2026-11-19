@@ -38,13 +38,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         router.push(safeNext);
         router.refresh();
       } else {
-        const { data, error: err } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
-          },
-        });
+        const { data, error: err } = await supabase.auth.signUp({ email, password });
         if (err) {
           setError(err.message);
           return;
@@ -52,8 +46,21 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         if (data.session) {
           router.push("/");
           router.refresh();
+          return;
+        }
+        // If Supabase returned no session, try signing in right away; otherwise Confirm Email is still enabled in Supabase Dashboard.
+        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInData.session) {
+          router.push("/");
+          router.refresh();
+          return;
+        }
+        if (signInErr?.message.toLowerCase().includes("confirm")) {
+          setError(
+            "Your Supabase project still has 'Confirm email' enabled. Turn it off in Supabase Dashboard -> Authentication -> Providers -> Email.",
+          );
         } else {
-          setInfo("Check your inbox to confirm your email address, then sign in.");
+          setInfo("Account created. You can sign in now.");
         }
       }
     } finally {
