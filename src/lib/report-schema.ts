@@ -104,3 +104,6 @@ export const reportDataStrictSchema = z.object(
     z.ZodString
   >,
 );
+
+/** Maximum number of turns stored/sent per conversation before asking user to Clear Chat. */
+export const MAX_CHAT_MESSAGES = 16;

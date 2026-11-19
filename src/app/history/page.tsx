@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
+import { getUserQuotaStatus } from "@/lib/admin";
 import type { ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
 import { HistoryClient, type ReportSummary } from "@/components/HistoryClient";
@@ -11,15 +12,19 @@ async function HistoryContent() {
   const { supabase, user } = await getUser();
   if (!user) redirect("/login");
 
-  const { data } = await supabase
-    .from("reports")
-    .select("id, raw_notes, structured_data, created_at, updated_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(100);
+  const [{ data }, quota] = await Promise.all([
+    supabase
+      .from("reports")
+      .select("id, title, raw_notes, structured_data, created_at, updated_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    getUserQuotaStatus(supabase, user.id, user.email),
+  ]);
 
   const reports: ReportSummary[] = (data ?? []).map((r) => ({
     id: r.id,
+    title: r.title ?? "",
     raw_notes: r.raw_notes,
     structured_data:
       r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
@@ -30,8 +35,12 @@ async function HistoryContent() {
   }));
 
   return (
-    <AppShell userEmail={user.email ?? ""}>
-      <HistoryClient initialReports={reports} />
+    <AppShell userEmail={user.email ?? ""} quota={quota}>
+      <HistoryClient
+        initialReports={reports}
+        maxReports={quota.maxReports}
+        canCreateReport={quota.canCreateReport}
+      />
     </AppShell>
   );
 }
@@ -40,7 +49,7 @@ export default function HistoryPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-sm text-slate-500">
+        <div className="min-h-screen flex items-center justify-center text-sm text-[#6B665E] bg-[#FAF9F5]">
           Loading history...
         </div>
       }

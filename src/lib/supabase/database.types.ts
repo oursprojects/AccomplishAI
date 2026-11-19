@@ -65,6 +65,7 @@ export type Database = {
           id: string;
           user_id: string;
           template_id: string | null;
+          title: string;
           raw_notes: string;
           structured_data: Json;
           chat_messages: Json;
@@ -75,6 +76,7 @@ export type Database = {
           id?: string;
           user_id?: string;
           template_id?: string | null;
+          title?: string;
           raw_notes?: string;
           structured_data?: Json;
           chat_messages?: Json;
@@ -96,11 +98,19 @@ export type Database = {
         Row: {
           id: number;
           default_daily_prompt_limit: number;
+          default_max_reports: number | null;
+          active_text_model: string;
+          active_stt_model: string;
+          max_bullets_per_day: number;
           updated_at: string;
         };
         Insert: {
           id?: number;
           default_daily_prompt_limit?: number;
+          default_max_reports?: number | null;
+          active_text_model?: string;
+          active_stt_model?: string;
+          max_bullets_per_day?: number;
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["admin_settings"]["Insert"]>;
@@ -111,6 +121,7 @@ export type Database = {
           user_id: string;
           email: string;
           custom_daily_limit: number | null;
+          custom_max_reports: number | null;
           is_blocked: boolean;
           created_at: string;
           updated_at: string;
@@ -119,6 +130,7 @@ export type Database = {
           user_id: string;
           email?: string;
           custom_daily_limit?: number | null;
+          custom_max_reports?: number | null;
           is_blocked?: boolean;
           created_at?: string;
           updated_at?: string;

@@ -12,6 +12,8 @@ const DAY_LABELS: Record<(typeof DAYS)[number], { short: string; full: string }>
 };
 
 interface ReportEditorProps {
+  title: string;
+  onTitleChange: (title: string) => void;
   data: ReportData;
   onChange: (next: ReportData) => void;
   onSave: () => void;
@@ -20,7 +22,16 @@ interface ReportEditorProps {
   hasChanges: boolean;
 }
 
-export function ReportEditor({ data, onChange, onSave, saving, savedId, hasChanges }: ReportEditorProps) {
+export function ReportEditor({
+  title,
+  onTitleChange,
+  data,
+  onChange,
+  onSave,
+  saving,
+  savedId,
+  hasChanges,
+}: ReportEditorProps) {
   function setField(key: ReportKey, value: string) {
     onChange({ ...data, [key]: value });
   }
@@ -28,10 +39,24 @@ export function ReportEditor({ data, onChange, onSave, saving, savedId, hasChang
   return (
     <div className="space-y-5">
       {/* Header metadata */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+      <div className="rounded-2xl border border-[#E6E2D8] bg-white p-4 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-900">Report Header & Period</h3>
-          <span className="text-[11px] text-slate-400">Live preview updates automatically</span>
+          <h3 className="text-sm font-semibold text-[#1F1E1C]">Report Title, Header &amp; Period</h3>
+          <span className="text-[11px] text-[#7A746B]">Live preview updates automatically</span>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-[#4A463F] mb-1">
+            Report Name (shown in History)
+          </label>
+          <input
+            type="text"
+            maxLength={120}
+            value={title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            placeholder="e.g. Week 1 — DNX Landing Page (or leave blank to use dates)"
+            className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white"
+          />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

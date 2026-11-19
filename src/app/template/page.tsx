@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
+import { getUserQuotaStatus } from "@/lib/admin";
 import { loadActiveTemplateReview } from "@/lib/templates/pipeline";
 import { AppShell } from "@/components/AppShell";
 import { TemplateScannerCard } from "@/components/TemplateScannerCard";
@@ -11,10 +12,13 @@ async function TemplateContent() {
   const { supabase, user } = await getUser();
   if (!user) redirect("/login");
 
-  const review = await loadActiveTemplateReview(supabase, user.id);
+  const [review, quota] = await Promise.all([
+    loadActiveTemplateReview(supabase, user.id),
+    getUserQuotaStatus(supabase, user.id, user.email),
+  ]);
 
   return (
-    <AppShell userEmail={user.email ?? ""}>
+    <AppShell userEmail={user.email ?? ""} quota={quota}>
       <div className="mx-auto max-w-4xl">
         <TemplateScannerCard initialReview={review} />
       </div>
@@ -26,7 +30,7 @@ export default function TemplatePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-sm text-slate-500">
+        <div className="min-h-screen flex items-center justify-center text-sm text-[#6B665E] bg-[#FAF9F5]">
           Loading template...
         </div>
       }

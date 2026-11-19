@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { reportDataStrictSchema } from "@/lib/report-schema";
+import { MAX_CHAT_MESSAGES, reportDataStrictSchema } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
 const chatMessageSchema = z.object({
@@ -12,9 +12,10 @@ const chatMessageSchema = z.object({
 });
 
 const patchReportSchema = z.object({
+  title: z.string().trim().max(120).optional(),
   rawNotes: z.string().max(15000).optional(),
   structuredData: reportDataStrictSchema.optional(),
-  chatMessages: z.array(chatMessageSchema).max(60).optional(),
+  chatMessages: z.array(chatMessageSchema).max(MAX_CHAT_MESSAGES + 10).optional(),
 });
 
 const uuidSchema = z.string().uuid();
@@ -30,8 +31,9 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
 
   const { data, error } = await supabase
     .from("reports")
-    .select("id, template_id, raw_notes, structured_data, chat_messages, created_at, updated_at")
+    .select("id, template_id, title, raw_notes, structured_data, chat_messages, created_at, updated_at")
     .eq("id", id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -53,7 +55,8 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ error: "Invalid update payload." }, { status: 400 });
   }
 
-  const updates: { raw_notes?: string; structured_data?: Json; chat_messages?: Json } = {};
+  const updates: { title?: string; raw_notes?: string; structured_data?: Json; chat_messages?: Json } = {};
+  if (parsed.data.title !== undefined) updates.title = parsed.data.title;
   if (parsed.data.rawNotes !== undefined) updates.raw_notes = parsed.data.rawNotes;
   if (parsed.data.structuredData !== undefined) {
     updates.structured_data = parsed.data.structuredData as unknown as Json;
@@ -62,11 +65,16 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     updates.chat_messages = parsed.data.chatMessages as unknown as Json;
   }
 
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from("reports")
     .update(updates)
     .eq("id", id)
-    .select("id, template_id, raw_notes, structured_data, chat_messages, created_at, updated_at")
+    .eq("user_id", user.id)
+    .select("id, template_id, title, raw_notes, structured_data, chat_messages, created_at, updated_at")
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -83,7 +91,7 @@ export async function DELETE(_request: Request, ctx: { params: Promise<{ id: str
     return NextResponse.json({ error: "Invalid report ID." }, { status: 400 });
   }
 
-  const { error } = await supabase.from("reports").delete().eq("id", id);
+  const { error } = await supabase.from("reports").delete().eq("id", id).eq("user_id", user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

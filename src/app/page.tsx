@@ -33,13 +33,18 @@ function parseChatTurns(rawChat: unknown): ChatTurn[] {
 async function WorkspaceContent({
   searchParams,
 }: {
-  searchParams: Promise<{ reportId?: string }>;
+  searchParams: Promise<{ reportId?: string; new?: string }>;
 }) {
   await connection();
   const { supabase, user } = await getUser();
   if (!user) redirect("/login");
 
-  const { reportId } = await searchParams;
+  const { reportId, new: newFlag } = await searchParams;
+  const isNewMode = newFlag === "1" && !reportId;
+
+  if (isNewMode) {
+    await supabase.from("workspace_drafts").delete().eq("user_id", user.id);
+  }
 
   const [{ data: profile }, review, quota, reportRes, draftRes] = await Promise.all([
     supabase
@@ -52,11 +57,12 @@ async function WorkspaceContent({
     reportId
       ? supabase
           .from("reports")
-          .select("id, raw_notes, structured_data, chat_messages")
+          .select("id, title, raw_notes, structured_data, chat_messages")
           .eq("id", reportId)
+          .eq("user_id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    !reportId
+    !reportId && !isNewMode
       ? supabase
           .from("workspace_drafts")
           .select("report_id, structured_data, chat_messages")
@@ -68,7 +74,7 @@ async function WorkspaceContent({
   const initialProfile = profile ?? {
     name_last_first: "",
     name_first_last: "",
-    office: "YML",
+    office: "DNX",
     default_verifier: "",
     default_daily_hours: 8,
   };
@@ -76,6 +82,7 @@ async function WorkspaceContent({
   const initialReport = reportRes.data
     ? {
         id: reportRes.data.id,
+        title: reportRes.data.title ?? "",
         raw_notes: reportRes.data.raw_notes,
         structured_data: reportDataSchema.parse(reportRes.data.structured_data ?? {}) as ReportData,
         chat_messages: parseChatTurns(reportRes.data.chat_messages),
@@ -83,7 +90,7 @@ async function WorkspaceContent({
     : null;
 
   const initialDraft =
-    !initialReport && draftRes.data
+    !initialReport && !isNewMode && draftRes.data
       ? {
           report_id: draftRes.data.report_id,
           structured_data: reportDataSchema.parse(draftRes.data.structured_data ?? {}) as ReportData,
@@ -92,8 +99,9 @@ async function WorkspaceContent({
       : null;
 
   return (
-    <AppShell userEmail={user.email ?? ""}>
+    <AppShell userEmail={user.email ?? ""} quota={quota}>
       <WorkspaceClient
+        key={initialReport?.id ?? (isNewMode ? "new-report" : "draft")}
         userId={user.id}
         profile={initialProfile}
         initialReview={review}
@@ -108,12 +116,12 @@ async function WorkspaceContent({
 export default function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ reportId?: string }>;
+  searchParams: Promise<{ reportId?: string; new?: string }>;
 }) {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-sm text-[#66645E] bg-[#FAF9F5]">
+        <div className="min-h-screen flex items-center justify-center text-sm text-[#6B665E] bg-[#FAF9F5]">
           Loading workspace...
         </div>
       }

@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Eye, RotateCcw, Save, Send, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Eraser,
+  Eye,
+  FilePlus2,
+  Save,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import type { QuotaStatus } from "@/lib/admin";
-import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
+import { DAYS, MAX_CHAT_MESSAGES, type ReportData, type ReportKey } from "@/lib/report-schema";
 import { VoiceRecorder } from "./VoiceRecorder";
 import { ChatMarkdown } from "./ChatMarkdown";
 
@@ -24,6 +33,7 @@ interface ReportChatProps {
   onMessagesChange: (next: ChatTurn[]) => void;
   onDataChange: (next: ReportData) => void;
   onQuotaChange: (next: QuotaStatus) => void;
+  onClearChat: () => void;
   onNewReport: () => void;
   onOpenPreview: () => void;
   onSaveReport: () => void;
@@ -55,6 +65,7 @@ export function ReportChat({
   onMessagesChange,
   onDataChange,
   onQuotaChange,
+  onClearChat,
   onNewReport,
   onOpenPreview,
   onSaveReport,
@@ -72,10 +83,14 @@ export function ReportChat({
 
   const missing = getMissingSummary(data);
   const quotaBlocked = !quota.allowed;
+  const contextCount = messages.length;
+  const contextAtLimit = contextCount >= MAX_CHAT_MESSAGES;
+  const contextNearLimit = !contextAtLimit && contextCount >= MAX_CHAT_MESSAGES - 4;
+  const composerDisabled = sending || quotaBlocked || contextAtLimit;
 
   async function sendMessage(textOverride?: string) {
     const text = (textOverride ?? input).trim();
-    if (!text || sending || quotaBlocked) return;
+    if (!text || composerDisabled) return;
 
     setError(null);
     const userTurn: ChatTurn = { id: `u-${++turnSeqRef.current}`, role: "user", content: text };
@@ -89,6 +104,7 @@ export function ReportChat({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reportId: savedId,
           messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
           currentData: data,
         }),
@@ -124,16 +140,16 @@ export function ReportChat({
   }
 
   return (
-    <section className="rounded-2xl border border-[#E6E4DD] bg-white shadow-xs overflow-hidden flex flex-col">
+    <section className="rounded-2xl border border-[#E6E2D8] bg-white shadow-xs overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="border-b border-[#E6E4DD] px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-[#F7F6F0]">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#D97757] text-white shadow-2xs">
+      <div className="border-b border-[#E6E2D8] px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-[#F7F6F0]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#D97757] text-white shadow-2xs shrink-0">
             <Sparkles className="h-4 w-4" />
           </span>
-          <div>
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-[#1F1E1C] leading-tight">Report Assistant</h2>
-            <p className="text-[11px] text-[#66645E]">
+            <p className="text-[11px] text-[#6B665E] truncate">
               {missing.length === 0
                 ? "All main fields filled — ready to download or save"
                 : "Share what you have — edit any blank fields manually anytime"}
@@ -141,33 +157,44 @@ export function ReportChat({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Context counter pill */}
           <span
+            title="Messages in current conversation context. Clearing chat keeps all filled document fields intact."
             className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
-              quota.isAdmin
-                ? "bg-[#D97757]/12 text-[#C96442] border-[#D97757]/30"
-                : quotaBlocked
-                  ? "bg-red-50 text-red-700 border-red-200"
+              contextAtLimit
+                ? "bg-red-50 text-red-700 border-red-200"
+                : contextNearLimit
+                  ? "bg-amber-50 text-amber-800 border-amber-200"
                   : "bg-white text-[#57544E] border-[#E0DDD3]"
             }`}
           >
-            {quota.isAdmin
-              ? "Admin · Unlimited"
-              : quota.isBlocked
-                ? "AI Paused"
-                : `${quota.remaining}/${quota.dailyLimit} prompts`}
+            {contextCount}/{MAX_CHAT_MESSAGES} ctx
           </span>
+
+          {messages.length > 1 && (
+            <button
+              type="button"
+              onClick={onClearChat}
+              disabled={sending}
+              title="Delete chat messages only — keeps your filled .docx document intact"
+              className="inline-flex items-center gap-1 rounded-xl border border-[#DDD7CB] bg-white px-2.5 py-1 text-xs font-medium text-[#4A463F] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
+            >
+              <Eraser className="h-3 w-3 text-[#D97757]" />
+              <span>Clear Chat</span>
+            </button>
+          )}
 
           {(savedId || messages.length > 1 || hasChanges) && (
             <button
               type="button"
               onClick={onNewReport}
               disabled={sending}
-              title="Delete conversation and reset report"
-              className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 cursor-pointer"
+              title="Start a separate blank report and fresh conversation"
+              className="inline-flex items-center gap-1 rounded-xl border border-[#DDD7CB] bg-white px-2.5 py-1 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
             >
-              <RotateCcw className="h-3 w-3" />
-              <span>Reset</span>
+              <FilePlus2 className="h-3 w-3 text-[#D97757]" />
+              <span>New Report</span>
             </button>
           )}
         </div>
@@ -184,7 +211,7 @@ export function ReportChat({
               className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-2xs ${
                 m.role === "user"
                   ? "bg-[#1F1E1C] text-white rounded-br-sm whitespace-pre-wrap"
-                  : "bg-white border border-[#E6E4DD] text-[#1F1E1C] rounded-bl-sm"
+                  : "bg-white border border-[#E6E2D8] text-[#1F1E1C] rounded-bl-sm"
               }`}
             >
               {m.role === "assistant" ? <ChatMarkdown content={m.content} /> : m.content}
@@ -215,13 +242,33 @@ export function ReportChat({
 
         {sending && (
           <div className="flex items-start">
-            <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-[#E6E4DD] bg-white px-3.5 py-2.5 text-xs text-[#66645E] animate-pulse">
-              <Sparkles className="h-3.5 w-3.5 text-[#C96442]" />
+            <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-[#E6E2D8] bg-white px-3.5 py-2.5 text-xs text-[#6B665E] animate-pulse">
+              <Sparkles className="h-3.5 w-3.5 text-[#D97757]" />
               <span>Updating your document...</span>
             </div>
           </div>
         )}
       </div>
+
+      {/* Context limit warning banner */}
+      {contextAtLimit && (
+        <div className="mx-3.5 my-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-700 shrink-0" />
+            <span>
+              Chat context limit reached ({MAX_CHAT_MESSAGES} messages). Clear the chat to keep going — your document
+              data stays untouched.
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={onClearChat}
+            className="rounded-lg bg-amber-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-800 cursor-pointer"
+          >
+            Clear Chat (Keep Document)
+          </button>
+        </div>
+      )}
 
       {/* Quick helper chips */}
       <div className="border-t border-[#ECEAE2] bg-white px-3.5 py-2 flex items-center gap-1.5 overflow-x-auto">
@@ -229,9 +276,9 @@ export function ReportChat({
           <button
             key={q}
             type="button"
-            disabled={sending || quotaBlocked}
+            disabled={composerDisabled}
             onClick={() => void sendMessage(q)}
-            className="shrink-0 rounded-full border border-[#E6E4DD] bg-[#FAF9F5] px-2.5 py-1 text-[11px] font-medium text-[#57544E] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
+            className="shrink-0 rounded-full border border-[#E6E2D8] bg-[#FAF9F5] px-2.5 py-1 text-[11px] font-medium text-[#57544E] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
           >
             {q}
           </button>
@@ -250,7 +297,7 @@ export function ReportChat({
           e.preventDefault();
           void sendMessage();
         }}
-        className="border-t border-[#E6E4DD] bg-white p-3 space-y-2.5"
+        className="border-t border-[#E6E2D8] bg-white p-3 space-y-2.5"
       >
         <textarea
           rows={3}
@@ -262,23 +309,27 @@ export function ReportChat({
               void sendMessage();
             }
           }}
-          disabled={sending || quotaBlocked}
-          placeholder="Tell me what you did this week (English or Tagalog)... Enter to send"
-          className="w-full rounded-xl border border-[#E0DDD3] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#1F1E1C] focus:bg-white resize-none disabled:opacity-60"
+          disabled={composerDisabled}
+          placeholder={
+            contextAtLimit
+              ? "Click 'Clear Chat' to continue chatting — your document fields remain filled."
+              : "Tell me what you did this week (English or Tagalog)... Enter to send"
+          }
+          className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white resize-none disabled:opacity-60"
         />
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <VoiceRecorder
               compact
-              disabled={sending || quota.isBlocked}
+              disabled={composerDisabled}
               onTranscript={(text) => setInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text))}
             />
             <button
               type="button"
               onClick={onSaveReport}
               disabled={saving || !hasChanges}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#E0DDD3] bg-white px-3 py-2 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#DDD7CB] bg-white px-3 py-2 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
             >
               {hasChanges ? <Save className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5 text-emerald-600" />}
               <span>{saving ? "Saving..." : !hasChanges ? "Saved" : savedId ? "Update" : "Save"}</span>
@@ -286,7 +337,7 @@ export function ReportChat({
             <button
               type="button"
               onClick={onOpenPreview}
-              className="lg:hidden inline-flex items-center gap-1 rounded-xl border border-[#E0DDD3] bg-white px-3 py-2 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] cursor-pointer"
+              className="lg:hidden inline-flex items-center gap-1 rounded-xl border border-[#DDD7CB] bg-white px-3 py-2 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] cursor-pointer"
             >
               <Eye className="h-3.5 w-3.5" />
               <span>Preview</span>
@@ -295,8 +346,8 @@ export function ReportChat({
 
           <button
             type="submit"
-            disabled={sending || !input.trim() || quotaBlocked}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#D97757] px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-[#C96442] disabled:opacity-50 transition cursor-pointer shadow-2xs"
+            disabled={composerDisabled || !input.trim()}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#D97757] px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-[#C86343] disabled:opacity-50 transition cursor-pointer shadow-2xs"
           >
             <Send className="h-3.5 w-3.5" />
             <span>{sending ? "Sending..." : "Send"}</span>

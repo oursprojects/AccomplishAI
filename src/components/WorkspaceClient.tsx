@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, Edit3, Eye, MessageSquareText, Save, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, Edit3, Eye, FilePlus2, FileText, MessageSquareText, Save, Sparkles } from "lucide-react";
 import { emptyReport, type ReportData } from "@/lib/report-schema";
 import type { Profile } from "@/lib/supabase/database.types";
 import type { TemplateReview } from "@/lib/templates/pipeline";
@@ -18,6 +19,7 @@ interface WorkspaceClientProps {
   initialReview: TemplateReview | null;
   initialReport: {
     id: string;
+    title: string;
     raw_notes: string;
     structured_data: ReportData;
     chat_messages: ChatTurn[];
@@ -44,14 +46,14 @@ function seedData(
       ...draft.structured_data,
       intern_name_last_first: draft.structured_data.intern_name_last_first || profile.name_last_first || "",
       intern_name_first_last: draft.structured_data.intern_name_first_last || profile.name_first_last || "",
-      office: draft.structured_data.office || profile.office || "YML",
+      office: draft.structured_data.office || profile.office || "DNX",
     };
   }
   return {
     ...emptyReport(),
     intern_name_last_first: profile.name_last_first || "",
     intern_name_first_last: profile.name_first_last || "",
-    office: profile.office || "YML",
+    office: profile.office || "DNX",
   };
 }
 
@@ -64,12 +66,12 @@ function buildWelcomeMessage(
       id: "welcome-existing",
       role: "assistant",
       content:
-        "I loaded your saved report. Tell me anything you'd like to add or update, and I'll update the preview.",
+        "Loaded your saved report. Tell me anything you'd like to add or adjust, and I'll update this report's preview.",
     };
   }
 
   const intro = profile.name_first_last
-    ? `Hi **${profile.name_first_last}**! Your name and office (**${profile.office || "YML"}**) are pre-filled.`
+    ? `Hi **${profile.name_first_last}**! Your name and office (**${profile.office || "DNX"}**) are pre-filled.`
     : `Hi! Paste or speak your weekly notes *(English or Tagalog)* and I'll put them straight into your **2026 Weekly Accomplishment Report**.`;
 
   return {
@@ -79,8 +81,9 @@ function buildWelcomeMessage(
   };
 }
 
-function snapshotOf(data: ReportData, messages: ChatTurn[]): string {
+function snapshotOf(title: string, data: ReportData, messages: ChatTurn[]): string {
   return JSON.stringify({
+    title: title.trim(),
     data,
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   });
@@ -94,8 +97,10 @@ export function WorkspaceClient({
   initialDraft,
   initialQuota,
 }: WorkspaceClientProps) {
+  const router = useRouter();
   const [review, setReview] = useState<TemplateReview | null>(initialReview);
   const [quota, setQuota] = useState<QuotaStatus>(initialQuota);
+  const [title, setTitle] = useState<string>(() => initialReport?.title ?? "");
   const [data, setData] = useState<ReportData>(() => seedData(profile, initialReport, initialDraft));
   const [savedId, setSavedId] = useState<string | null>(initialReport?.id ?? initialDraft?.report_id ?? null);
   const [messages, setMessages] = useState<ChatTurn[]>(() => {
@@ -104,25 +109,23 @@ export function WorkspaceClient({
     return [buildWelcomeMessage(profile, initialReport)];
   });
 
-  // Track last-saved state so Save is disabled whenever there are no unsaved edits
   const [savedSnapshot, setSavedSnapshot] = useState<string>(() => {
     if (initialReport) {
       const initData = seedData(profile, initialReport, null);
       const initMsgs = initialReport.chat_messages.length
         ? initialReport.chat_messages
         : [buildWelcomeMessage(profile, initialReport)];
-      return snapshotOf(initData, initMsgs);
+      return snapshotOf(initialReport.title ?? "", initData, initMsgs);
     }
     if (initialDraft && (initialDraft.chat_messages.length > 0 || Object.values(initialDraft.structured_data).some(Boolean))) {
-      // Unsaved cross-device draft still has unsaved changes relative to empty report
       return "";
     }
     const freshData = seedData(profile, null, null);
     const freshMsgs = [buildWelcomeMessage(profile, null)];
-    return snapshotOf(freshData, freshMsgs);
+    return snapshotOf("", freshData, freshMsgs);
   });
 
-  const currentSnapshot = useMemo(() => snapshotOf(data, messages), [data, messages]);
+  const currentSnapshot = useMemo(() => snapshotOf(title, data, messages), [title, data, messages]);
   const hasChanges = currentSnapshot !== savedSnapshot;
 
   const [tab, setTab] = useState<WorkspaceTab>(initialReport ? "edit" : "chat");
@@ -137,23 +140,37 @@ export function WorkspaceClient({
   useEffect(() => {
     if (!hasChanges && !initialDraft) return;
     const timer = window.setTimeout(() => {
+      const serialized = messages.map(({ id, role, content, toolActions }) => ({
+        id,
+        role,
+        content,
+        ...(toolActions ? { toolActions } : {}),
+      }));
+
+      if (savedId) {
+        void fetch(`/api/reports/${savedId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title.trim(),
+            structuredData: data,
+            chatMessages: serialized,
+          }),
+        }).catch(() => {});
+      }
+
       void fetch("/api/workspace-draft", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           reportId: savedId,
           structuredData: data,
-          chatMessages: messages.map(({ id, role, content, toolActions }) => ({
-            id,
-            role,
-            content,
-            ...(toolActions ? { toolActions } : {}),
-          })),
+          chatMessages: serialized,
         }),
       }).catch(() => {});
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [userId, savedId, data, messages, hasChanges, initialDraft]);
+  }, [userId, savedId, title, data, messages, hasChanges, initialDraft]);
 
   async function handleQuickConfirm() {
     if (!review) return;
@@ -202,17 +219,26 @@ export function WorkspaceClient({
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          title: title.trim(),
           templateId: review?.template.id ?? null,
           rawNotes,
           structuredData: data,
           chatMessages: serializedMsgs,
         }),
       });
-      const json = (await res.json()) as { report?: { id: string }; error?: string };
+      const json = (await res.json()) as { report?: { id: string }; quota?: QuotaStatus; error?: string };
+      if (json.quota) setQuota(json.quota);
       if (!res.ok || !json.report) throw new Error(json.error ?? "Could not save report.");
 
       setSavedId(json.report.id);
       setSavedSnapshot(currentSnapshot);
+      if (!savedId) {
+        setQuota((prev) => ({
+          ...prev,
+          reportsCount: prev.reportsCount + 1,
+          canCreateReport: prev.isAdmin || prev.maxReports === null || prev.reportsCount + 1 < prev.maxReports,
+        }));
+      }
       setNotice(savedId ? "Saved changes to report history." : "Report saved to history.");
 
       void fetch("/api/workspace-draft", {
@@ -231,24 +257,65 @@ export function WorkspaceClient({
     }
   }
 
-  function handleResetConversation() {
+  /**
+   * Clears ONLY the chat messages so the context counter resets while all filled
+   * .docx report fields and saved state remain intact.
+   */
+  function handleClearChat() {
+    const freshMsgs: ChatTurn[] = [
+      {
+        id: "cleared-chat",
+        role: "assistant",
+        content:
+          "Conversation reset. **All existing fields in your report document were kept intact.** Send more updates anytime!",
+      },
+    ];
+    setMessages(freshMsgs);
+    setNotice("Conversation cleared. Your report fields remain filled.");
+    setError(null);
+
+    const serialized = freshMsgs.map(({ id, role, content }) => ({ id, role, content }));
+    if (savedId) {
+      void fetch(`/api/reports/${savedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatMessages: serialized }),
+      }).catch(() => {});
+    }
+    void fetch("/api/workspace-draft", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reportId: savedId,
+        structuredData: data,
+        chatMessages: serialized,
+      }),
+    }).catch(() => {});
+  }
+
+  /** Starts a completely separate blank report and fresh conversation. */
+  function handleNewReport() {
     const freshData = seedData(profile, null, null);
     const freshMsgs = [buildWelcomeMessage(profile, null)];
     setSavedId(null);
+    setTitle("");
     setData(freshData);
     setMessages(freshMsgs);
-    setSavedSnapshot(snapshotOf(freshData, freshMsgs));
-    setNotice("Conversation deleted and report reset across all devices.");
+    setSavedSnapshot(snapshotOf("", freshData, freshMsgs));
+    setNotice("Started a brand-new blank report and conversation.");
     setError(null);
     setTab("chat");
     setDesktopLeftMode("chat");
     void fetch("/api/workspace-draft", { method: "DELETE" }).catch(() => {});
+    if (initialReport) {
+      router.replace("/?new=1");
+    }
   }
 
   if (!review) {
     return (
       <div className="mx-auto max-w-3xl space-y-4">
-        <div className="rounded-2xl border border-[#D97757]/30 bg-[#D97757]/10 p-4 text-sm text-[#1F1E1C]">
+        <div className="rounded-2xl border border-[#D97757]/30 bg-[#FDF3EF] p-4 text-sm text-[#1F1E1C]">
           <p className="font-semibold">Template Setup</p>
           <p className="mt-1 text-xs sm:text-sm text-[#57544E]">
             Click <strong>Auto-Scan 2026 Template</strong> to initialize your personal{" "}
@@ -261,27 +328,69 @@ export function WorkspaceClient({
   }
 
   const profileMissingName = !profile.name_last_first || !profile.name_first_last;
+  const fallbackTitle = [data.date_from, data.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-6">
+      {/* Compact active report bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[#E6E2D8] bg-white px-4 py-2.5 shadow-2xs">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <FileText className="h-4 w-4 text-[#D97757] shrink-0" />
+          <input
+            type="text"
+            maxLength={120}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={fallbackTitle}
+            aria-label="Report title"
+            className="min-w-0 w-full max-w-md bg-transparent text-sm font-semibold text-[#1F1E1C] placeholder:text-[#6B665E] outline-none border-b border-transparent focus:border-[#D97757] py-0.5 transition"
+          />
+          {savedId && (
+            <span className="hidden sm:inline-flex rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-medium text-emerald-700 shrink-0">
+              Saved Report
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleNewReport}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-1.5 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] cursor-pointer"
+          >
+            <FilePlus2 className="h-3.5 w-3.5 text-[#D97757]" />
+            <span>New Report</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !hasChanges}
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#33312E] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {hasChanges ? <Save className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+            <span>{saving ? "Saving..." : !hasChanges ? "Saved" : savedId ? "Update Report" : "Save Report"}</span>
+          </button>
+        </div>
+      </div>
+
       {review.template.status === "pending_review" && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#D97757]/30 bg-[#D97757]/10 px-4 py-2.5 text-xs sm:text-sm text-[#1F1E1C]">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#D97757]/30 bg-[#FDF3EF] px-4 py-2.5 text-xs sm:text-sm text-[#1F1E1C]">
           <span className="inline-flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#C96442] shrink-0" />
+            <Sparkles className="h-4 w-4 text-[#C86343] shrink-0" />
             <span>
               Auto-detected <strong>{review.fields.length} fields</strong> from{" "}
               <code className="font-mono text-xs">{review.template.name}</code> — original design preserved.
             </span>
           </span>
           <div className="flex items-center gap-3 shrink-0">
-            <Link href="/template" className="font-medium underline underline-offset-4 text-[#C96442]">
+            <Link href="/template" className="font-medium underline underline-offset-4 text-[#C86343]">
               Review Fields
             </Link>
             <button
               type="button"
               disabled={confirming}
               onClick={handleQuickConfirm}
-              className="rounded-xl bg-[#D97757] px-3 py-1 text-xs font-medium text-white hover:bg-[#C96442] disabled:opacity-60 cursor-pointer"
+              className="rounded-xl bg-[#D97757] px-3 py-1 text-xs font-medium text-white hover:bg-[#C86343] disabled:opacity-60 cursor-pointer"
             >
               {confirming ? "Saving..." : "Looks Good"}
             </button>
@@ -299,7 +408,7 @@ export function WorkspaceClient({
       )}
 
       {/* Mobile tab bar */}
-      <div className="lg:hidden sticky top-[57px] z-20 grid grid-cols-3 rounded-2xl border border-[#E6E4DD] bg-white/95 backdrop-blur p-1 shadow-xs">
+      <div className="lg:hidden sticky top-[57px] z-20 grid grid-cols-3 rounded-2xl border border-[#E6E2D8] bg-white/95 backdrop-blur p-1 shadow-xs">
         <button
           type="button"
           onClick={() => setTab("chat")}
@@ -344,7 +453,7 @@ export function WorkspaceClient({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left column: Chatbot + Manual Editor */}
         <div className="lg:col-span-6 space-y-4">
-          <div className="hidden lg:grid grid-cols-2 rounded-2xl border border-[#E6E4DD] bg-white p-1 shadow-2xs">
+          <div className="hidden lg:grid grid-cols-2 rounded-2xl border border-[#E6E2D8] bg-white p-1 shadow-2xs">
             <button
               type="button"
               onClick={() => setDesktopLeftMode("chat")}
@@ -381,7 +490,8 @@ export function WorkspaceClient({
               onMessagesChange={setMessages}
               onDataChange={setData}
               onQuotaChange={setQuota}
-              onNewReport={handleResetConversation}
+              onClearChat={handleClearChat}
+              onNewReport={handleNewReport}
               onOpenPreview={() => setTab("preview")}
               onSaveReport={handleSave}
               saving={saving}
@@ -394,6 +504,8 @@ export function WorkspaceClient({
             }`}
           >
             <ReportEditor
+              title={title}
+              onTitleChange={setTitle}
               data={data}
               onChange={setData}
               onSave={handleSave}

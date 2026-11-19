@@ -2,40 +2,43 @@ import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { getManilaDayStartIso, isAdminEmail } from "@/lib/admin";
+import {
+  ALLOWED_STT_MODELS,
+  ALLOWED_TEXT_MODELS,
+  getManilaDayStartIso,
+  isAdminEmail,
+  loadAdminDashboardData,
+} from "@/lib/admin";
 import { publicEnv } from "@/lib/env";
 import type { Database } from "@/lib/supabase/database.types";
 
-export interface AdminMember {
-  userId: string;
-  email: string;
-  nameLastFirst: string;
-  office: string;
-  customDailyLimit: number | null;
-  effectiveDailyLimit: number;
-  isBlocked: boolean;
-  isAdmin: boolean;
-  usedToday: number;
-  usedTotal: number;
-  reportsCount: number;
-  createdAt: string;
-}
+const textModelIds = ALLOWED_TEXT_MODELS.map((m) => m.id) as [string, ...string[]];
+const sttModelIds = ALLOWED_STT_MODELS.map((m) => m.id) as [string, ...string[]];
 
 const createMemberSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
   password: z.string().min(6, "Password must be at least 6 characters.").max(128),
   customDailyLimit: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+  customMaxReports: z.coerce.number().int().min(1).max(10000).nullable().optional(),
 });
 
 const patchSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("update_default_limit"),
     defaultDailyLimit: z.coerce.number().int().min(0).max(1000),
+    defaultMaxReports: z.coerce.number().int().min(1).max(10000).nullable().optional(),
+  }),
+  z.object({
+    action: z.literal("update_ai_settings"),
+    activeTextModel: z.enum(textModelIds),
+    activeSttModel: z.enum(sttModelIds),
+    maxBulletsPerDay: z.coerce.number().int().min(1).max(5),
   }),
   z.object({
     action: z.literal("update_member"),
     userId: z.string().uuid(),
     customDailyLimit: z.coerce.number().int().min(0).max(1000).nullable(),
+    customMaxReports: z.coerce.number().int().min(1).max(10000).nullable().optional(),
     isBlocked: z.boolean(),
   }),
   z.object({
@@ -44,74 +47,13 @@ const patchSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-async function loadAdminData(supabase: Awaited<ReturnType<typeof getUser>>["supabase"]) {
-  const dayStart = getManilaDayStartIso();
-
-  const [
-    { data: settings },
-    { data: quotas, error: qErr },
-    { data: profiles },
-    { data: logs },
-    { data: reports },
-  ] = await Promise.all([
-    supabase.from("admin_settings").select("default_daily_prompt_limit").eq("id", 1).maybeSingle(),
-    supabase
-      .from("user_quotas")
-      .select("user_id, email, custom_daily_limit, is_blocked, created_at")
-      .order("created_at", { ascending: true }),
-    supabase.from("profiles").select("id, name_last_first, office"),
-    supabase.from("prompt_usage_logs").select("user_id, created_at"),
-    supabase.from("reports").select("user_id"),
-  ]);
-
-  if (qErr) throw new Error(qErr.message);
-
-  const defaultDailyLimit = settings?.default_daily_prompt_limit ?? 15;
-  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
-
-  const todayMap = new Map<string, number>();
-  const totalMap = new Map<string, number>();
-  for (const log of logs ?? []) {
-    totalMap.set(log.user_id, (totalMap.get(log.user_id) ?? 0) + 1);
-    if (log.created_at >= dayStart) {
-      todayMap.set(log.user_id, (todayMap.get(log.user_id) ?? 0) + 1);
-    }
-  }
-
-  const reportMap = new Map<string, number>();
-  for (const r of reports ?? []) {
-    reportMap.set(r.user_id, (reportMap.get(r.user_id) ?? 0) + 1);
-  }
-
-  const members: AdminMember[] = (quotas ?? []).map((q) => {
-    const p = profileMap.get(q.user_id);
-    const admin = isAdminEmail(q.email);
-    return {
-      userId: q.user_id,
-      email: q.email,
-      nameLastFirst: p?.name_last_first ?? "",
-      office: p?.office ?? "YML",
-      customDailyLimit: q.custom_daily_limit,
-      effectiveDailyLimit: q.custom_daily_limit ?? defaultDailyLimit,
-      isBlocked: !admin && q.is_blocked,
-      isAdmin: admin,
-      usedToday: todayMap.get(q.user_id) ?? 0,
-      usedTotal: totalMap.get(q.user_id) ?? 0,
-      reportsCount: reportMap.get(q.user_id) ?? 0,
-      createdAt: q.created_at,
-    };
-  });
-
-  return { defaultDailyLimit, members };
-}
-
 export async function GET() {
   const { supabase, user } = await getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isAdminEmail(user.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
-    const data = await loadAdminData(supabase);
+    const data = await loadAdminDashboardData(supabase);
     return NextResponse.json(data);
   } catch (err) {
     return NextResponse.json(
@@ -131,7 +73,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid account details." }, { status: 400 });
   }
 
-  const { email, password, customDailyLimit } = parsed.data;
+  const { email, password, customDailyLimit, customMaxReports } = parsed.data;
 
   try {
     let createdUserId: string | null = null;
@@ -168,12 +110,13 @@ export async function POST(request: Request) {
             user_id: createdUserId,
             email,
             custom_daily_limit: customDailyLimit ?? null,
+            custom_max_reports: customMaxReports ?? null,
           },
           { onConflict: "user_id" },
         );
     }
 
-    const data = await loadAdminData(supabase);
+    const data = await loadAdminDashboardData(supabase);
     return NextResponse.json({ ...data, needsConfirmWarning }, { status: 201 });
   } catch (err) {
     return NextResponse.json(
@@ -198,13 +141,34 @@ export async function PATCH(request: Request) {
     if (body.action === "update_default_limit") {
       const { error } = await supabase
         .from("admin_settings")
-        .upsert({ id: 1, default_daily_prompt_limit: body.defaultDailyLimit }, { onConflict: "id" });
+        .upsert(
+          {
+            id: 1,
+            default_daily_prompt_limit: body.defaultDailyLimit,
+            default_max_reports: body.defaultMaxReports ?? null,
+          },
+          { onConflict: "id" },
+        );
+      if (error) throw new Error(error.message);
+    } else if (body.action === "update_ai_settings") {
+      const { error } = await supabase
+        .from("admin_settings")
+        .upsert(
+          {
+            id: 1,
+            active_text_model: body.activeTextModel,
+            active_stt_model: body.activeSttModel,
+            max_bullets_per_day: body.maxBulletsPerDay,
+          },
+          { onConflict: "id" },
+        );
       if (error) throw new Error(error.message);
     } else if (body.action === "update_member") {
       const { error } = await supabase
         .from("user_quotas")
         .update({
           custom_daily_limit: body.customDailyLimit,
+          custom_max_reports: body.customMaxReports ?? null,
           is_blocked: body.isBlocked,
         })
         .eq("user_id", body.userId);
@@ -218,11 +182,11 @@ export async function PATCH(request: Request) {
       if (error) throw new Error(error.message);
     }
 
-    const data = await loadAdminData(supabase);
+    const data = await loadAdminDashboardData(supabase);
     return NextResponse.json(data);
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to update settings." },
+      { error: err instanceof Error ? err.message : "Update failed." },
       { status: 500 },
     );
   }

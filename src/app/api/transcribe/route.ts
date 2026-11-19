@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 import { getUser } from "@/lib/supabase/server";
-import { getUserQuotaStatus } from "@/lib/admin";
+import { getAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import { getGroq, GROQ_STT_FALLBACK_MODEL, GROQ_STT_MODEL, groqErrorResponse } from "@/lib/ai/groq";
 
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
@@ -10,13 +10,20 @@ export async function POST(request: Request) {
   const { supabase, user } = await getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const quota = await getUserQuotaStatus(supabase, user.id, user.email);
+  const [quota, aiSettings] = await Promise.all([
+    getUserQuotaStatus(supabase, user.id, user.email),
+    getAiSettings(supabase),
+  ]);
+
   if (quota.isBlocked) {
     return NextResponse.json(
       { error: "Your AI access is currently paused by the admin." },
       { status: 403 },
     );
   }
+
+  const primaryModel = aiSettings.activeSttModel || GROQ_STT_MODEL;
+  const fallbackModel = primaryModel === GROQ_STT_MODEL ? GROQ_STT_FALLBACK_MODEL : GROQ_STT_MODEL;
 
   try {
     const form = await request.formData();
@@ -29,13 +36,13 @@ export async function POST(request: Request) {
     }
 
     const prompt =
-      "Weekly accomplishment report notes for a student intern: Monday, Tuesday, Wednesday, Thursday, Friday, hours worked, office YML, trainings, problems encountered, solutions done.";
+      "Weekly accomplishment report notes for a student intern: Monday, Tuesday, Wednesday, Thursday, Friday, hours worked, office DNX, trainings, problems encountered, solutions done.";
 
     let transcription;
     try {
       transcription = await getGroq().audio.transcriptions.create({
         file: audio,
-        model: GROQ_STT_MODEL,
+        model: primaryModel,
         response_format: "json",
         prompt,
       });
@@ -43,7 +50,7 @@ export async function POST(request: Request) {
       if (err instanceof Groq.APIError && (err.status === 429 || err.status === 404)) {
         transcription = await getGroq().audio.transcriptions.create({
           file: audio,
-          model: GROQ_STT_FALLBACK_MODEL,
+          model: fallbackModel,
           response_format: "json",
           prompt,
         });

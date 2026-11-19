@@ -33,8 +33,11 @@ export async function groqJson<T = unknown>(opts: {
   user: string;
   temperature?: number;
   maxTokens?: number;
+  preferredModel?: string;
 }): Promise<{ data: T; usage?: Groq.CompletionUsage; model: string }> {
-  const models = [GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS];
+  const models = opts.preferredModel
+    ? [opts.preferredModel, ...[GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS].filter((m) => m !== opts.preferredModel)]
+    : [GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS];
   let lastError: unknown;
 
   for (const model of models) {
@@ -97,6 +100,10 @@ export async function groqChatWithTools(opts: {
   throw lastError;
 }
 
+function redactSecrets(text: string): string {
+  return text.replace(/gsk_[A-Za-z0-9_-]+/gi, "[redacted]").replace(/sb_[a-z]+_[A-Za-z0-9_-]+/gi, "[redacted]");
+}
+
 /** Maps Groq SDK errors to an HTTP status + user-safe message. */
 export function groqErrorResponse(err: unknown): { status: number; message: string } {
   if (err instanceof MissingGroqKeyError) return { status: 500, message: err.message };
@@ -104,9 +111,9 @@ export function groqErrorResponse(err: unknown): { status: number; message: stri
     if (err.status === 429) {
       return { status: 429, message: "Groq rate limit reached across active models. Please wait a minute and retry." };
     }
-    if (err.status === 401) return { status: 500, message: "Groq API key is invalid." };
-    return { status: 502, message: `Groq error: ${err.message}` };
+    if (err.status === 401) return { status: 500, message: "AI service authentication error." };
+    return { status: 502, message: `Groq error: ${redactSecrets(err.message)}` };
   }
   if (err instanceof SyntaxError) return { status: 502, message: "AI returned malformed JSON. Please retry." };
-  return { status: 500, message: err instanceof Error ? err.message : "Unknown error" };
+  return { status: 500, message: err instanceof Error ? redactSecrets(err.message) : "Unknown error" };
 }

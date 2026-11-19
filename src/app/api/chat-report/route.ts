@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { getUserQuotaStatus } from "@/lib/admin";
+import { getAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import { groqErrorResponse } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage, type GroqTool } from "@/lib/ai/chat-tools";
 import type { Json } from "@/lib/supabase/database.types";
 import {
   DAYS,
   isReportKey,
+  MAX_CHAT_MESSAGES,
   REPORT_FIELD_META,
   REPORT_KEYS,
   reportDataStrictSchema,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/report-schema";
 
 const requestSchema = z.object({
+  reportId: z.string().uuid().nullable().optional(),
   messages: z
     .array(
       z.object({
@@ -24,19 +26,19 @@ const requestSchema = z.object({
       }),
     )
     .min(1)
-    .max(20),
+    .max(MAX_CHAT_MESSAGES + 4),
   currentData: reportDataStrictSchema,
 });
 
 const BULLET_PREFIX = /^\s*(?:[-*•▪◦·–—]|\d+[.)])\s+/gm;
 const INLINE_MARKDOWN = /[*_`]/g;
 
-function cleanFieldValue(key: ReportKey, raw: unknown): string {
+function cleanFieldValue(key: ReportKey, raw: unknown, maxDayBullets: number): string {
   if (raw === null || raw === undefined) return "";
   const str = (Array.isArray(raw) ? raw.map(String).join("\n") : String(raw)).replace(INLINE_MARKDOWN, "");
   if (REPORT_FIELD_META[key].kind === "list") {
     const isReflection = key === "new_trainings" || key === "problems_encountered" || key === "solutions_done";
-    const maxLines = isReflection ? 2 : 3;
+    const maxLines = isReflection ? 2 : maxDayBullets;
     return str
       .split(/\r?\n/)
       .map((l) => l.replace(BULLET_PREFIX, "").trim().slice(0, 100))
@@ -70,19 +72,6 @@ function computeStatus(data: ReportData) {
   const anyDayFilled = DAYS.some((d) => data[`${d}_accomplishments`].trim().length > 0);
   if (!anyDayFilled) {
     missingEssential.push({ key: "mon_accomplishments", label: "Daily Accomplishments (Mon–Fri)" });
-  } else {
-    const dayNames: Record<(typeof DAYS)[number], string> = {
-      mon: "Monday",
-      tue: "Tuesday",
-      wed: "Wednesday",
-      thu: "Thursday",
-      fri: "Friday",
-    };
-    for (const d of DAYS) {
-      if (!data[`${d}_accomplishments`].trim()) {
-        missingDetails.push({ key: `${d}_accomplishments`, label: `${dayNames[d]} accomplishments (if worked)` });
-      }
-    }
   }
 
   if (!data.hours_this_week.trim()) {
@@ -90,15 +79,6 @@ function computeStatus(data: ReportData) {
   }
   if (!data.total_hours_worked.trim()) {
     missingDetails.push({ key: "total_hours_worked", label: "Total Hours Worked (previous + this week)" });
-  }
-  if (!data.new_trainings.trim()) {
-    missingDetails.push({ key: "new_trainings", label: "New trainings (or None)" });
-  }
-  if (!data.problems_encountered.trim()) {
-    missingDetails.push({ key: "problems_encountered", label: "Problems encountered (or None)" });
-  }
-  if (!data.solutions_done.trim()) {
-    missingDetails.push({ key: "solutions_done", label: "Solutions done (or None)" });
   }
 
   return {
@@ -125,7 +105,7 @@ const TOOLS: GroqTool[] = [
                 type: "string",
                 description:
                   REPORT_FIELD_META[k].kind === "list"
-                    ? `${REPORT_FIELD_META[k].description}. 1-3 concise formal lines separated by \\n, max 14 words per line, NO bullet characters.`
+                    ? `${REPORT_FIELD_META[k].description}. Concise formal past-tense lines separated by \\n, max 12 words per line, NO bullet characters.`
                     : REPORT_FIELD_META[k].description,
               },
             ]),
@@ -160,11 +140,41 @@ const TOOLS: GroqTool[] = [
     type: "function",
     function: {
       name: "get_report_status",
-      description: "Inspect the current report data and see which required or optional fields are still missing.",
+      description: "Inspect the current report data and see which fields are currently filled or blank.",
       parameters: { type: "object", properties: {} },
     },
   },
 ];
+
+async function persistConversation(
+  supabase: Awaited<ReturnType<typeof getUser>>["supabase"],
+  userId: string,
+  reportId: string | null | undefined,
+  workingData: ReportData,
+  nextHistory: Array<{ id: string; role: "user" | "assistant"; content: string; toolActions?: string[] }>,
+) {
+  if (reportId) {
+    await supabase
+      .from("reports")
+      .update({
+        structured_data: workingData as unknown as Json,
+        chat_messages: nextHistory as unknown as Json,
+      })
+      .eq("id", reportId)
+      .eq("user_id", userId);
+    return;
+  }
+
+  await supabase.from("workspace_drafts").upsert(
+    {
+      user_id: userId,
+      report_id: null,
+      structured_data: workingData as unknown as Json,
+      chat_messages: nextHistory as unknown as Json,
+    },
+    { onConflict: "user_id" },
+  );
+}
 
 export async function POST(request: Request) {
   const { supabase, user } = await getUser();
@@ -175,24 +185,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: body.error.issues[0]?.message ?? "Invalid chat request." }, { status: 400 });
   }
 
+  if (body.data.messages.length > MAX_CHAT_MESSAGES) {
+    return NextResponse.json(
+      {
+        error: `Conversation context limit reached (${MAX_CHAT_MESSAGES} messages). Click Clear Chat to start a fresh thread — your document fields stay safe.`,
+      },
+      { status: 400 },
+    );
+  }
+
   const quotaBefore = await getUserQuotaStatus(supabase, user.id, user.email);
   if (quotaBefore.isBlocked) {
     return NextResponse.json(
-      { error: "Your AI prompt access is currently paused by the admin. Contact mikorynosantiago@gmail.com." },
+      { error: "Your AI prompt access is currently paused by the admin." },
       { status: 403 },
     );
   }
   if (!quotaBefore.allowed) {
     return NextResponse.json(
       {
-        error: `Daily AI prompt limit reached (${quotaBefore.usedToday}/${quotaBefore.dailyLimit} used today). Ask mikorynosantiago@gmail.com to increase your limit.`,
+        error: `Daily AI prompt limit reached (${quotaBefore.usedToday}/${quotaBefore.dailyLimit} used today). Ask your admin to increase your limit.`,
         quota: quotaBefore,
       },
       { status: 429 },
     );
   }
 
-  const [{ data: profile }, { data: latestReport }] = await Promise.all([
+  const [aiSettings, { data: profile }, { data: latestReport }] = await Promise.all([
+    getAiSettings(supabase),
     supabase
       .from("profiles")
       .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours")
@@ -208,7 +228,6 @@ export async function POST(request: Request) {
   ]);
 
   const workingData: ReportData = { ...body.data.currentData };
-  // Seed blanks from profile defaults before the turn begins
   if (!workingData.intern_name_last_first && profile?.name_last_first) {
     workingData.intern_name_last_first = profile.name_last_first;
   }
@@ -216,7 +235,7 @@ export async function POST(request: Request) {
     workingData.intern_name_first_last = profile.name_first_last;
   }
   if (!workingData.office) {
-    workingData.office = profile?.office || "YML";
+    workingData.office = profile?.office || "DNX";
   }
 
   const prevTotal =
@@ -232,7 +251,7 @@ Today's date: ${new Date().toISOString().slice(0, 10)}
 User profile defaults: ${JSON.stringify({
     name_last_first: profile?.name_last_first ?? "",
     name_first_last: profile?.name_first_last ?? "",
-    office: profile?.office || "YML",
+    office: profile?.office || "DNX",
     default_verifier: profile?.default_verifier ?? "",
     default_daily_hours: profile?.default_daily_hours ?? 8,
     previous_report_total_hours: prevTotal,
@@ -243,7 +262,7 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
 1. Whenever the user gives notes (English, Tagalog, Taglish, raw text, or a formatted report) or says "just input it" / "translate in english", **IMMEDIATELY call \`update_report_fields\`** to put every provided field directly into the document.
 2. **NEVER require missing fields.** Some fields (such as *Verified By*, *Name*, *Dates*, *Hours*, or *Trainings/Problems/Solutions*) may be filled manually by the user later or signed in wet ink. Leave unmentioned fields blank—DO NOT list every empty field with ❌ or demand them.
 3. Keep tool values plain text (NO \`**\`, \`*\`, or \`-\` bullets), summarized into crisp **past-tense** formal English statements that fit inside the Word table:
-   - Max **1–3 short lines** per worked day (\`<= 12 words\` per line, separated by \`\\n\`).
+   - Max **1–${aiSettings.maxBulletsPerDay} short lines** per worked day (\`<= 12 words\` per line, separated by \`\\n\`).
    - Max **1–2 short lines** for \`new_trainings\`, \`problems_encountered\`, and \`solutions_done\`.
    - If the user mentions company/office (e.g., \`DNX\`), update \`office\`. If they provide their name, fill \`intern_name_last_first\` and \`intern_name_first_last\`.
 4. Only refuse if the user asks something completely unrelated to their internship or this report (e.g., trivia, coding homework, jokes). Do NOT say "I can only help with your Weekly Accomplishment Report" on greetings ("hi") or report prompts.
@@ -266,7 +285,7 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
         tools: TOOLS,
         temperature: 0.2,
         maxTokens: 1500,
-        preferredModel: usedModel || undefined,
+        preferredModel: usedModel || aiSettings.activeTextModel,
       });
       usedModel = model;
 
@@ -286,7 +305,7 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
             content: reply,
             ...(toolActions.length ? { toolActions } : {}),
           },
-        ].slice(-40);
+        ].slice(-MAX_CHAT_MESSAGES);
 
         await Promise.all([
           supabase.from("prompt_usage_logs").insert({
@@ -294,14 +313,7 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
             kind: "chat_report",
             model: usedModel,
           }),
-          supabase.from("workspace_drafts").upsert(
-            {
-              user_id: user.id,
-              structured_data: workingData as unknown as Json,
-              chat_messages: nextHistory as unknown as Json,
-            },
-            { onConflict: "user_id" },
-          ),
+          persistConversation(supabase, user.id, body.data.reportId, workingData, nextHistory),
         ]);
         const quotaAfter = await getUserQuotaStatus(supabase, user.id, user.email);
 
@@ -337,7 +349,7 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
           const changed: string[] = [];
           for (const key of REPORT_KEYS) {
             if (key in args && args[key] !== undefined && args[key] !== null) {
-              const cleaned = cleanFieldValue(key, args[key]);
+              const cleaned = cleanFieldValue(key, args[key], aiSettings.maxBulletsPerDay);
               if (cleaned !== "" && cleaned !== workingData[key]) {
                 workingData[key] = cleaned;
                 updatedKeys.add(key);
@@ -369,16 +381,16 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
         } else if (name === "save_profile_defaults") {
           const patch: Record<string, string> = {};
           if (typeof args.name_last_first === "string" && args.name_last_first.trim()) {
-            patch.name_last_first = args.name_last_first.trim();
+            patch.name_last_first = args.name_last_first.trim().slice(0, 120);
           }
           if (typeof args.name_first_last === "string" && args.name_first_last.trim()) {
-            patch.name_first_last = args.name_first_last.trim();
+            patch.name_first_last = args.name_first_last.trim().slice(0, 120);
           }
           if (typeof args.office === "string" && args.office.trim()) {
-            patch.office = args.office.trim();
+            patch.office = args.office.trim().slice(0, 80);
           }
           if (typeof args.default_verifier === "string" && args.default_verifier.trim()) {
-            patch.default_verifier = args.default_verifier.trim();
+            patch.default_verifier = args.default_verifier.trim().slice(0, 120);
           }
           if (Object.keys(patch).length > 0) {
             await supabase.from("profiles").upsert({ id: user.id, ...patch }, { onConflict: "id" });
@@ -401,20 +413,17 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
     await supabase.from("prompt_usage_logs").insert({
       user_id: user.id,
       kind: "chat_report",
-      model: usedModel || "openai/gpt-oss-120b",
+      model: usedModel || aiSettings.activeTextModel,
     });
     const quotaAfter = await getUserQuotaStatus(supabase, user.id, user.email);
 
     return NextResponse.json({
-      reply:
-        status.missingEssential.length > 0
-          ? `I still need: ${status.missingEssential.map((m) => m.label).join(", ")}.`
-          : "Your report has been updated in the preview.",
+      reply: "Your report has been updated in the preview.",
       structuredData: workingData,
       updatedKeys: Array.from(updatedKeys),
       toolActions,
       ...status,
-      model: usedModel,
+      model: usedModel || aiSettings.activeTextModel,
       quota: quotaAfter,
     });
   } catch (err) {
