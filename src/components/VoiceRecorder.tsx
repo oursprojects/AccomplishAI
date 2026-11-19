@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 interface VoiceRecorderProps {
   onTranscript: (text: string) => void;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 function pickAudioMime(): string {
@@ -15,7 +16,7 @@ function pickAudioMime(): string {
   return "";
 }
 
-export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
+export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorderProps) {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -99,28 +100,32 @@ export function VoiceRecorder({ onTranscript, disabled }: VoiceRecorderProps) {
   const ss = String(seconds % 60).padStart(2, "0");
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
         <button
           type="button"
           disabled={disabled || transcribing}
           onClick={recording ? stopRecording : startRecording}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition cursor-pointer disabled:opacity-60 ${
+          className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition cursor-pointer disabled:opacity-60 ${
+            compact ? "px-3 py-2 text-xs" : "px-4 py-2.5 text-sm"
+          } ${
             recording
               ? "bg-red-600 text-white hover:bg-red-700"
               : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
           }`}
         >
           <span
-            className={`h-2.5 w-2.5 rounded-full ${
+            className={`h-2 w-2 rounded-full ${
               recording ? "bg-white animate-pulse" : transcribing ? "bg-amber-500 animate-pulse" : "bg-red-500"
             }`}
           />
-          {recording ? `Stop (${mm}:${ss})` : transcribing ? "Transcribing..." : "Speak Notes"}
+          {recording ? `Stop (${mm}:${ss})` : transcribing ? "Transcribing..." : compact ? "Voice" : "Speak Notes"}
         </button>
-        {recording && <span className="text-xs text-red-600 font-medium">Listening — tap Stop when done</span>}
+        {!compact && recording && (
+          <span className="text-xs text-red-600 font-medium">Listening — tap Stop when done</span>
+        )}
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-[11px] text-red-600">{error}</p>}
     </div>
   );
 }

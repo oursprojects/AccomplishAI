@@ -61,6 +61,42 @@ export async function groqJson<T = unknown>(opts: {
   throw lastError;
 }
 
+export type GroqMessage = Groq.Chat.Completions.ChatCompletionMessageParam;
+export type GroqTool = Groq.Chat.Completions.ChatCompletionTool;
+
+/** Run a chat completion (with optional tool calling) and automatic model fallback. */
+export async function groqChatWithTools(opts: {
+  messages: GroqMessage[];
+  tools?: GroqTool[];
+  temperature?: number;
+  maxTokens?: number;
+  preferredModel?: string;
+}): Promise<{ completion: Groq.Chat.Completions.ChatCompletion; model: string }> {
+  const models = opts.preferredModel
+    ? [opts.preferredModel, ...[GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS].filter((m) => m !== opts.preferredModel)]
+    : [GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS];
+  let lastError: unknown;
+
+  for (const model of models) {
+    try {
+      const completion = await getGroq().chat.completions.create({
+        model,
+        temperature: opts.temperature ?? 0.2,
+        max_completion_tokens: opts.maxTokens ?? 1500,
+        reasoning_effort: "low",
+        messages: opts.messages,
+        ...(opts.tools?.length ? { tools: opts.tools, tool_choice: "auto" as const } : {}),
+      });
+      return { completion, model };
+    } catch (err) {
+      lastError = err;
+      if (!shouldFallback(err)) throw err;
+    }
+  }
+
+  throw lastError;
+}
+
 /** Maps Groq SDK errors to an HTTP status + user-safe message. */
 export function groqErrorResponse(err: unknown): { status: number; message: string } {
   if (err instanceof MissingGroqKeyError) return { status: 500, message: err.message };
