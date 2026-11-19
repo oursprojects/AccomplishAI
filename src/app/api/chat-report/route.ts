@@ -4,6 +4,7 @@ import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
 import { groqErrorResponse } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage, type GroqTool } from "@/lib/ai/chat-tools";
+import type { Json } from "@/lib/supabase/database.types";
 import {
   DAYS,
   isReportKey,
@@ -277,11 +278,31 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
         const reply = (msg.content ?? "").trim() || "Updated your report.";
         const status = computeStatus(workingData);
 
-        await supabase.from("prompt_usage_logs").insert({
-          user_id: user.id,
-          kind: "chat_report",
-          model: usedModel,
-        });
+        const nextHistory = [
+          ...body.data.messages.map((m, idx) => ({ id: `h-${idx}`, role: m.role, content: m.content })),
+          {
+            id: `a-${Date.now()}`,
+            role: "assistant" as const,
+            content: reply,
+            ...(toolActions.length ? { toolActions } : {}),
+          },
+        ].slice(-40);
+
+        await Promise.all([
+          supabase.from("prompt_usage_logs").insert({
+            user_id: user.id,
+            kind: "chat_report",
+            model: usedModel,
+          }),
+          supabase.from("workspace_drafts").upsert(
+            {
+              user_id: user.id,
+              structured_data: workingData as unknown as Json,
+              chat_messages: nextHistory as unknown as Json,
+            },
+            { onConflict: "user_id" },
+          ),
+        ]);
         const quotaAfter = await getUserQuotaStatus(supabase, user.id, user.email);
 
         return NextResponse.json({

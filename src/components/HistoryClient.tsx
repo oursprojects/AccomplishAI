@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Calendar, Clock, ExternalLink, FileText, Plus, Trash2 } from "lucide-react";
 import type { ReportData } from "@/lib/report-schema";
 
 export interface ReportSummary {
@@ -47,14 +48,15 @@ export function HistoryClient({ initialReports }: { initialReports: ReportSummar
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Report History</h1>
-          <p className="text-sm text-slate-600">Reopen any saved weekly report to edit, preview, print, or download.</p>
+          <h1 className="text-xl font-semibold text-[#1F1E1C]">Report History</h1>
+          <p className="text-sm text-[#66645E]">Reopen any saved weekly report to continue chatting, edit, preview, or download.</p>
         </div>
         <Link
           href="/"
-          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-4 py-2 text-sm font-medium text-white hover:bg-[#33312E] transition"
         >
-          New Report
+          <Plus className="h-4 w-4" />
+          <span>New Report</span>
         </Link>
       </div>
 
@@ -86,41 +88,46 @@ export function HistoryClient({ initialReports }: { initialReports: ReportSummar
               >
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-sm font-semibold text-slate-900">{period}</h2>
+                    <FileText className="h-4 w-4 text-[#C96442] shrink-0" />
+                    <h2 className="text-sm font-semibold text-[#1F1E1C]">{period}</h2>
                     {d.office && (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                      <span className="rounded-full bg-[#F4F2EA] px-2 py-0.5 text-[11px] font-medium text-[#57544E]">
                         {d.office}
                       </span>
                     )}
                     {d.hours_this_week && (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                        <Clock className="h-3 w-3" />
                         {d.hours_this_week} hrs
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500">
+                  <p className="inline-flex items-center gap-1 text-xs text-[#66645E]">
+                    <Calendar className="h-3 w-3" />
                     Saved {created}
                     {d.intern_name_last_first ? ` · ${d.intern_name_last_first}` : ""}
                   </p>
                   {report.raw_notes && (
-                    <p className="text-xs text-slate-600 line-clamp-2 pt-0.5">{report.raw_notes}</p>
+                    <p className="text-xs text-[#57544E] line-clamp-2 pt-0.5">{report.raw_notes}</p>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
                   <Link
                     href={`/?reportId=${report.id}`}
-                    className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-medium text-white hover:bg-slate-800 transition"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-3.5 py-2 text-xs font-medium text-white hover:bg-[#33312E] transition"
                   >
-                    Open & Print
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Open &amp; Download</span>
                   </Link>
                   <button
                     type="button"
                     onClick={() => handleDelete(report.id)}
                     disabled={deletingId === report.id}
-                    className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition cursor-pointer"
+                    className="inline-flex items-center gap-1 rounded-xl border border-[#E6E4DD] px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition cursor-pointer"
                   >
-                    {deletingId === report.id ? "..." : "Delete"}
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>{deletingId === report.id ? "..." : "Delete"}</span>
                   </button>
                 </div>
               </article>

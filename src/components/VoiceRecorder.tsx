@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Mic, Square } from "lucide-react";
 
 interface VoiceRecorderProps {
   onTranscript: (text: string) => void;
@@ -106,19 +107,19 @@ export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorder
           type="button"
           disabled={disabled || transcribing}
           onClick={recording ? stopRecording : startRecording}
-          className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition cursor-pointer disabled:opacity-60 ${
+          className={`inline-flex items-center justify-center gap-1.5 rounded-xl font-medium transition cursor-pointer disabled:opacity-60 ${
             compact ? "px-3 py-2 text-xs" : "px-4 py-2.5 text-sm"
           } ${
             recording
               ? "bg-red-600 text-white hover:bg-red-700"
-              : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+              : "border border-[#E0DDD3] bg-white text-[#1F1E1C] hover:bg-[#F4F2EA]"
           }`}
         >
-          <span
-            className={`h-2 w-2 rounded-full ${
-              recording ? "bg-white animate-pulse" : transcribing ? "bg-amber-500 animate-pulse" : "bg-red-500"
-            }`}
-          />
+          {recording ? (
+            <Square className="h-3.5 w-3.5 fill-current animate-pulse" />
+          ) : (
+            <Mic className={`h-3.5 w-3.5 ${transcribing ? "text-[#C96442] animate-pulse" : "text-[#C96442]"}`} />
+          )}
           {recording ? `Stop (${mm}:${ss})` : transcribing ? "Transcribing..." : compact ? "Voice" : "Speak Notes"}
         </button>
         {!compact && recording && (

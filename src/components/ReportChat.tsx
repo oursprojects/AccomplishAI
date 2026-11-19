@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Check, Eye, RotateCcw, Save, Send, Sparkles } from "lucide-react";
 import type { QuotaStatus } from "@/lib/admin";
 import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
 import { VoiceRecorder } from "./VoiceRecorder";
@@ -18,6 +19,7 @@ interface ReportChatProps {
   data: ReportData;
   quota: QuotaStatus;
   savedId: string | null;
+  hasChanges: boolean;
   messages: ChatTurn[];
   onMessagesChange: (next: ChatTurn[]) => void;
   onDataChange: (next: ReportData) => void;
@@ -48,6 +50,7 @@ export function ReportChat({
   data,
   quota,
   savedId,
+  hasChanges,
   messages,
   onMessagesChange,
   onDataChange,
@@ -121,19 +124,19 @@ export function ReportChat({
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden flex flex-col">
+    <section className="rounded-2xl border border-[#E6E4DD] bg-white shadow-xs overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="border-b border-slate-100 px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-slate-50/70">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white text-xs font-bold">
-            AI
+      <div className="border-b border-[#E6E4DD] px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-[#F7F6F0]">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#D97757] text-white shadow-2xs">
+            <Sparkles className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-sm font-semibold text-slate-900 leading-tight">Report Assistant</h2>
-            <p className="text-[11px] text-slate-500">
+            <h2 className="text-sm font-semibold text-[#1F1E1C] leading-tight">Report Assistant</h2>
+            <p className="text-[11px] text-[#66645E]">
               {missing.length === 0
-                ? "All main fields filled — ready to print or save"
-                : "Put what you have — edit any blank fields manually anytime"}
+                ? "All main fields filled — ready to download or save"
+                : "Share what you have — edit any blank fields manually anytime"}
             </p>
           </div>
         </div>
@@ -142,10 +145,10 @@ export function ReportChat({
           <span
             className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
               quota.isAdmin
-                ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                ? "bg-[#D97757]/12 text-[#C96442] border-[#D97757]/30"
                 : quotaBlocked
                   ? "bg-red-50 text-red-700 border-red-200"
-                  : "bg-white text-slate-700 border-slate-200"
+                  : "bg-white text-[#57544E] border-[#E0DDD3]"
             }`}
           >
             {quota.isAdmin
@@ -155,15 +158,16 @@ export function ReportChat({
                 : `${quota.remaining}/${quota.dailyLimit} prompts`}
           </span>
 
-          {(savedId || messages.length > 1) && (
+          {(savedId || messages.length > 1 || hasChanges) && (
             <button
               type="button"
               onClick={onNewReport}
               disabled={sending}
               title="Delete conversation and reset report"
-              className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 cursor-pointer"
             >
-              Reset Chat
+              <RotateCcw className="h-3 w-3" />
+              <span>Reset</span>
             </button>
           )}
         </div>
@@ -172,35 +176,37 @@ export function ReportChat({
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-4 space-y-3 min-h-[280px] max-h-[52vh] bg-slate-50/40"
+        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-4 space-y-3 min-h-[280px] max-h-[52vh] bg-[#FAF9F5]/70"
       >
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
             <div
               className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-2xs ${
                 m.role === "user"
-                  ? "bg-slate-900 text-white rounded-br-sm whitespace-pre-wrap"
-                  : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
+                  ? "bg-[#1F1E1C] text-white rounded-br-sm whitespace-pre-wrap"
+                  : "bg-white border border-[#E6E4DD] text-[#1F1E1C] rounded-bl-sm"
               }`}
             >
               {m.role === "assistant" ? <ChatMarkdown content={m.content} /> : m.content}
             </div>
             {m.role === "assistant" && m.toolActions && m.toolActions.length > 0 && (
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {m.toolActions.map((act, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-medium text-emerald-800"
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800"
                   >
-                    ✓ {act}
+                    <Check className="h-3 w-3" />
+                    {act}
                   </span>
                 ))}
                 <button
                   type="button"
                   onClick={onOpenPreview}
-                  className="lg:hidden inline-flex items-center rounded-full bg-slate-900 px-2.5 py-0.5 text-[11px] font-medium text-white cursor-pointer"
+                  className="lg:hidden inline-flex items-center gap-1 rounded-full bg-[#1F1E1C] px-2.5 py-0.5 text-[11px] font-medium text-white cursor-pointer"
                 >
-                  View Preview →
+                  <Eye className="h-3 w-3" />
+                  <span>View Preview</span>
                 </button>
               </div>
             )}
@@ -209,22 +215,23 @@ export function ReportChat({
 
         {sending && (
           <div className="flex items-start">
-            <div className="rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-500 animate-pulse">
-              Updating your report &amp; checking missing fields...
+            <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-[#E6E4DD] bg-white px-3.5 py-2.5 text-xs text-[#66645E] animate-pulse">
+              <Sparkles className="h-3.5 w-3.5 text-[#C96442]" />
+              <span>Updating your document...</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Quick helper chips + Preview/Save shortcuts */}
-      <div className="border-t border-slate-100 bg-white px-3.5 py-2 flex items-center gap-1.5 overflow-x-auto">
+      {/* Quick helper chips */}
+      <div className="border-t border-[#ECEAE2] bg-white px-3.5 py-2 flex items-center gap-1.5 overflow-x-auto">
         {QUICK_REPLIES.map((q) => (
           <button
             key={q}
             type="button"
             disabled={sending || quotaBlocked}
             onClick={() => void sendMessage(q)}
-            className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 cursor-pointer"
+            className="shrink-0 rounded-full border border-[#E6E4DD] bg-[#FAF9F5] px-2.5 py-1 text-[11px] font-medium text-[#57544E] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
           >
             {q}
           </button>
@@ -243,7 +250,7 @@ export function ReportChat({
           e.preventDefault();
           void sendMessage();
         }}
-        className="border-t border-slate-200 bg-white p-3 space-y-2.5"
+        className="border-t border-[#E6E4DD] bg-white p-3 space-y-2.5"
       >
         <textarea
           rows={3}
@@ -256,8 +263,8 @@ export function ReportChat({
             }
           }}
           disabled={sending || quotaBlocked}
-          placeholder="Tell me what you did this week, dates, hours, or answer my question... (Enter to send)"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:bg-white resize-none disabled:opacity-60"
+          placeholder="Tell me what you did this week (English or Tagalog)... Enter to send"
+          className="w-full rounded-xl border border-[#E0DDD3] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#1F1E1C] focus:bg-white resize-none disabled:opacity-60"
         />
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -270,26 +277,29 @@ export function ReportChat({
             <button
               type="button"
               onClick={onSaveReport}
-              disabled={saving}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+              disabled={saving || !hasChanges}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#E0DDD3] bg-white px-3 py-2 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
             >
-              {saving ? "Saving..." : savedId ? "Update Saved" : "Save"}
+              {hasChanges ? <Save className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5 text-emerald-600" />}
+              <span>{saving ? "Saving..." : !hasChanges ? "Saved" : savedId ? "Update" : "Save"}</span>
             </button>
             <button
               type="button"
               onClick={onOpenPreview}
-              className="lg:hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+              className="lg:hidden inline-flex items-center gap-1 rounded-xl border border-[#E0DDD3] bg-white px-3 py-2 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] cursor-pointer"
             >
-              Preview
+              <Eye className="h-3.5 w-3.5" />
+              <span>Preview</span>
             </button>
           </div>
 
           <button
             type="submit"
             disabled={sending || !input.trim() || quotaBlocked}
-            className="rounded-xl bg-slate-900 px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#D97757] px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-[#C96442] disabled:opacity-50 transition cursor-pointer shadow-2xs"
           >
-            {sending ? "Sending..." : "Send"}
+            <Send className="h-3.5 w-3.5" />
+            <span>{sending ? "Sending..." : "Send"}</span>
           </button>
         </div>
       </form>

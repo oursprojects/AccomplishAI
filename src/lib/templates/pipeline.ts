@@ -141,6 +141,17 @@ export async function loadActiveTemplateReview(
   if (error || !tpl) return null;
 
   const fields = (Array.isArray(tpl.schema) ? tpl.schema : []) as unknown as DetectedField[];
+  // Skip downloading 714 KB original.docx on every visit once the template is already confirmed
+  if (tpl.status === "confirmed") {
+    return {
+      template: { id: tpl.id, name: tpl.name, status: tpl.status, updated_at: tpl.updated_at },
+      fields,
+      preserved: [],
+      unassigned: [],
+      aiUsed: false,
+      warnings: [],
+    };
+  }
   const { data: blob } = await supabase.storage.from(TEMPLATE_BUCKET).download(tpl.original_path);
   if (!blob) {
     return {
@@ -166,8 +177,39 @@ const DEFAULT_TEMPLATE_NAME = "2026-Weekly-Accomplishment-Report.docx";
 const DEFAULT_TEMPLATE_PATH = join(process.cwd(), "templates", DEFAULT_TEMPLATE_NAME);
 
 /**
- * First-open auto-scanner: returns the user's active template, or automatically
- * scans, tags, and stores 2026-Weekly-Accomplishment-Report.docx on first visit.
+ * Fast template loader for the main workspace: reads schema from Postgres
+ * without downloading/re-scanning the 714 KB original .docx on every page visit.
+ */
+export async function ensureFastActiveTemplateReview(
+  supabase: Supabase,
+  userId: string,
+): Promise<TemplateReview | null> {
+  const { data: tpl, error } = await supabase
+    .from("templates")
+    .select("id, name, schema, status, updated_at")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!error && tpl) {
+    const fields = (Array.isArray(tpl.schema) ? tpl.schema : []) as unknown as DetectedField[];
+    return {
+      template: { id: tpl.id, name: tpl.name, status: tpl.status, updated_at: tpl.updated_at },
+      fields,
+      preserved: [],
+      unassigned: [],
+      aiUsed: false,
+      warnings: [],
+    };
+  }
+
+  const original = await readFile(DEFAULT_TEMPLATE_PATH);
+  return await scanAndStoreTemplate(supabase, userId, original, DEFAULT_TEMPLATE_NAME);
+}
+
+/**
+ * First-open auto-scanner (full): returns the user's active template with
+ * preserved/unassigned areas, or automatically scans on first visit.
  */
 export async function ensureActiveTemplateReview(
   supabase: Supabase,

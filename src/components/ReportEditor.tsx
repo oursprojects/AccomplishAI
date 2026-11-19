@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Save } from "lucide-react";
 import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
 
 const DAY_LABELS: Record<(typeof DAYS)[number], { short: string; full: string }> = {
@@ -16,9 +17,10 @@ interface ReportEditorProps {
   onSave: () => void;
   saving: boolean;
   savedId: string | null;
+  hasChanges: boolean;
 }
 
-export function ReportEditor({ data, onChange, onSave, saving, savedId }: ReportEditorProps) {
+export function ReportEditor({ data, onChange, onSave, saving, savedId, hasChanges }: ReportEditorProps) {
   function setField(key: ReportKey, value: string) {
     onChange({ ...data, [key]: value });
   }
@@ -199,10 +201,19 @@ export function ReportEditor({ data, onChange, onSave, saving, savedId }: Report
           <button
             type="button"
             onClick={onSave}
-            disabled={saving}
-            className="w-full sm:w-auto rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60 transition cursor-pointer"
+            disabled={saving || !hasChanges}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#1F1E1C] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#33312E] disabled:opacity-45 disabled:cursor-not-allowed transition cursor-pointer"
           >
-            {saving ? "Saving..." : savedId ? "Update Saved Report" : "Save Report to History"}
+            {hasChanges ? <Save className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+            <span>
+              {saving
+                ? "Saving..."
+                : !hasChanges
+                  ? "No Changes to Save"
+                  : savedId
+                    ? "Update Saved Report"
+                    : "Save Report to History"}
+            </span>
           </button>
         </div>
       </div>

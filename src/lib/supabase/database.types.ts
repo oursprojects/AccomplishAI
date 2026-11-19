@@ -144,6 +144,24 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["prompt_usage_logs"]["Insert"]>;
         Relationships: [];
       };
+      workspace_drafts: {
+        Row: {
+          user_id: string;
+          report_id: string | null;
+          structured_data: Json;
+          chat_messages: Json;
+          updated_at: string;
+        };
+        Insert: {
+          user_id?: string;
+          report_id?: string | null;
+          structured_data?: Json;
+          chat_messages?: Json;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["workspace_drafts"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f1f5f9;
-  --foreground: #0f172a;
+  --background: #faf9f5;
+  --foreground: #1f1e1c;
 }
 
 @theme inline {
@@ -18,80 +18,21 @@ body {
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }
 
-/* docx-preview stage styling on screen */
+/* Prevent mobile browsers from inflating fonts inside the rendered DOCX */
+.docx-preview-stage {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 .docx-preview-stage .docx-wrapper {
-  background: #e2e8f0 !important;
-  padding: 16px !important;
-  align-items: center !important;
+  background: transparent !important;
+  padding: 0 !important;
+  align-items: flex-start !important;
 }
 
 .docx-preview-stage .docx-wrapper > section.docx {
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.14) !important;
-  margin-bottom: 16px !important;
+  box-shadow: 0 10px 30px rgba(31, 30, 28, 0.14) !important;
+  margin: 0 !important;
   background: #ffffff !important;
-}
-
-/* Clean, isolated 1-page print output for the rendered Word document */
-@media print {
-  html,
-  body {
-    background: #ffffff !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-
-  .docx-print-root {
-    display: block !important;
-    position: static !important;
-    width: auto !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    overflow: hidden !important;
-    background: #ffffff !important;
-    print-color-adjust: exact !important;
-    -webkit-print-color-adjust: exact !important;
-  }
-
-  .docx-preview-stage {
-    overflow: hidden !important;
-    max-height: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-    background: #ffffff !important;
-  }
-
-  .docx-preview-stage > div {
-    zoom: 1 !important;
-    transform: none !important;
-  }
-
-  .docx-preview-stage .docx-wrapper {
-    background: #ffffff !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    display: block !important;
-  }
-
-  .docx-preview-stage .docx-wrapper > section.docx {
-    box-shadow: none !important;
-    margin: 0 !important;
-    overflow: hidden !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
+  border-radius: 2px;
 }
