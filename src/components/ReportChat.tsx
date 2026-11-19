@@ -155,13 +155,15 @@ export function ReportChat({
                 : `${quota.remaining}/${quota.dailyLimit} prompts`}
           </span>
 
-          {savedId && (
+          {(savedId || messages.length > 1) && (
             <button
               type="button"
               onClick={onNewReport}
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+              disabled={sending}
+              title="Delete conversation and reset report"
+              className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 cursor-pointer"
             >
-              New
+              Reset Chat
             </button>
           )}
         </div>

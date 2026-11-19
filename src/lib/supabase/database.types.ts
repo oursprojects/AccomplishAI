@@ -67,6 +67,7 @@ export type Database = {
           template_id: string | null;
           raw_notes: string;
           structured_data: Json;
+          chat_messages: Json;
           created_at: string;
           updated_at: string;
         };
@@ -76,6 +77,7 @@ export type Database = {
           template_id?: string | null;
           raw_notes?: string;
           structured_data?: Json;
+          chat_messages?: Json;
           created_at?: string;
           updated_at?: string;
         };

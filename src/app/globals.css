@@ -88,9 +88,6 @@ body {
   .docx-preview-stage .docx-wrapper > section.docx {
     box-shadow: none !important;
     margin: 0 !important;
-    height: 99.4vh !important;
-    min-height: 0 !important;
-    max-height: 99.4vh !important;
     overflow: hidden !important;
     page-break-after: avoid !important;
     break-after: avoid !important;

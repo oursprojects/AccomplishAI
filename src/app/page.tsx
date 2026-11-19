@@ -7,6 +7,7 @@ import { ensureActiveTemplateReview } from "@/lib/templates/pipeline";
 import { reportDataSchema, type ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
 import { WorkspaceClient } from "@/components/WorkspaceClient";
+import type { ChatTurn } from "@/components/ReportChat";
 
 async function WorkspaceContent({
   searchParams,
@@ -30,7 +31,7 @@ async function WorkspaceContent({
     reportId
       ? supabase
           .from("reports")
-          .select("id, raw_notes, structured_data")
+          .select("id, raw_notes, structured_data, chat_messages")
           .eq("id", reportId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -44,17 +45,40 @@ async function WorkspaceContent({
     default_daily_hours: 8,
   };
 
+  const rawChat = reportRes.data?.chat_messages;
+  const chatMessages: ChatTurn[] = Array.isArray(rawChat)
+    ? rawChat.flatMap((m, idx): ChatTurn[] => {
+        if (!m || typeof m !== "object" || Array.isArray(m)) return [];
+        const rec = m as Record<string, unknown>;
+        if ((rec.role === "user" || rec.role === "assistant") && typeof rec.content === "string") {
+          return [
+            {
+              id: typeof rec.id === "string" ? rec.id : `m-${idx}`,
+              role: rec.role,
+              content: rec.content,
+              toolActions: Array.isArray(rec.toolActions)
+                ? rec.toolActions.filter((a): a is string => typeof a === "string")
+                : undefined,
+            },
+          ];
+        }
+        return [];
+      })
+    : [];
+
   const initialReport = reportRes.data
     ? {
         id: reportRes.data.id,
         raw_notes: reportRes.data.raw_notes,
         structured_data: reportDataSchema.parse(reportRes.data.structured_data ?? {}) as ReportData,
+        chat_messages: chatMessages,
       }
     : null;
 
   return (
     <AppShell userEmail={user.email ?? ""}>
       <WorkspaceClient
+        userId={user.id}
         profile={initialProfile}
         initialReview={review}
         initialReport={initialReport}

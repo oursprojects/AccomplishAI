@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { emptyReport, type ReportData } from "@/lib/report-schema";
 import type { Profile } from "@/lib/supabase/database.types";
@@ -12,12 +12,14 @@ import { ReportEditor } from "./ReportEditor";
 import { DocxPreviewPanel } from "./DocxPreviewPanel";
 
 interface WorkspaceClientProps {
+  userId: string;
   profile: Pick<Profile, "name_last_first" | "name_first_last" | "office" | "default_verifier" | "default_daily_hours">;
   initialReview: TemplateReview | null;
   initialReport: {
     id: string;
     raw_notes: string;
     structured_data: ReportData;
+    chat_messages: ChatTurn[];
   } | null;
   initialQuota: QuotaStatus;
 }
@@ -46,13 +48,13 @@ function buildWelcomeMessage(
       id: "welcome-existing",
       role: "assistant",
       content:
-        "I loaded your saved report. Tell me anything you'd like to add or update (for example: extra tasks, hours, or dates), and I'll update the 1-page preview.",
+        "I loaded your saved report. Tell me anything you'd like to add or update, and I'll update the 1-page preview.",
     };
   }
 
   const missingProfile: string[] = [];
   if (!profile.name_last_first.trim() || !profile.name_first_last.trim()) {
-    missingProfile.push("your full name");
+    missingProfile.push("**Full name**");
   }
   const intro = profile.name_first_last
     ? `Hi **${profile.name_first_last}**! I pre-filled your name and office (**${profile.office || "YML"}**).`
@@ -73,19 +75,67 @@ function buildWelcomeMessage(
   };
 }
 
-export function WorkspaceClient({ profile, initialReview, initialReport, initialQuota }: WorkspaceClientProps) {
+function draftKey(userId: string, reportId: string | null) {
+  return `accomplish_chat_${userId}_${reportId ?? "draft"}`;
+}
+
+export function WorkspaceClient({ userId, profile, initialReview, initialReport, initialQuota }: WorkspaceClientProps) {
   const [review, setReview] = useState<TemplateReview | null>(initialReview);
   const [quota, setQuota] = useState<QuotaStatus>(initialQuota);
   const [data, setData] = useState<ReportData>(() => seedFromProfile(profile, initialReport));
   const [savedId, setSavedId] = useState<string | null>(initialReport?.id ?? null);
-  const [messages, setMessages] = useState<ChatTurn[]>(() => [buildWelcomeMessage(profile, initialReport)]);
+  const [messages, setMessages] = useState<ChatTurn[]>(() =>
+    initialReport?.chat_messages?.length
+      ? initialReport.chat_messages
+      : [buildWelcomeMessage(profile, initialReport)],
+  );
   const [tab, setTab] = useState<WorkspaceTab>(initialReport ? "edit" : "chat");
   const [desktopLeftMode, setDesktopLeftMode] = useState<"chat" | "edit">(initialReport ? "edit" : "chat");
+  const [hydratedDraft, setHydratedDraft] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Restore ongoing draft conversation on mount so the AI remembers across refreshes
+  useEffect(() => {
+    let active = true;
+    const key = draftKey(userId, initialReport?.id ?? null);
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (raw && !initialReport) {
+          const parsed = JSON.parse(raw) as { messages?: ChatTurn[]; data?: Partial<ReportData> };
+          if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+            setMessages(parsed.messages);
+          }
+          if (parsed.data && typeof parsed.data === "object") {
+            setData((prev) => ({ ...prev, ...parsed.data }));
+          }
+        }
+      } catch {
+        // Ignore malformed local draft
+      } finally {
+        if (active) setHydratedDraft(true);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId, initialReport]);
+
+  // Persist current conversation & report state locally
+  useEffect(() => {
+    if (!hydratedDraft) return;
+    try {
+      const key = draftKey(userId, savedId);
+      window.localStorage.setItem(key, JSON.stringify({ messages, data }));
+    } catch {
+      // Ignore quota errors
+    }
+  }, [hydratedDraft, userId, savedId, messages, data]);
 
   async function handleQuickConfirm() {
     if (!review) return;
@@ -130,6 +180,12 @@ export function WorkspaceClient({ profile, initialReview, initialReport, initial
           templateId: review?.template.id ?? null,
           rawNotes,
           structuredData: data,
+          chatMessages: messages.map(({ id, role, content, toolActions }) => ({
+            id,
+            role,
+            content,
+            ...(toolActions ? { toolActions } : {}),
+          })),
         }),
       });
       const json = (await res.json()) as { report?: { id: string }; error?: string };
@@ -143,11 +199,17 @@ export function WorkspaceClient({ profile, initialReview, initialReport, initial
     }
   }
 
-  function handleStartNew() {
+  function handleResetConversation() {
+    try {
+      window.localStorage.removeItem(draftKey(userId, savedId));
+      window.localStorage.removeItem(draftKey(userId, null));
+    } catch {
+      // Ignore storage errors
+    }
     setSavedId(null);
     setData(seedFromProfile(profile, null));
     setMessages([buildWelcomeMessage(profile, null)]);
-    setNotice(null);
+    setNotice("Conversation deleted and report reset.");
     setError(null);
     setTab("chat");
     setDesktopLeftMode("chat");
@@ -239,7 +301,6 @@ export function WorkspaceClient({ profile, initialReview, initialReport, initial
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left column: Chatbot + Manual Editor */}
         <div className="no-print lg:col-span-6 space-y-4">
-          {/* Desktop mode toggle between AI Chat and Manual Field Editor */}
           <div className="hidden lg:grid grid-cols-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-2xs">
             <button
               type="button"
@@ -270,7 +331,7 @@ export function WorkspaceClient({ profile, initialReview, initialReport, initial
               onMessagesChange={setMessages}
               onDataChange={setData}
               onQuotaChange={setQuota}
-              onNewReport={handleStartNew}
+              onNewReport={handleResetConversation}
               onOpenPreview={() => setTab("preview")}
               onSaveReport={handleSave}
               saving={saving}

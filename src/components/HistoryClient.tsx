@@ -28,6 +28,14 @@ export function HistoryClient({ initialReports }: { initialReports: ReportSummar
         throw new Error(j.error ?? "Could not delete report.");
       }
       setReports((prev) => prev.filter((r) => r.id !== id));
+      try {
+        for (let i = window.localStorage.length - 1; i >= 0; i--) {
+          const k = window.localStorage.key(i);
+          if (k && k.endsWith(`_${id}`)) window.localStorage.removeItem(k);
+        }
+      } catch {
+        // Ignore storage errors
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed.");
     } finally {

@@ -76,12 +76,23 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data }: 
     return () => window.removeEventListener("resize", updateZoom);
   }, [manualZoom]);
 
-  // Dynamic @page size so Print / Save PDF matches chosen paper size cleanly on 1 page
+  // Dynamic @page size and physical print dimensions (never depend on vh)
   useEffect(() => {
     const dims = PAPER_DIMENSIONS[paperSize];
+    const printHeightPt = dims.heightPt - 2; // 2pt safety margin prevents blank trailing page 2
     const style = document.createElement("style");
     style.id = "accomplish-print-page-size";
-    style.textContent = `@page { size: ${dims.widthIn} ${dims.heightIn}; margin: 0; }`;
+    style.textContent = `
+      @page { size: ${dims.widthIn} ${dims.heightIn}; margin: 0; }
+      @media print {
+        .docx-preview-stage .docx-wrapper > section.docx {
+          width: ${dims.widthPt}pt !important;
+          height: ${printHeightPt}pt !important;
+          min-height: ${printHeightPt}pt !important;
+          max-height: ${printHeightPt}pt !important;
+        }
+      }
+    `;
     document.head.appendChild(style);
     return () => style.remove();
   }, [paperSize]);

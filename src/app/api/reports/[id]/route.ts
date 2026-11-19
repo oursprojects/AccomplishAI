@@ -4,9 +4,17 @@ import { getUser } from "@/lib/supabase/server";
 import { reportDataStrictSchema } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
+const chatMessageSchema = z.object({
+  id: z.string().max(100),
+  role: z.enum(["user", "assistant"]),
+  content: z.string().max(8000),
+  toolActions: z.array(z.string().max(120)).optional(),
+});
+
 const patchReportSchema = z.object({
   rawNotes: z.string().max(15000).optional(),
   structuredData: reportDataStrictSchema.optional(),
+  chatMessages: z.array(chatMessageSchema).max(60).optional(),
 });
 
 const uuidSchema = z.string().uuid();
@@ -22,7 +30,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
 
   const { data, error } = await supabase
     .from("reports")
-    .select("id, template_id, raw_notes, structured_data, created_at, updated_at")
+    .select("id, template_id, raw_notes, structured_data, chat_messages, created_at, updated_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -45,17 +53,20 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ error: "Invalid update payload." }, { status: 400 });
   }
 
-  const updates: { raw_notes?: string; structured_data?: Json } = {};
+  const updates: { raw_notes?: string; structured_data?: Json; chat_messages?: Json } = {};
   if (parsed.data.rawNotes !== undefined) updates.raw_notes = parsed.data.rawNotes;
   if (parsed.data.structuredData !== undefined) {
     updates.structured_data = parsed.data.structuredData as unknown as Json;
+  }
+  if (parsed.data.chatMessages !== undefined) {
+    updates.chat_messages = parsed.data.chatMessages as unknown as Json;
   }
 
   const { data, error } = await supabase
     .from("reports")
     .update(updates)
     .eq("id", id)
-    .select("id, template_id, raw_notes, structured_data, created_at, updated_at")
+    .select("id, template_id, raw_notes, structured_data, chat_messages, created_at, updated_at")
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

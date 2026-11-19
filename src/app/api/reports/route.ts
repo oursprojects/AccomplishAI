@@ -4,10 +4,18 @@ import { getUser } from "@/lib/supabase/server";
 import { reportDataStrictSchema } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
+const chatMessageSchema = z.object({
+  id: z.string().max(100),
+  role: z.enum(["user", "assistant"]),
+  content: z.string().max(8000),
+  toolActions: z.array(z.string().max(120)).optional(),
+});
+
 const createReportSchema = z.object({
   templateId: z.string().uuid().nullable().optional(),
   rawNotes: z.string().max(15000).default(""),
   structuredData: reportDataStrictSchema,
+  chatMessages: z.array(chatMessageSchema).max(60).optional(),
 });
 
 export async function GET() {
@@ -16,7 +24,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("reports")
-    .select("id, template_id, raw_notes, structured_data, created_at, updated_at")
+    .select("id, template_id, raw_notes, structured_data, chat_messages, created_at, updated_at")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(100);
@@ -41,8 +49,9 @@ export async function POST(request: Request) {
       template_id: parsed.data.templateId ?? null,
       raw_notes: parsed.data.rawNotes,
       structured_data: parsed.data.structuredData as unknown as Json,
+      chat_messages: (parsed.data.chatMessages ?? []) as unknown as Json,
     })
-    .select("id, template_id, raw_notes, structured_data, created_at, updated_at")
+    .select("id, template_id, raw_notes, structured_data, chat_messages, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
