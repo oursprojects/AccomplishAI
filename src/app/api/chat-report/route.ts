@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
-import { groqChatWithTools, groqErrorResponse, type GroqMessage, type GroqTool } from "@/lib/ai/groq";
+import { groqErrorResponse } from "@/lib/ai/groq";
+import { groqChatWithTools, type GroqMessage, type GroqTool } from "@/lib/ai/chat-tools";
 import {
   DAYS,
   isReportKey,
