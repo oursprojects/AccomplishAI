@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Accomplish AI
 
-## Getting Started
+Mobile-friendly Next.js (App Router) web application that turns typed or spoken daily notes into your official **2026 Weekly Accomplishment Report** (`templates/2026-Weekly-Accomplishment-Report.docx`) — preserving all original Word borders, headers, footers, Century Gothic typography, table structure, and signatory blocks (`NIÑO R. GUILLERMO`, wet-ink `Date:` line).
 
-First, run the development server:
+## Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Framework:** Next.js 16 (App Router), TypeScript, Tailwind CSS
+- **Auth, Database & Storage:** Supabase (`@supabase/supabase-js`, `@supabase/ssr`) with per-user Row Level Security
+- **AI (Free Tier):** Groq SDK (`llama-3.3-70b-versatile` JSON mode + `whisper-large-v3-turbo` voice transcription)
+- **DOCX Engine:** `pizzip`, `@xmldom/xmldom`, `docxtemplater`, `docx-preview`, `file-saver`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. **Configure environment variables**
+   Copy `.env.example` to `.env.local` and fill in your Supabase and Groq credentials:
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+   GROQ_API_KEY=gsk_your_groq_api_key
+   ```
 
-## Learn More
+3. **Run the Supabase database & storage migration**
+   Execute `supabase/migrations/0001_init.sql` in the **Supabase SQL Editor** (or via `supabase db push`). This creates:
+   - `profiles`, `templates`, and `reports` tables with strict `auth.uid()` RLS policies
+   - Auto-profile creation trigger on sign-up
+   - Private `templates` Storage bucket scoped to `{user_id}/...`
 
-To learn more about Next.js, take a look at the following resources:
+4. **Test the offline DOCX scanner/tagger/filler pipeline (optional)**
+   ```bash
+   npx tsx scripts/test-template.ts
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+5. **Run locally**
+   ```bash
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploying to Vercel
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push the repository to GitHub/GitLab/Bitbucket and import it in Vercel.
+2. Add the environment variables from `.env.example` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `GROQ_API_KEY`) in **Project Settings → Environment Variables**.
+3. In **Supabase → Authentication → URL Configuration**, add your Vercel domain (`https://your-app.vercel.app`) to Site URL and `https://your-app.vercel.app/auth/callback` to Redirect URLs.
+4. Deploy — `next.config.ts` includes `outputFileTracingIncludes` so `templates/2026-Weekly-Accomplishment-Report.docx` is bundled with `/api/scan-template`.
