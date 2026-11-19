@@ -5,6 +5,7 @@ import Link from "next/link";
 import { emptyReport, type ReportData } from "@/lib/report-schema";
 import type { Profile } from "@/lib/supabase/database.types";
 import type { TemplateReview } from "@/lib/templates/pipeline";
+import type { QuotaStatus } from "@/lib/admin";
 import { VoiceRecorder } from "./VoiceRecorder";
 import { TemplateScannerCard } from "./TemplateScannerCard";
 import { ReportEditor } from "./ReportEditor";
@@ -18,6 +19,7 @@ interface WorkspaceClientProps {
     raw_notes: string;
     structured_data: ReportData;
   } | null;
+  initialQuota: QuotaStatus;
 }
 
 type MobileTab = "notes" | "edit" | "preview";
@@ -35,8 +37,9 @@ function seedFromProfile(
   };
 }
 
-export function WorkspaceClient({ profile, initialReview, initialReport }: WorkspaceClientProps) {
+export function WorkspaceClient({ profile, initialReview, initialReport, initialQuota }: WorkspaceClientProps) {
   const [review, setReview] = useState<TemplateReview | null>(initialReview);
+  const [quota, setQuota] = useState<QuotaStatus>(initialQuota);
   const [rawNotes, setRawNotes] = useState(initialReport?.raw_notes ?? "");
   const [data, setData] = useState<ReportData>(() => seedFromProfile(profile, initialReport));
   const [savedId, setSavedId] = useState<string | null>(initialReport?.id ?? null);
@@ -89,10 +92,15 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
           existingData: data,
         }),
       });
-      const json = (await res.json()) as { structuredData?: ReportData; error?: string };
+      const json = (await res.json()) as {
+        structuredData?: ReportData;
+        quota?: QuotaStatus;
+        error?: string;
+      };
+      if (json.quota) setQuota(json.quota);
       if (!res.ok || !json.structuredData) throw new Error(json.error ?? "AI generation failed.");
       setData(json.structuredData);
-      setNotice("Report generated! Review any field or jump straight to Preview & Print.");
+      setNotice("Report populated into your official 1-page template. Review or Print/Download.");
       setTab("preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not generate report.");
@@ -153,14 +161,15 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
   }
 
   const profileMissingName = !profile.name_last_first || !profile.name_first_last;
+  const quotaBlocked = !quota.allowed;
 
   return (
     <div className="space-y-4">
       {review.template.status === "pending_review" && (
-        <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs sm:text-sm text-indigo-950">
+        <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-200 bg-indigo-50/90 px-4 py-2.5 text-xs sm:text-sm text-indigo-950">
           <span>
             Auto-detected <strong>{review.fields.length} fields</strong> from{" "}
-            <code className="font-mono text-xs">{review.template.name}</code> — layout &amp; signatories preserved.
+            <code className="font-mono text-xs">{review.template.name}</code> — original design preserved.
           </span>
           <div className="flex items-center gap-3 shrink-0">
             <Link href="/template" className="font-medium underline underline-offset-4">
@@ -177,9 +186,10 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
           </div>
         </div>
       )}
+
       {profileMissingName && (
-        <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs sm:text-sm text-amber-900">
-          <span>Set your default intern name & verifier so every report auto-fills automatically.</span>
+        <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs sm:text-sm text-amber-900">
+          <span>Set your default intern name &amp; verifier in Profile so every report auto-fills.</span>
           <Link href="/profile" className="font-semibold underline underline-offset-4">
             Open Profile
           </Link>
@@ -187,7 +197,7 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
       )}
 
       {/* Mobile tab bar */}
-      <div className="no-print lg:hidden grid grid-cols-3 rounded-xl border border-slate-200 bg-white p-1 shadow-xs">
+      <div className="no-print lg:hidden sticky top-[96px] z-20 grid grid-cols-3 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur p-1 shadow-xs">
         {(
           [
             { id: "notes", label: "1. Notes" },
@@ -199,8 +209,8 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
-            className={`rounded-lg py-2 text-xs font-semibold transition cursor-pointer ${
-              tab === item.id ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+            className={`min-h-[38px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
+              tab === item.id ? "bg-slate-900 text-white shadow-2xs" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
             {item.label}
@@ -222,62 +232,77 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left column: Notes + Structured Editor */}
         <div className="no-print lg:col-span-6 space-y-5">
-          {/* Raw Notes & Voice Input */}
           <section
             className={`${
               tab === "notes" ? "block" : "hidden lg:block"
-            } rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-3`}
+            } rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs space-y-3.5`}
           >
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">Weekly Notes & Voice Input</h2>
+                <h2 className="text-base font-semibold text-slate-900">Weekly Notes &amp; Voice Input</h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Speak or jot down what you did Mon–Fri, hours, trainings, and issues. AI formats it cleanly.
+                  Speak or jot down what you did Mon–Fri. AI summarizes concisely to fit on 1 page.
                 </p>
               </div>
-              {savedId && (
-                <button
-                  type="button"
-                  onClick={handleStartNew}
-                  className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+              <div className="flex items-center gap-2 shrink-0">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
+                    quota.isAdmin
+                      ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                      : quotaBlocked
+                        ? "bg-red-50 text-red-700 border-red-200"
+                        : "bg-slate-50 text-slate-700 border-slate-200"
+                  }`}
                 >
-                  New Report
-                </button>
-              )}
+                  {quota.isAdmin
+                    ? "Admin · Unlimited"
+                    : quota.isBlocked
+                      ? "AI Paused"
+                      : `${quota.remaining}/${quota.dailyLimit} prompts left today`}
+                </span>
+                {savedId && (
+                  <button
+                    type="button"
+                    onClick={handleStartNew}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+                  >
+                    New
+                  </button>
+                )}
+              </div>
             </div>
 
             <textarea
               rows={6}
               value={rawNotes}
               onChange={(e) => setRawNotes(e.target.value)}
-              placeholder="Example: Week of Nov 16 to Nov 20, 2026. Monday attended orientation and set up workstation. Tuesday helped configure switches in the server room. Wednesday fixed printer driver issues. Thursday updated inventory spreadsheet. Friday tested backup scripts. 40 hours this week, total 120 hours. Training: basic VLAN setup. Problem: unclear ticket details. Solution: clarified requirements with supervisor."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-sm text-slate-900 outline-none focus:border-slate-900 focus:bg-white resize-y"
+              placeholder="Example: Week of Nov 16 to Nov 20, 2026. Monday attended orientation and set up workstation. Tuesday configured switches in server room. Wednesday fixed printer driver issues. Thursday updated inventory sheet. Friday tested backup scripts. 40 hours this week, total 120 hours."
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-sm text-slate-900 outline-none focus:border-slate-900 focus:bg-white resize-y"
             />
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <VoiceRecorder
-                disabled={generating}
+                disabled={generating || quota.isBlocked}
                 onTranscript={(text) => setRawNotes((prev) => (prev.trim() ? `${prev.trim()}\n${text}` : text))}
               />
 
               <button
                 type="button"
                 onClick={handleGenerate}
-                disabled={generating || !rawNotes.trim()}
-                className="w-full sm:w-auto rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 transition cursor-pointer"
+                disabled={generating || !rawNotes.trim() || quotaBlocked}
+                className="w-full sm:w-auto min-h-[42px] rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 transition cursor-pointer shadow-xs"
               >
                 {generating ? "Formatting with AI..." : "Generate Report"}
               </button>
             </div>
           </section>
 
-          {/* Inline Field Editor */}
           <div className={tab === "edit" ? "block" : "hidden lg:block"}>
             <ReportEditor data={data} onChange={setData} onSave={handleSave} saving={saving} savedId={savedId} />
           </div>
         </div>
 
-        {/* Right column: Live DOCX Preview & Print */}
+        {/* Right column: Live 1-Page DOCX Preview & Print */}
         <div
           className={`${
             tab === "preview" ? "block" : "hidden lg:block"
@@ -294,7 +319,7 @@ export function WorkspaceClient({ profile, initialReview, initialReport }: Works
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 cursor-pointer"
+              className="w-full min-h-[42px] rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 cursor-pointer"
             >
               {saving ? "Saving..." : savedId ? "Update Saved Report" : "Save Report to History"}
             </button>

@@ -90,6 +90,58 @@ export type Database = {
           },
         ];
       };
+      admin_settings: {
+        Row: {
+          id: number;
+          default_daily_prompt_limit: number;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          default_daily_prompt_limit?: number;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["admin_settings"]["Insert"]>;
+        Relationships: [];
+      };
+      user_quotas: {
+        Row: {
+          user_id: string;
+          email: string;
+          custom_daily_limit: number | null;
+          is_blocked: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          email?: string;
+          custom_daily_limit?: number | null;
+          is_blocked?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["user_quotas"]["Insert"]>;
+        Relationships: [];
+      };
+      prompt_usage_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: string;
+          model: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          kind?: string;
+          model?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["prompt_usage_logs"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

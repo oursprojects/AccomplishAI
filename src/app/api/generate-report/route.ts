@@ -1,31 +1,32 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
+import { getUserQuotaStatus } from "@/lib/admin";
 import { groqErrorResponse, groqJson } from "@/lib/ai/groq";
 import { DAYS, REPORT_FIELD_META, REPORT_KEYS, reportDataSchema, type ReportData } from "@/lib/report-schema";
-import type { DetectedField } from "@/lib/docx/types";
 
 const requestSchema = z.object({
-  rawNotes: z.string().trim().min(1, "Please enter or record some notes first.").max(15000),
+  rawNotes: z.string().trim().min(1, "Please enter or record some notes first.").max(8000),
   templateId: z.string().uuid().optional(),
   existingData: z.record(z.string(), z.string()).optional(),
 });
 
-const SYSTEM_PROMPT = `You convert a student intern's raw typed or spoken notes into a structured JSON object for an official university "Weekly Accomplishment Report" (Monday to Friday).
+const SYSTEM_PROMPT = `You convert a student intern's raw typed or spoken notes into a concise JSON object for a 1-page university "Weekly Accomplishment Report" (Monday to Friday).
 
-Return a single JSON object containing EVERY ONE of these exact keys (all string values, no nested objects or arrays):
+Return a single JSON object with ALL of these string keys (no nested objects/arrays):
 ${REPORT_KEYS.map((k) => `- "${k}": ${REPORT_FIELD_META[k].description}`).join("\n")}
 
-Formatting & tone rules:
-1. Rewrite casual or spoken notes into clear, concise, formal past-tense accomplishment statements matching an institutional report (e.g., "Attended the orientation where company rules and regulations were discussed", "Assisted in configuring network switches and updating cable labels").
-2. Group tasks across Monday ("mon_accomplishments") through Friday ("fri_accomplishments") whenever days are mentioned. Separate multiple bullet items for the same day or reflection section with a single newline ("\\n") and do NOT add bullet symbols ("-", "•", "1.") because Word's native bullet list already renders them.
-3. If a day has no work mentioned, leave that day's accomplishments and verified_by as "". Never fabricate tasks for unmentioned days.
-4. Use the provided user profile defaults for "intern_name_last_first" (format: LASTNAME, FIRSTNAME MI.), "intern_name_first_last" (format: FIRSTNAME MI. LASTNAME), and "office" unless the notes explicitly override them.
-5. For each day that has accomplishments, populate its "*_verified_by" field with the notes' verifier or the profile's default_verifier (if set); leave empty if neither is provided.
-6. Format "date_from" and "date_to" like "November 16, 2026" when dates or a week are mentioned.
-7. For "hours_this_week", use the hours stated in the notes (or count working days × default_daily_hours only when clearly implied, otherwise ""). For "total_hours_worked", compute previous_total_hours + hours_this_week if both are numeric and known, or use the total explicitly stated in the notes, otherwise "".
-8. Extract any trainings/orientations/workshops into "new_trainings", blockers/issues into "problems_encountered", and how they were resolved into "solutions_done" (use "" if none mentioned).
-9. Respond with valid JSON ONLY.`;
+STRICT CONCISENESS & FORMATTING RULES (the entire report MUST fit cleanly on ONE page):
+1. Do NOT write too many bullets or long paragraphs. Keep each worked day to 1-3 short, crisp bullet lines (maximum ~12-14 words per bullet).
+2. Rewrite casual/spoken notes into formal past-tense institutional statements (e.g., "Attended orientation on company rules and regulations", "Configured network switches in the server room").
+3. Separate multiple items for the same day/section with a single newline ("\\n"). Do NOT add bullet symbols ("-", "•", "1.").
+4. Leave unmentioned days completely blank (""). Never invent tasks.
+5. Keep "new_trainings", "problems_encountered", and "solutions_done" concise (max 1-2 short lines each, <= 14 words per line, or "" if none mentioned).
+6. Use profile defaults for "intern_name_last_first" (LASTNAME, FIRSTNAME MI.), "intern_name_first_last" (FIRSTNAME MI. LASTNAME), and "office" unless overridden in notes.
+7. Populate "*_verified_by" only for days that have accomplishments using notes or profile default_verifier (otherwise "").
+8. Format "date_from" and "date_to" like "November 16, 2026".
+9. Set "hours_this_week" if stated or clearly implied by worked days × default_daily_hours, and "total_hours_worked" as previous_total + hours_this_week if numeric, else "".
+10. Respond with valid JSON only.`;
 
 export async function POST(request: Request) {
   const { supabase, user } = await getUser();
@@ -39,15 +40,30 @@ export async function POST(request: Request) {
     );
   }
 
-  const [{ data: profile }, { data: template }, { data: latestReport }] = await Promise.all([
+  // Enforce admin-configured per-user daily prompt rate limit
+  const quotaBefore = await getUserQuotaStatus(supabase, user.id, user.email);
+  if (quotaBefore.isBlocked) {
+    return NextResponse.json(
+      { error: "Your AI prompt access is currently paused by the admin. Contact mikorynosantiago@gmail.com." },
+      { status: 403 },
+    );
+  }
+  if (!quotaBefore.allowed) {
+    return NextResponse.json(
+      {
+        error: `Daily AI prompt limit reached (${quotaBefore.usedToday}/${quotaBefore.dailyLimit} used today). Ask mikorynosantiago@gmail.com to increase your limit.`,
+        quota: quotaBefore,
+      },
+      { status: 429 },
+    );
+  }
+
+  const [{ data: profile }, { data: latestReport }] = await Promise.all([
     supabase
       .from("profiles")
       .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours")
       .eq("id", user.id)
       .maybeSingle(),
-    body.data.templateId
-      ? supabase.from("templates").select("id, schema").eq("id", body.data.templateId).maybeSingle()
-      : supabase.from("templates").select("id, schema").eq("user_id", user.id).eq("is_active", true).maybeSingle(),
     supabase
       .from("reports")
       .select("structured_data")
@@ -57,8 +73,6 @@ export async function POST(request: Request) {
       .maybeSingle(),
   ]);
 
-  const detectedFields = (Array.isArray(template?.schema) ? template.schema : []) as unknown as DetectedField[];
-  const activeSchemaSummary = detectedFields.map((f) => ({ key: f.key, label: f.label, kind: f.kind }));
   const prevTotal =
     latestReport?.structured_data &&
     typeof latestReport.structured_data === "object" &&
@@ -76,13 +90,11 @@ export async function POST(request: Request) {
       default_daily_hours: profile?.default_daily_hours ?? 8,
     },
     previous_report_total_hours: prevTotal,
-    detected_template_fields: activeSchemaSummary,
-    existing_draft: body.data.existingData ?? null,
     raw_notes: body.data.rawNotes,
   };
 
   try {
-    const { data, usage } = await groqJson<unknown>({
+    const { data, usage, model } = await groqJson<unknown>({
       system: SYSTEM_PROMPT,
       user: JSON.stringify(userPayload),
       temperature: 0.2,
@@ -91,7 +103,6 @@ export async function POST(request: Request) {
 
     const parsed = reportDataSchema.parse(data ?? {}) as ReportData;
 
-    // Guarantee profile defaults fill blank identity fields so the report is ready to preview.
     if (!parsed.intern_name_last_first && profile?.name_last_first) {
       parsed.intern_name_last_first = profile.name_last_first;
     }
@@ -109,7 +120,14 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ structuredData: parsed, usage });
+    await supabase.from("prompt_usage_logs").insert({
+      user_id: user.id,
+      kind: "generate_report",
+      model,
+    });
+
+    const quotaAfter = await getUserQuotaStatus(supabase, user.id, user.email);
+    return NextResponse.json({ structuredData: parsed, usage, model, quota: quotaAfter });
   } catch (err) {
     const mapped = groqErrorResponse(err);
     return NextResponse.json({ error: mapped.message }, { status: mapped.status });

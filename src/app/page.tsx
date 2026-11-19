@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
+import { getUserQuotaStatus } from "@/lib/admin";
 import { ensureActiveTemplateReview } from "@/lib/templates/pipeline";
 import { reportDataSchema, type ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
@@ -18,13 +19,14 @@ async function WorkspaceContent({
 
   const { reportId } = await searchParams;
 
-  const [{ data: profile }, review, reportRes] = await Promise.all([
+  const [{ data: profile }, review, quota, reportRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours")
       .eq("id", user.id)
       .maybeSingle(),
     ensureActiveTemplateReview(supabase, user.id).catch(() => null),
+    getUserQuotaStatus(supabase, user.id, user.email),
     reportId
       ? supabase
           .from("reports")
@@ -52,7 +54,12 @@ async function WorkspaceContent({
 
   return (
     <AppShell userEmail={user.email ?? ""}>
-      <WorkspaceClient profile={initialProfile} initialReview={review} initialReport={initialReport} />
+      <WorkspaceClient
+        profile={initialProfile}
+        initialReview={review}
+        initialReport={initialReport}
+        initialQuota={quota}
+      />
     </AppShell>
   );
 }

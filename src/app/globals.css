@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
+  --background: #f1f5f9;
   --foreground: #0f172a;
 }
 
@@ -26,26 +26,22 @@ body {
 }
 
 .docx-preview-stage .docx-wrapper > section.docx {
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.14) !important;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.14) !important;
   margin-bottom: 16px !important;
   background: #ffffff !important;
 }
 
-/* Clean, isolated print output for the rendered Word document */
-@page {
-  size: letter;
-  margin: 0;
-}
-
+/* Clean, isolated 1-page print output for the rendered Word document */
 @media print {
   html,
   body {
     background: #ffffff !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: auto !important;
+    width: 100% !important;
     height: auto !important;
-    overflow: visible !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
   }
 
   .no-print {
@@ -55,20 +51,21 @@ body {
   .docx-print-root {
     display: block !important;
     position: static !important;
-    width: 100% !important;
+    width: auto !important;
     max-width: none !important;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     background: #ffffff !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
   }
 
   .docx-preview-stage {
-    overflow: visible !important;
+    overflow: hidden !important;
     max-height: none !important;
     padding: 0 !important;
     margin: 0 !important;
@@ -91,14 +88,13 @@ body {
   .docx-preview-stage .docx-wrapper > section.docx {
     box-shadow: none !important;
     margin: 0 !important;
-    transform: none !important;
-    zoom: 1 !important;
-    page-break-after: always;
-    break-after: page;
-  }
-
-  .docx-preview-stage .docx-wrapper > section.docx:last-child {
-    page-break-after: auto;
-    break-after: auto;
+    height: 99.4vh !important;
+    min-height: 0 !important;
+    max-height: 99.4vh !important;
+    overflow: hidden !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
