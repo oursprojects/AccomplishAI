@@ -16,12 +16,12 @@ const SYSTEM_PROMPT = `You convert a student intern's raw typed or spoken notes 
 Return a single JSON object with ALL of these string keys (no nested objects/arrays):
 ${REPORT_KEYS.map((k) => `- "${k}": ${REPORT_FIELD_META[k].description}`).join("\n")}
 
-STRICT CONCISENESS & FORMATTING RULES (the entire report MUST fit cleanly on ONE page):
-1. Do NOT write too many bullets or long paragraphs. Keep each worked day to 1-3 short, crisp bullet lines (maximum ~12-14 words per bullet).
-2. Rewrite casual/spoken notes into formal past-tense institutional statements (e.g., "Attended orientation on company rules and regulations", "Configured network switches in the server room").
+STRICT SUMMARIZATION, PAST-TENSE & TABLE-FIT RULES (the entire report MUST fit cleanly on ONE page):
+1. Summarize into **past-tense** formal action statements ONLY (e.g., "Attended orientation on company rules", "Configured network switches in the server room"). Never include markdown symbols, small talk, or extra commentary.
+2. Keep each worked day to **1-3 concise lines** (maximum ~12 words / <= 95 chars per line).
 3. Separate multiple items for the same day/section with a single newline ("\\n"). Do NOT add bullet symbols ("-", "•", "1.").
 4. Leave unmentioned days completely blank (""). Never invent tasks.
-5. Keep "new_trainings", "problems_encountered", and "solutions_done" concise (max 1-2 short lines each, <= 14 words per line, or "" if none mentioned).
+5. Keep "new_trainings", "problems_encountered", and "solutions_done" summarized to **1-2 short lines** (<= 12 words per line, or "" if none mentioned).
 6. Use profile defaults for "intern_name_last_first" (LASTNAME, FIRSTNAME MI.), "intern_name_first_last" (FIRSTNAME MI. LASTNAME), and "office" unless overridden in notes.
 7. Populate "*_verified_by" only for days that have accomplishments using notes or profile default_verifier (otherwise "").
 8. Format "date_from" and "date_to" like "November 16, 2026".

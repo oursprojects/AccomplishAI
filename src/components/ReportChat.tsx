@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { QuotaStatus } from "@/lib/admin";
 import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
 import { VoiceRecorder } from "./VoiceRecorder";
+import { ChatMarkdown } from "./ChatMarkdown";
 
 export interface ChatTurn {
   id: string;
@@ -174,13 +175,13 @@ export function ReportChat({
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
             <div
-              className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap leading-relaxed shadow-2xs ${
+              className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-2xs ${
                 m.role === "user"
-                  ? "bg-slate-900 text-white rounded-br-sm"
+                  ? "bg-slate-900 text-white rounded-br-sm whitespace-pre-wrap"
                   : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
               }`}
             >
-              {m.content}
+              {m.role === "assistant" ? <ChatMarkdown content={m.content} /> : m.content}
             </div>
             {m.role === "assistant" && m.toolActions && m.toolActions.length > 0 && (
               <div className="mt-1 flex flex-wrap items-center gap-1.5">

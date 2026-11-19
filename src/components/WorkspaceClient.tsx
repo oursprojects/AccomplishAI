@@ -55,21 +55,21 @@ function buildWelcomeMessage(
     missingProfile.push("your full name");
   }
   const intro = profile.name_first_last
-    ? `Hi ${profile.name_first_last}! I pre-filled your name and office (${profile.office || "YML"}).`
-    : `Hi! Tell me what you accomplished this week (or tap Voice to speak).`;
+    ? `Hi **${profile.name_first_last}**! I pre-filled your name and office (**${profile.office || "YML"}**).`
+    : `Hi! Tell me what you accomplished this week *(or tap Voice to speak)*.`;
 
   const askList = [
     ...missingProfile,
-    "week dates (From – To)",
-    "what you did (Mon–Fri)",
-    "hours worked this week & total hours",
-    "any new trainings, problems, or solutions",
+    "**Week dates** (*From – To*)",
+    "**Daily tasks** (*Mon–Fri*)",
+    "**Hours worked** (*this week & total*)",
+    "**New trainings, problems, or solutions**",
   ];
 
   return {
     id: "welcome",
     role: "assistant",
-    content: `${intro}\n\nShare what you have so far — if anything is still needed, I'll ask you for it:\n• ${askList.join("\n• ")}`,
+    content: `${intro}\n\nShare what you have for your **Weekly Accomplishment Report** — if anything is still needed, I'll ask:\n- ${askList.join("\n- ")}`,
   };
 }
 

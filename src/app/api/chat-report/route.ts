@@ -28,19 +28,22 @@ const requestSchema = z.object({
 });
 
 const BULLET_PREFIX = /^\s*(?:[-*•▪◦·–—]|\d+[.)])\s+/gm;
+const INLINE_MARKDOWN = /[*_`]/g;
 
 function cleanFieldValue(key: ReportKey, raw: unknown): string {
   if (raw === null || raw === undefined) return "";
-  const str = Array.isArray(raw) ? raw.map(String).join("\n") : String(raw);
+  const str = (Array.isArray(raw) ? raw.map(String).join("\n") : String(raw)).replace(INLINE_MARKDOWN, "");
   if (REPORT_FIELD_META[key].kind === "list") {
+    const isReflection = key === "new_trainings" || key === "problems_encountered" || key === "solutions_done";
+    const maxLines = isReflection ? 2 : 3;
     return str
       .split(/\r?\n/)
-      .map((l) => l.replace(BULLET_PREFIX, "").trim())
+      .map((l) => l.replace(BULLET_PREFIX, "").trim().slice(0, 100))
       .filter(Boolean)
-      .slice(0, 4) // Keep each section concise for 1-page layout
+      .slice(0, maxLines)
       .join("\n");
   }
-  return str.trim();
+  return str.trim().slice(0, 120);
 }
 
 function computeStatus(data: ReportData) {
@@ -222,7 +225,7 @@ export async function POST(request: Request) {
       ? String((latestReport.structured_data as Record<string, unknown>).total_hours_worked ?? "")
       : "";
 
-  const systemPrompt = `You are Accomplish AI, a friendly, concise assistant that helps a student intern fill out their official 1-page "2026 Weekly Accomplishment Report" through conversation.
+  const systemPrompt = `You are **Accomplish AI**, a strict, focused assistant ONLY for filling the student intern's official 1-page **"2026 Weekly Accomplishment Report"** document.
 
 Today's date: ${new Date().toISOString().slice(0, 10)}
 User profile defaults: ${JSON.stringify({
@@ -235,15 +238,22 @@ User profile defaults: ${JSON.stringify({
   })}
 Current report fields: ${JSON.stringify(workingData)}
 
-HOW TO WORK:
-1. Whenever the user gives any information (name, dates, daily tasks, hours, verifier, trainings, problems, solutions, or "none"), IMMEDIATELY call \`update_report_fields\` with cleanly rewritten, formal past-tense institutional statements.
-2. Keep every list field concise so the report fits cleanly on ONE page: max 1-3 short bullets per worked day (<= 14 words each, separated by \\n, NO "-" or "•" prefixes), and max 1-2 short lines for trainings/problems/solutions.
-3. If the user provides their full name for the first time (or in one format), derive BOTH \`intern_name_last_first\` ("LASTNAME, FIRSTNAME MI.") and \`intern_name_first_last\` ("FIRSTNAME MI. LASTNAME") and also call \`save_profile_defaults\` if their profile defaults are currently empty.
-4. For any worked day where verifier isn't specified, use \`default_verifier\` if available. If the user says "none" for trainings/problems/solutions, set that field to "None".
-5. NEVER invent tasks, dates, or hours the user did not provide.
-6. After tool calls finish, check what is still missing from the tool response:
-   - If required info or important details are missing or incomplete, reply concisely telling the user **what you just filled** and clearly listing **what specific information is still needed** (in short bullet points) so they can reply with it.
-   - If all essential information is filled, confirm what's in the report and let them know it's ready in the 1-Page Preview to Print/Save PDF, Download .docx, or Save to History.`;
+STRICT TOPIC & SCOPE RULE:
+- ONLY discuss internship tasks and fields inside this Weekly Accomplishment Report (\`Student Intern\`, \`Office\`, \`From/To\`, \`Mon–Fri\` accomplishments & verifiers, \`Hours\`, \`New trainings\`, \`Problems encountered\`, \`Solutions done\`).
+- If the user asks anything unrelated to their internship tasks or this document (e.g., general chat, coding help, trivia, jokes, other topics), politely refuse in one short sentence (*"I can only help with your Weekly Accomplishment Report."*) and state what report info is still needed.
+
+SUMMARIZATION, PAST TENSE & TABLE-FIT RULES (FOR \`update_report_fields\` TOOL VALUES):
+1. All tool values written to the document MUST be plain text (NO markdown symbols like \`**\`, \`*\`, or \`-\` bullets).
+2. Summarize long descriptions into crisp, formal **past-tense** action statements (e.g., *"Attended orientation on office rules"*, *"Configured network switches in the server room"*). Never use present/future tense or extra filler.
+3. Keep values short enough to fit inside the 1-page Word table with ZERO extra overflow:
+   - Max **1–3 short lines** per worked day (\`<= 12 words\` per line, separated by \`\\n\`).
+   - Max **1–2 short lines** for \`new_trainings\`, \`problems_encountered\`, and \`solutions_done\` (\`<= 12 words\` per line, or \`"None"\` if user says none).
+4. Never invent tasks, dates, or hours not provided by the user.
+5. When the user gives their name, derive BOTH \`intern_name_last_first\` ("LASTNAME, FIRSTNAME MI.") and \`intern_name_first_last\` ("FIRSTNAME MI. LASTNAME"), and call \`save_profile_defaults\` if profile defaults are empty.
+
+CHAT REPLY FORMAT (SHOWN TO USER IN CHAT):
+- Format your reply cleanly using **Markdown**: use **bold**, *italics*, and a compact **Markdown table** (\`| Field | Status |\`) showing what was updated and what is still missing.
+- Keep your chat reply concise and focused strictly on the report—no small talk or extra commentary.`;
 
   const recentMessages = body.data.messages.slice(-10);
   const loopMessages: GroqMessage[] = [
