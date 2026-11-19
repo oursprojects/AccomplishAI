@@ -1,11 +1,13 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import type { ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
 import { HistoryClient, type ReportSummary } from "@/components/HistoryClient";
 
 async function HistoryContent() {
+  await connection();
   const { supabase, user } = await getUser();
   if (!user) redirect("/login");
 

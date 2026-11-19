@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { AppShell } from "@/components/AppShell";
 import { ProfileForm } from "@/components/ProfileForm";
 
 async function ProfileContent() {
+  await connection();
   const { supabase, user } = await getUser();
   if (!user) redirect("/login");
 

@@ -1,11 +1,13 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { loadActiveTemplateReview } from "@/lib/templates/pipeline";
 import { AppShell } from "@/components/AppShell";
 import { TemplateScannerCard } from "@/components/TemplateScannerCard";
 
 async function TemplateContent() {
+  await connection();
   const { supabase, user } = await getUser();
   if (!user) redirect("/login");
 

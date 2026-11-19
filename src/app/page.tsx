@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { ensureActiveTemplateReview } from "@/lib/templates/pipeline";
 import { reportDataSchema, type ReportData } from "@/lib/report-schema";
@@ -11,6 +12,7 @@ async function WorkspaceContent({
 }: {
   searchParams: Promise<{ reportId?: string }>;
 }) {
+  await connection();
   const { supabase, user } = await getUser();
   if (!user) redirect("/login");
 
