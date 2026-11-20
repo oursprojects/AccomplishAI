@@ -16,6 +16,7 @@ import { DocxPreviewPanel } from "./DocxPreviewPanel";
 interface WorkspaceClientProps {
   userId: string;
   profile: Pick<Profile, "name_last_first" | "name_first_last" | "office" | "default_verifier" | "default_daily_hours">;
+  previousTotalHours?: string;
   initialReview: TemplateReview | null;
   initialReport: {
     id: string;
@@ -92,6 +93,7 @@ function snapshotOf(title: string, data: ReportData, messages: ChatTurn[]): stri
 export function WorkspaceClient({
   userId,
   profile,
+  previousTotalHours = "",
   initialReview,
   initialReport,
   initialDraft,
@@ -512,6 +514,9 @@ export function WorkspaceClient({
               saving={saving}
               savedId={savedId}
               hasChanges={hasChanges}
+              defaultVerifier={profile.default_verifier}
+              defaultDailyHours={profile.default_daily_hours}
+              previousTotalHours={previousTotalHours}
             />
           </div>
         </div>
@@ -523,6 +528,7 @@ export function WorkspaceClient({
             templateVersion={review.template.updated_at}
             fields={review.fields}
             data={data}
+            reportTitle={title}
           />
           <div className="mt-3 flex justify-end lg:hidden">
             <button

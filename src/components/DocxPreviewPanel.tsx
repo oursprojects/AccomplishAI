@@ -13,11 +13,19 @@ interface DocxPreviewPanelProps {
   templateVersion: string;
   fields: DetectedField[];
   data: ReportData;
+  reportTitle?: string;
 }
 
 const PT_TO_PX = 96 / 72;
 
-function defaultFileName(data: ReportData): string {
+function defaultFileName(data: ReportData, reportTitle?: string): string {
+  const custom = (reportTitle ?? "")
+    .trim()
+    .replace(/[^a-zA-Z0-9 _-]+/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (custom) return custom;
+
   const slug = [data.date_from, data.date_to]
     .filter(Boolean)
     .join("_to_")
@@ -26,7 +34,7 @@ function defaultFileName(data: ReportData): string {
   return slug ? `Weekly-Accomplishment-Report_${slug}` : "2026-Weekly-Accomplishment-Report";
 }
 
-export function DocxPreviewPanel({ templateId, templateVersion, fields, data }: DocxPreviewPanelProps) {
+export function DocxPreviewPanel({ templateId, templateVersion, fields, data, reportTitle }: DocxPreviewPanelProps) {
   const inlineStageRef = useRef<HTMLDivElement | null>(null);
   const inlineContainerRef = useRef<HTMLDivElement | null>(null);
   const modalStageRef = useRef<HTMLDivElement | null>(null);
@@ -179,7 +187,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data }: 
   }, [loadedKey, targetKey, data, fields, paperSize, previewModalOpen, renderInto]);
 
   function openDownloadPrompt() {
-    setCustomFileName(defaultFileName(data));
+    setCustomFileName(defaultFileName(data, reportTitle));
     setDownloadModalOpen(true);
   }
 
@@ -191,7 +199,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data }: 
       .trim()
       .replace(/[<>:"/\\|?*]+/g, "-")
       .replace(/\.docx$/i, "");
-    const finalName = `${cleaned || defaultFileName(data)}.docx`;
+    const finalName = `${cleaned || defaultFileName(data, reportTitle)}.docx`;
     const copy = new Uint8Array(filled);
     saveAs(new Blob([copy], { type: DOCX_MIME }), finalName);
     setDownloadModalOpen(false);

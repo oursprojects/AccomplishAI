@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
 import { ensureFastActiveTemplateReview } from "@/lib/templates/pipeline";
-import { reportDataSchema, type ReportData } from "@/lib/report-schema";
+import { emptyReport, reportDataSchema, type ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
 import { WorkspaceClient } from "@/components/WorkspaceClient";
 import type { ChatTurn } from "@/components/ReportChat";
@@ -33,20 +33,20 @@ function parseChatTurns(rawChat: unknown): ChatTurn[] {
 async function WorkspaceContent({
   searchParams,
 }: {
-  searchParams: Promise<{ reportId?: string; new?: string }>;
+  searchParams: Promise<{ reportId?: string; new?: string; duplicateFrom?: string }>;
 }) {
   await connection();
   const { supabase, user } = await getUser();
   if (!user) redirect("/login");
 
-  const { reportId, new: newFlag } = await searchParams;
-  const isNewMode = newFlag === "1" && !reportId;
+  const { reportId, new: newFlag, duplicateFrom } = await searchParams;
+  const isNewMode = (newFlag === "1" || Boolean(duplicateFrom)) && !reportId;
 
   if (isNewMode) {
     await supabase.from("workspace_drafts").delete().eq("user_id", user.id);
   }
 
-  const [{ data: profile }, review, quota, reportRes, draftRes] = await Promise.all([
+  const [{ data: profile }, review, quota, reportRes, draftRes, latestReportRes, duplicateRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours")
@@ -66,6 +66,20 @@ async function WorkspaceContent({
       ? supabase
           .from("workspace_drafts")
           .select("report_id, structured_data, chat_messages")
+          .eq("user_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("reports")
+      .select("id, structured_data")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(2),
+    duplicateFrom
+      ? supabase
+          .from("reports")
+          .select("structured_data")
+          .eq("id", duplicateFrom)
           .eq("user_id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -89,21 +103,50 @@ async function WorkspaceContent({
       }
     : null;
 
-  const initialDraft =
-    !initialReport && !isNewMode && draftRes.data
-      ? {
-          report_id: draftRes.data.report_id,
-          structured_data: reportDataSchema.parse(draftRes.data.structured_data ?? {}) as ReportData,
-          chat_messages: parseChatTurns(draftRes.data.chat_messages),
-        }
-      : null;
+  let initialDraft: {
+    report_id: string | null;
+    structured_data: ReportData;
+    chat_messages: ChatTurn[];
+  } | null = null;
+
+  if (!initialReport && duplicateRes.data?.structured_data) {
+    const src = reportDataSchema.parse(duplicateRes.data.structured_data ?? {}) as ReportData;
+    const seeded = emptyReport();
+    seeded.intern_name_last_first = src.intern_name_last_first || initialProfile.name_last_first;
+    seeded.intern_name_first_last = src.intern_name_first_last || initialProfile.name_first_last;
+    seeded.office = src.office || initialProfile.office || "DNX";
+    initialDraft = {
+      report_id: null,
+      structured_data: seeded,
+      chat_messages: [],
+    };
+  } else if (!initialReport && !isNewMode && draftRes.data) {
+    initialDraft = {
+      report_id: draftRes.data.report_id,
+      structured_data: reportDataSchema.parse(draftRes.data.structured_data ?? {}) as ReportData,
+      chat_messages: parseChatTurns(draftRes.data.chat_messages),
+    };
+  }
+
+  const prevSource =
+    duplicateRes.data ??
+    (latestReportRes.data ?? []).find((r) => !reportId || r.id !== reportId) ??
+    null;
+
+  const previousTotalHours =
+    prevSource?.structured_data &&
+    typeof prevSource.structured_data === "object" &&
+    !Array.isArray(prevSource.structured_data)
+      ? String((prevSource.structured_data as Record<string, unknown>).total_hours_worked ?? "")
+      : "";
 
   return (
     <AppShell userEmail={user.email ?? ""} quota={quota}>
       <WorkspaceClient
-        key={initialReport?.id ?? (isNewMode ? "new-report" : "draft")}
+        key={initialReport?.id ?? (duplicateFrom ? `dup-${duplicateFrom}` : isNewMode ? "new-report" : "draft")}
         userId={user.id}
         profile={initialProfile}
+        previousTotalHours={previousTotalHours}
         initialReview={review}
         initialReport={initialReport}
         initialDraft={initialDraft}
@@ -116,7 +159,7 @@ async function WorkspaceContent({
 export default function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ reportId?: string; new?: string }>;
+  searchParams: Promise<{ reportId?: string; new?: string; duplicateFrom?: string }>;
 }) {
   return (
     <Suspense

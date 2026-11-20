@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
+  Copy,
   Eraser,
   Eye,
   FilePlus2,
@@ -51,8 +52,9 @@ function getMissingSummary(data: ReportData): string[] {
 }
 
 const QUICK_REPLIES = [
-  "Translate my notes to formal past-tense English & apply",
-  "Summarize shorter so it fits cleanly",
+  "Translate Tagalog/Taglish & apply",
+  "Polish to formal past-tense",
+  "Shorten bullets to fit 1 page",
   "No trainings, problems, or solutions",
 ];
 
@@ -73,9 +75,20 @@ export function ReportChat({
 }: ReportChatProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const turnSeqRef = useRef(0);
+
+  async function handleCopyReply(id: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId((prev) => (prev === id ? null : prev)), 1500);
+    } catch {
+      // Ignore clipboard failures
+    }
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -216,9 +229,9 @@ export function ReportChat({
             >
               {m.role === "assistant" ? <ChatMarkdown content={m.content} /> : m.content}
             </div>
-            {m.role === "assistant" && m.toolActions && m.toolActions.length > 0 && (
+            {m.role === "assistant" && (
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {m.toolActions.map((act, idx) => (
+                {m.toolActions?.map((act, idx) => (
                   <span
                     key={idx}
                     className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800"
@@ -227,14 +240,27 @@ export function ReportChat({
                     {act}
                   </span>
                 ))}
-                <button
-                  type="button"
-                  onClick={onOpenPreview}
-                  className="lg:hidden inline-flex items-center gap-1 rounded-full bg-[#1F1E1C] px-2.5 py-0.5 text-[11px] font-medium text-white cursor-pointer"
-                >
-                  <Eye className="h-3 w-3" />
-                  <span>View Preview</span>
-                </button>
+                {m.id !== "welcome" && m.id !== "welcome-existing" && (
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyReply(m.id, m.content)}
+                    className="inline-flex items-center gap-1 rounded-full border border-[#DDD7CB] bg-white px-2 py-0.5 text-[11px] font-medium text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                    title="Copy reply"
+                  >
+                    {copiedId === m.id ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                    <span>{copiedId === m.id ? "Copied" : "Copy"}</span>
+                  </button>
+                )}
+                {m.toolActions && m.toolActions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={onOpenPreview}
+                    className="lg:hidden inline-flex items-center gap-1 rounded-full bg-[#1F1E1C] px-2.5 py-0.5 text-[11px] font-medium text-white cursor-pointer"
+                  >
+                    <Eye className="h-3 w-3" />
+                    <span>View Preview</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

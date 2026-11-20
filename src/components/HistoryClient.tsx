@@ -6,10 +6,12 @@ import {
   Calendar,
   Check,
   Clock,
+  CopyPlus,
   ExternalLink,
   FileText,
   Pencil,
   Plus,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -34,11 +36,31 @@ export function HistoryClient({
   canCreateReport: boolean;
 }) {
   const [reports, setReports] = useState<ReportSummary[]>(initialReports);
+  const [query, setQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredReports = normalizedQuery
+    ? reports.filter((r) => {
+        const d = r.structured_data;
+        const haystack = [
+          r.title,
+          d.date_from,
+          d.date_to,
+          d.office,
+          d.intern_name_last_first,
+          r.raw_notes,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+    : reports;
 
   function startRename(report: ReportSummary) {
     const d = report.structured_data;
@@ -129,6 +151,19 @@ export function HistoryClient({
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>
       )}
 
+      {reports.length > 0 && (
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A847A]" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search saved reports by title, dates, office, or notes..."
+            className="w-full rounded-xl border border-[#E6E2D8] bg-white pl-10 pr-4 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757]"
+          />
+        </div>
+      )}
+
       {reports.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#DDD7CB] bg-white p-10 text-center">
           <p className="text-sm font-medium text-[#1F1E1C]">No saved reports yet</p>
@@ -136,9 +171,13 @@ export function HistoryClient({
             Create your first Weekly Accomplishment Report in Report Chat and click &ldquo;Save Report&rdquo;.
           </p>
         </div>
+      ) : filteredReports.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[#DDD7CB] bg-white p-8 text-center">
+          <p className="text-sm font-medium text-[#1F1E1C]">No reports match &ldquo;{query.trim()}&rdquo;</p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {reports.map((report) => {
+          {filteredReports.map((report) => {
             const d = report.structured_data;
             const dateFallback = [d.date_from, d.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
             const displayTitle = report.title.trim() || dateFallback;
@@ -229,13 +268,21 @@ export function HistoryClient({
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
                   <Link
                     href={`/?reportId=${report.id}`}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-3.5 py-2 text-xs font-medium text-white hover:bg-[#33312E] transition"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
-                    <span>Open &amp; Download</span>
+                    <span>Open</span>
+                  </Link>
+                  <Link
+                    href={`/?duplicateFrom=${report.id}`}
+                    title="Start next week's blank report keeping your name, office, and carried-over total hours"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] transition"
+                  >
+                    <CopyPlus className="h-3.5 w-3.5 text-[#D97757]" />
+                    <span>Next Week</span>
                   </Link>
                   <button
                     type="button"

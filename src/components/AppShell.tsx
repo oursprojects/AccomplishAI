@@ -82,15 +82,14 @@ export function AppShell({
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [signOutOpen, setSignOutOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  async function executeSignOut() {
+  async function handleSignOut() {
+    if (signingOut) return;
     setSigningOut(true);
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      setSignOutOpen(false);
       router.push("/login");
       router.refresh();
     } finally {
@@ -103,8 +102,8 @@ export function AppShell({
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#FAF9F5] text-[#1F1E1C]">
       {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-[#E5E2D9] bg-[#FAF9F5]/95 backdrop-blur-md px-3.5 py-2.5">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-[#E5E2D9] bg-[#FAF9F5]/95 backdrop-blur-md px-3.5 py-2">
+        <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
@@ -117,9 +116,9 @@ export function AppShell({
             <Image
               src="/logo.png"
               alt="Accomplish AI"
-              width={28}
-              height={28}
-              className="h-7 w-7 rounded-lg border border-[#E5E2D9] object-contain shrink-0"
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-xl object-contain shrink-0"
             />
             <span className="text-sm font-semibold tracking-tight truncate">{currentLabel}</span>
           </div>
@@ -129,9 +128,10 @@ export function AppShell({
           <AllowancePill quota={quota} />
           <button
             type="button"
-            onClick={() => setSignOutOpen(true)}
+            disabled={signingOut}
+            onClick={() => void handleSignOut()}
             title="Sign out"
-            className="inline-flex items-center justify-center rounded-xl border border-[#E5E2D9] bg-white p-2 text-xs font-medium text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+            className="inline-flex items-center justify-center rounded-xl border border-[#E5E2D9] bg-white p-2 text-xs font-medium text-[#57544E] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
           >
             <LogOut className="h-3.5 w-3.5" />
           </button>
@@ -152,9 +152,9 @@ export function AppShell({
                   <Image
                     src="/logo.png"
                     alt="Accomplish AI"
-                    width={36}
-                    height={36}
-                    className="h-9 w-9 rounded-xl border border-[#E5E2D9] bg-white object-contain shadow-2xs"
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 rounded-xl object-contain shrink-0"
                   />
                   <div>
                     <span className="block text-sm font-semibold text-[#1F1E1C]">Accomplish AI</span>
@@ -216,14 +216,15 @@ export function AppShell({
               </div>
               <button
                 type="button"
+                disabled={signingOut}
                 onClick={() => {
                   setMobileOpen(false);
-                  setSignOutOpen(true);
+                  void handleSignOut();
                 }}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#E5E2D9] bg-white px-3 py-2 text-xs font-medium text-[#57544E] hover:bg-[#EAE7DD]/60 cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#E5E2D9] bg-white px-3 py-2 text-xs font-medium text-[#57544E] hover:bg-[#EAE7DD]/60 disabled:opacity-50 cursor-pointer"
               >
                 <LogOut className="h-3.5 w-3.5" />
-                <span>Sign out</span>
+                <span>{signingOut ? "Signing out..." : "Sign out"}</span>
               </button>
               <p className="text-center text-[10px] text-[#7A746B]">
                 Created by Mike Ryno Santiago — DNX Intern
@@ -236,19 +237,19 @@ export function AppShell({
       {/* Desktop sticky sidebar */}
       <aside
         className={`hidden md:flex sticky top-0 h-screen shrink-0 flex-col justify-between border-r border-[#E5E2D9] bg-[#F4F2EA] transition-all duration-200 ${
-          collapsed ? "w-[72px] px-2.5 py-4" : "w-60 px-3.5 py-4"
+          collapsed ? "w-[76px] px-2.5 py-4" : "w-60 px-3.5 py-4"
         }`}
       >
         <div className="space-y-4">
-          <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between px-1"}`}>
+          <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between px-0.5"}`}>
             {!collapsed && (
               <Link href="/" className="flex items-center gap-2.5 min-w-0">
                 <Image
                   src="/logo.png"
                   alt="Accomplish AI"
-                  width={34}
-                  height={34}
-                  className="h-8 w-8 shrink-0 rounded-xl border border-[#E5E2D9] bg-white object-contain shadow-2xs"
+                  width={44}
+                  height={44}
+                  className="h-11 w-11 shrink-0 rounded-xl object-contain"
                 />
                 <div className="min-w-0">
                   <span className="block text-sm font-semibold tracking-tight text-[#1F1E1C] truncate">
@@ -320,14 +321,15 @@ export function AppShell({
 
           <button
             type="button"
-            onClick={() => setSignOutOpen(true)}
+            disabled={signingOut}
+            onClick={() => void handleSignOut()}
             title="Sign out"
             className={`w-full flex items-center ${
               collapsed ? "justify-center px-2" : "justify-center gap-2 px-3"
-            } rounded-xl border border-[#E5E2D9] bg-white py-2 text-xs font-medium text-[#57544E] hover:bg-[#EAE7DD]/60 transition cursor-pointer`}
+            } rounded-xl border border-[#E5E2D9] bg-white py-2 text-xs font-medium text-[#57544E] hover:bg-[#EAE7DD]/60 disabled:opacity-50 transition cursor-pointer`}
           >
             <LogOut className="h-3.5 w-3.5 shrink-0" />
-            {!collapsed && <span>Sign out</span>}
+            {!collapsed && <span>{signingOut ? "Signing out..." : "Sign out"}</span>}
           </button>
 
           {!collapsed && (
@@ -359,57 +361,6 @@ export function AppShell({
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
-
-      {/* Sign-Out Confirmation Modal */}
-      {signOutOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F1E1C]/45 backdrop-blur-[2px] p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[#E6E2D8] bg-white p-5 shadow-xl space-y-4">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FDF3EF] text-[#D97757] border border-[#F0D5C9]">
-                  <LogOut className="h-4 w-4" />
-                </span>
-                <div>
-                  <h2 className="text-sm font-semibold text-[#1F1E1C]">Confirm Sign Out</h2>
-                  <p className="text-xs text-[#6B665E]">Are you sure you want to leave?</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={signingOut}
-                onClick={() => setSignOutOpen(false)}
-                className="rounded-lg p-1 text-[#6B665E] hover:bg-[#F4F2EA] cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-[#57544E] rounded-xl bg-[#FAF9F5] border border-[#E6E2D8] px-3.5 py-2.5">
-              Signed in as <strong className="text-[#1F1E1C]">{userEmail}</strong>. Saved reports and workspace drafts
-              are synced to your account for your next login.
-            </p>
-
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                disabled={signingOut}
-                onClick={() => setSignOutOpen(false)}
-                className="rounded-xl border border-[#DDD7CB] bg-white px-3.5 py-2 text-xs font-medium text-[#4A463F] hover:bg-[#F4F2EA] cursor-pointer"
-              >
-                Stay Signed In
-              </button>
-              <button
-                type="button"
-                disabled={signingOut}
-                onClick={() => void executeSignOut()}
-                className="rounded-xl bg-[#1F1E1C] px-4 py-2 text-xs font-semibold text-white hover:bg-[#33312E] disabled:opacity-60 cursor-pointer"
-              >
-                {signingOut ? "Signing out..." : "Sign Out"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
