@@ -6,6 +6,7 @@ import { getUserQuotaStatus } from "@/lib/admin";
 import { loadActiveTemplateReview } from "@/lib/templates/pipeline";
 import { AppShell } from "@/components/AppShell";
 import { TemplateScannerCard } from "@/components/TemplateScannerCard";
+import TemplateLoading from "./loading";
 
 async function TemplateContent() {
   await connection();
@@ -28,13 +29,7 @@ async function TemplateContent() {
 
 export default function TemplatePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center text-sm text-[#6B665E] bg-[#FAF9F5]">
-          Loading template...
-        </div>
-      }
-    >
+    <Suspense fallback={<TemplateLoading />}>
       <TemplateContent />
     </Suspense>
   );

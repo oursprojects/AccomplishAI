@@ -1,11 +1,12 @@
 import "server-only";
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "./database.types";
 import { publicEnv } from "@/lib/env";
 
 /** Supabase client for Server Components, Server Actions and Route Handlers. */
-export async function createClient() {
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies();
   return createServerClient<Database>(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
     cookies: {
@@ -21,13 +22,13 @@ export async function createClient() {
       },
     },
   });
-}
+});
 
 /** Returns the signed-in user or null (validated against Supabase Auth). */
-export async function getUser() {
+export const getUser = cache(async function getUser() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return { supabase, user };
-}
+});

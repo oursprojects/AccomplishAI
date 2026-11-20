@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   FileCheck2,
@@ -35,6 +35,12 @@ const BASE_NAV: NavItem[] = [
   { href: "/template", label: "Template", icon: FileCheck2 },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
+
+function NavPendingSpinner() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-[#C86343] shrink-0" />;
+}
 
 function AllowancePill({ quota }: { quota?: QuotaStatus }) {
   if (!quota) return null;
@@ -88,9 +94,7 @@ export function AppShell({
   const [signingOut, setSigningOut] = useState(false);
   const [creatingReport, setCreatingReport] = useState(false);
   const [navError, setNavError] = useState<string | null>(null);
-  const [pendingNav, setPendingNav] = useState<{ fromPath: string; target: string } | null>(null);
-
-  const isNavigating = pendingNav !== null && pendingNav.fromPath === pathname;
+  const [isNavTransition, startNavTransition] = useTransition();
 
   function isNavActive(item: NavItem): boolean {
     if (pathname === item.href) return true;
@@ -126,11 +130,11 @@ export function AppShell({
         throw new Error(json.error ?? "Could not create a new report.");
       }
       setMobileOpen(false);
-      setPendingNav({ fromPath: pathname, target: `/reports/${json.report.id}` });
-      router.push(`/reports/${json.report.id}`);
+      startNavTransition(() => {
+        router.push(`/reports/${json.report!.id}`);
+      });
     } catch (err) {
       setNavError(err instanceof Error ? err.message : "Could not create report.");
-    } finally {
       setCreatingReport(false);
     }
   }
@@ -140,8 +144,8 @@ export function AppShell({
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#FAF9F5] text-[#1F1E1C]">
-      {/* Subtle top progress bar during route transitions */}
-      {isNavigating && (
+      {/* Subtle top progress bar during imperative route transitions */}
+      {(creatingReport || isNavTransition) && (
         <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-[#F0D5C9] overflow-hidden">
           <div className="h-full w-1/2 bg-[#D97757] animate-[pulse_0.9s_ease-in-out_infinite] rounded-full" />
         </div>
@@ -242,10 +246,7 @@ export function AppShell({
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => {
-                        setMobileOpen(false);
-                        if (item.href !== pathname) setPendingNav({ fromPath: pathname, target: item.href });
-                      }}
+                      onClick={() => setMobileOpen(false)}
                       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                         active
                           ? "bg-white text-[#1F1E1C] shadow-2xs border border-[#E5E2D9]"
@@ -254,6 +255,7 @@ export function AppShell({
                     >
                       <Icon className={`h-4 w-4 ${active ? "text-[#C96442]" : "text-[#7A776F]"}`} />
                       <span>{item.label}</span>
+                      <NavPendingSpinner />
                     </Link>
                   );
                 })}
@@ -303,9 +305,6 @@ export function AppShell({
             {!collapsed && (
               <Link
                 href="/"
-                onClick={() => {
-                  if (pathname !== "/") setPendingNav({ fromPath: pathname, target: "/" });
-                }}
                 className="flex items-center gap-2.5 min-w-0"
               >
                 <Image
@@ -354,9 +353,6 @@ export function AppShell({
                   key={item.href}
                   href={item.href}
                   title={collapsed ? item.label : undefined}
-                  onClick={() => {
-                    if (item.href !== pathname) setPendingNav({ fromPath: pathname, target: item.href });
-                  }}
                   className={`flex items-center ${
                     collapsed ? "justify-center px-2" : "gap-3 px-3"
                   } rounded-xl py-2.5 text-sm font-medium transition ${
@@ -367,6 +363,7 @@ export function AppShell({
                 >
                   <Icon className={`h-4 w-4 shrink-0 ${active ? "text-[#C96442]" : "text-[#7A776F]"}`} />
                   {!collapsed && <span className="truncate">{item.label}</span>}
+                  {!collapsed && <NavPendingSpinner />}
                 </Link>
               );
             })}
@@ -417,12 +414,6 @@ export function AppShell({
                 {quota.reportsCount}
                 {quota.maxReports === null ? " saved reports" : `/${quota.maxReports} reports`}
               </Badge>
-            )}
-            {isNavigating && (
-              <span className="inline-flex items-center gap-1 text-xs text-[#C86343]">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span>Opening...</span>
-              </span>
             )}
           </div>
           <div className="flex items-center gap-2.5">

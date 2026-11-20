@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState, useTransition } from "react";
+import Link, { useLinkStatus } from "next/link";
 import { useRouter } from "next/navigation";
 import PizZip from "pizzip";
 import { saveAs } from "file-saver";
@@ -52,6 +52,20 @@ export interface ReportSummary {
 type SortMode = "newest" | "oldest" | "week_asc";
 type StatusFilter = "all" | "ready" | "draft";
 
+function OpenLinkContent() {
+  const { pending } = useLinkStatus();
+  return (
+    <>
+      {pending ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <ExternalLink className="h-3.5 w-3.5" />
+      )}
+      <span>{pending ? "Opening..." : "Open & Chat"}</span>
+    </>
+  );
+}
+
 function isReportReady(d: Partial<ReportData>): boolean {
   const hasDates = Boolean(d.date_from?.trim() && d.date_to?.trim());
   const hasTasks = DAYS.some((day) => Boolean(d[`${day}_accomplishments`]?.trim()));
@@ -96,6 +110,7 @@ export function HistoryClient({
 
   const [creating, setCreating] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [, startNavTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -255,7 +270,9 @@ export function HistoryClient({
       if (!res.ok || !json.report) {
         throw new Error(json.error ?? "Could not create report.");
       }
-      router.push(`/reports/${json.report.id}`);
+      startNavTransition(() => {
+        router.push(`/reports/${json.report!.id}`);
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create report.");
       setCreating(false);
@@ -670,8 +687,7 @@ export function HistoryClient({
                     href={`/reports/${report.id}`}
                     className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#1F1E1C] px-3 text-xs font-medium text-white hover:bg-[#33312E] transition"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    <span>Open &amp; Chat</span>
+                    <OpenLinkContent />
                   </Link>
                   <Button
                     type="button"

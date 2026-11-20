@@ -11,7 +11,7 @@ export default function TemplateLoading() {
         </div>
       </aside>
       <div className="flex-1 p-4 sm:p-6 mx-auto max-w-4xl space-y-4">
-        <Skeleton className="h-44 rounded-2xl bg-white border border-[#E6E2D8]" />
+        <Skeleton className="h-16 rounded-2xl bg-white border border-[#E6E2D8]" />
         <Skeleton className="h-80 rounded-2xl bg-white border border-[#E6E2D8]" />
       </div>
     </div>
