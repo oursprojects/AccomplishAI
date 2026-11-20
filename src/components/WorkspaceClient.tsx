@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/toast";
 import { ReportChat, type ChatTurn } from "./ReportChat";
 import { TemplateScannerCard } from "./TemplateScannerCard";
 import { ReportEditor } from "./ReportEditor";
@@ -126,14 +127,10 @@ export function WorkspaceClient({
   const [quickNotesOpen, setQuickNotesOpen] = useState(false);
   const [quickNotesText, setQuickNotesText] = useState("");
   const [generatingFromNotes, setGeneratingFromNotes] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   async function handleQuickFillNotes(e: React.FormEvent) {
     e.preventDefault();
     if (!quickNotesText.trim() || generatingFromNotes) return;
-    setError(null);
-    setNotice(null);
     setGeneratingFromNotes(true);
     try {
       const res = await fetch("/api/generate-report", {
@@ -162,9 +159,9 @@ export function WorkspaceClient({
       setData(merged);
       setQuickNotesOpen(false);
       setQuickNotesText("");
-      setNotice("Filled report from your raw notes — review the live preview or click Undo anytime.");
+      toast.success("Filled report from your raw notes — review the live preview or click Undo anytime.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not process raw notes.");
+      toast.error(err instanceof Error ? err.message : "Could not process raw notes.");
     } finally {
       setGeneratingFromNotes(false);
     }
@@ -215,8 +212,7 @@ export function WorkspaceClient({
     setUndoStack((stack) => stack.slice(0, -1));
     setTitle(prev.title);
     setData(prev.data);
-    setError(null);
-    setNotice("Reverted the last change.");
+    toast.info("Reverted the last change.");
     void persistReportPatch(prev.title, prev.data);
   }
 
@@ -225,8 +221,7 @@ export function WorkspaceClient({
     pushUndoSnapshot(title, data);
     setTitle(baseline.title);
     setData(baseline.data);
-    setError(null);
-    setNotice("Cancelled unsaved edits and restored last saved version.");
+    toast.info("Cancelled unsaved edits and restored last saved version.");
   }
 
   async function handleQuickConfirm() {
@@ -245,8 +240,12 @@ export function WorkspaceClient({
           })),
         }),
       });
-      const json = (await res.json()) as { review?: TemplateReview };
-      if (res.ok && json.review) setReview(json.review);
+      const json = (await res.json()) as { review?: TemplateReview; error?: string };
+      if (!res.ok || !json.review) throw new Error(json.error ?? "Could not confirm template.");
+      setReview(json.review);
+      toast.success("Template confirmed and saved.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not confirm template.");
     } finally {
       setConfirming(false);
     }
@@ -254,8 +253,6 @@ export function WorkspaceClient({
 
   async function handleSave() {
     if (!hasChanges || saving) return;
-    setError(null);
-    setNotice(null);
     setSaving(true);
     try {
       const userNotes = messages
@@ -285,9 +282,9 @@ export function WorkspaceClient({
 
       savedStateRef.current = { title: title.trim(), data };
       setSavedSnapshot(formSnapshotOf(title.trim(), data));
-      setNotice("Saved changes to this report.");
+      toast.success("Saved changes to this report.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save report.");
+      toast.error(err instanceof Error ? err.message : "Could not save report.");
     } finally {
       setSaving(false);
     }
@@ -304,8 +301,7 @@ export function WorkspaceClient({
       },
     ];
     setMessages(freshMsgs);
-    setNotice("Conversation cleared. Your document fields remain intact.");
-    setError(null);
+    toast.info("Conversation cleared. Your document fields remain intact.");
     void persistReportPatch(title, data, freshMsgs);
   }
 
@@ -321,10 +317,13 @@ export function WorkspaceClient({
           structuredData: data,
         }),
       })
-        .then((r) => {
+        .then(async (r) => {
           if (r.ok) {
             savedStateRef.current = { title: title.trim(), data };
             setSavedSnapshot(formSnapshotOf(title.trim(), data));
+          } else {
+            const j = (await r.json().catch(() => ({}))) as { error?: string };
+            if (j.error) toast.error(j.error);
           }
         })
         .catch(() => {});
@@ -474,15 +473,6 @@ export function WorkspaceClient({
           <span>3. Preview</span>
         </button>
       </div>
-
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>
-      )}
-      {notice && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
-          {notice}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left column: Chatbot + Manual Editor */}

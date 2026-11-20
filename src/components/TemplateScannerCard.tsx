@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { REPORT_FIELD_META, REPORT_KEYS, type ReportKey } from "@/lib/report-schema";
 import type { TemplateReview } from "@/lib/templates/pipeline";
+import { toast } from "@/components/ui/toast";
 
 interface TemplateScannerCardProps {
   initialReview: TemplateReview | null;
@@ -41,15 +42,17 @@ function toEditableRows(review: TemplateReview): EditableRow[] {
 export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScannerCardProps) {
   const [review, setReview] = useState<TemplateReview | null>(initialReview);
   const [rows, setRows] = useState<EditableRow[]>(initialReview ? toEditableRows(initialReview) : []);
+  const [baselineJson, setBaselineJson] = useState<string>(() =>
+    initialReview ? JSON.stringify(toEditableRows(initialReview)) : "[]",
+  );
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const hasMappingChanges = JSON.stringify(rows) !== baselineJson;
+  const confirmDisabled = saving || (review?.template.status === "confirmed" && !hasMappingChanges);
+
   async function scanDefault() {
-    setError(null);
-    setSuccess(null);
     setScanning(true);
     try {
       const res = await fetch("/api/scan-template", {
@@ -59,18 +62,19 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
       });
       const json = (await res.json()) as { review?: TemplateReview; error?: string };
       if (!res.ok || !json.review) throw new Error(json.error ?? "Scan failed.");
+      const nextRows = toEditableRows(json.review);
       setReview(json.review);
-      setRows(toEditableRows(json.review));
+      setRows(nextRows);
+      setBaselineJson(JSON.stringify(nextRows));
+      toast.success("Scanned template fields cleanly.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not scan template.");
+      toast.error(err instanceof Error ? err.message : "Could not scan template.");
     } finally {
       setScanning(false);
     }
   }
 
   async function scanUpload(file: File) {
-    setError(null);
-    setSuccess(null);
     setScanning(true);
     try {
       const form = new FormData();
@@ -78,10 +82,13 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
       const res = await fetch("/api/scan-template", { method: "POST", body: form });
       const json = (await res.json()) as { review?: TemplateReview; error?: string };
       if (!res.ok || !json.review) throw new Error(json.error ?? "Scan failed.");
+      const nextRows = toEditableRows(json.review);
       setReview(json.review);
-      setRows(toEditableRows(json.review));
+      setRows(nextRows);
+      setBaselineJson(JSON.stringify(nextRows));
+      toast.success("Uploaded and scanned custom .docx template.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not scan uploaded file.");
+      toast.error(err instanceof Error ? err.message : "Could not scan uploaded file.");
     } finally {
       setScanning(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -89,9 +96,7 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
   }
 
   async function handleConfirm() {
-    if (!review) return;
-    setError(null);
-    setSuccess(null);
+    if (!review || confirmDisabled) return;
     setSaving(true);
     try {
       const res = await fetch("/api/scan-template", {
@@ -108,12 +113,14 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
       });
       const json = (await res.json()) as { review?: TemplateReview; error?: string };
       if (!res.ok || !json.review) throw new Error(json.error ?? "Could not save field mapping.");
+      const nextRows = toEditableRows(json.review);
       setReview(json.review);
-      setRows(toEditableRows(json.review));
-      setSuccess("Template tagged and saved to your private storage.");
+      setRows(nextRows);
+      setBaselineJson(JSON.stringify(nextRows));
+      toast.success("Template tagged and saved to your private storage.");
       onConfirmed?.(json.review);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not confirm template.");
+      toast.error(err instanceof Error ? err.message : "Could not confirm template.");
     } finally {
       setSaving(false);
     }
@@ -167,14 +174,6 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">{error}</div>
-      )}
-      {success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800">
-          {success}
-        </div>
-      )}
       {review && review.warnings.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800 space-y-1">
           {review.warnings.map((w, i) => (
@@ -277,10 +276,14 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={saving}
-              className="w-full sm:w-auto rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 transition cursor-pointer"
+              disabled={confirmDisabled}
+              className="w-full sm:w-auto rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:pointer-events-none disabled:opacity-50 transition cursor-pointer"
             >
-              {saving ? "Tagging & Saving..." : "Confirm & Use This Template"}
+              {saving
+                ? "Tagging & Saving..."
+                : review.template.status === "confirmed" && !hasMappingChanges
+                  ? "Template Confirmed"
+                  : "Confirm & Use This Template"}
             </button>
           </div>
         </div>

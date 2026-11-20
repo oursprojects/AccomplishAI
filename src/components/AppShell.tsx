@@ -24,6 +24,7 @@ import type { QuotaStatus } from "@/lib/admin";
 import { QuotaGaugeIcon } from "@/components/icons/AccomplishIcons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 
 interface NavItem {
   href: string;
@@ -170,7 +171,6 @@ export function AppShell({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [creatingReport, setCreatingReport] = useState(false);
-  const [navError, setNavError] = useState<string | null>(null);
   const [isNavTransition, startNavTransition] = useTransition();
 
   useEffect(() => {
@@ -203,7 +203,6 @@ export function AppShell({
 
   async function handleCreateReport() {
     if (creatingReport) return;
-    setNavError(null);
     setCreatingReport(true);
     try {
       const res = await fetch("/api/reports", {
@@ -231,7 +230,7 @@ export function AppShell({
         router.push(`/reports/${json.report!.id}`);
       });
     } catch (err) {
-      setNavError(err instanceof Error ? err.message : "Could not create report.");
+      toast.error(err instanceof Error ? err.message : "Could not create report.");
       setCreatingReport(false);
     }
   }
@@ -525,14 +524,6 @@ export function AppShell({
         </header>
 
         <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-5">
-          {navError && (
-            <div className="mx-auto max-w-7xl mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 flex items-center justify-between">
-              <span>{navError}</span>
-              <button type="button" onClick={() => setNavError(null)} className="text-xs underline cursor-pointer">
-                Dismiss
-              </button>
-            </div>
-          )}
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>

@@ -53,6 +53,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/toast";
 import { InternshipCalendar } from "./InternshipCalendar";
 
 export interface ReportSummary {
@@ -132,8 +133,6 @@ export function HistoryClient({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [conflictReport, setConflictReport] = useState<{ id: string; title: string } | null>(null);
 
   const reportByMondayIso = useMemo(() => {
     const map = new Map<string, ReportSummary>();
@@ -260,7 +259,6 @@ export function HistoryClient({
 
   async function saveAnchorDate(isoDate: string) {
     setSavingAnchor(true);
-    setError(null);
     try {
       const res = await fetch("/api/profile", {
         method: "PUT",
@@ -280,8 +278,9 @@ export function HistoryClient({
         throw new Error(j.error ?? "Could not save internship start date.");
       }
       setStartDate(isoDate || null);
+      toast.success("Internship Week 1 start date updated.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save start date.");
+      toast.error(err instanceof Error ? err.message : "Could not save start date.");
     } finally {
       setSavingAnchor(false);
     }
@@ -290,7 +289,6 @@ export function HistoryClient({
   async function handleExportAllZip() {
     if (!exportTemplate || reports.length === 0 || exportingAll) return;
     setExportingAll(true);
-    setError(null);
     try {
       const res = await fetch(`/api/template-file?templateId=${encodeURIComponent(exportTemplate.templateId)}`, {
         cache: "no-store",
@@ -319,8 +317,9 @@ export function HistoryClient({
       } else {
         saveAs(blob, "AccomplishAI-Weekly-Reports.zip");
       }
+      toast.success(`Exported ${reports.length} report${reports.length === 1 ? "" : "s"} to .zip`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to export .zip (${DOCX_MIME}).`);
+      toast.error(err instanceof Error ? err.message : `Failed to export .zip (${DOCX_MIME}).`);
     } finally {
       setExportingAll(false);
     }
@@ -333,8 +332,6 @@ export function HistoryClient({
     title?: string;
   }) {
     if (!canCreateReport || creating || duplicatingId) return;
-    setError(null);
-    setConflictReport(null);
 
     // Client-side guard: only 1 report allowed per accomplishment report week
     if (opts?.weekStartDate || opts?.weekEndDate) {
@@ -365,10 +362,13 @@ export function HistoryClient({
       };
       if (!res.ok || !json.report) {
         if (res.status === 409 && json.existingReportId) {
-          setConflictReport({
-            id: json.existingReportId,
-            title: json.existingReportTitle || "Open existing report",
+          toast.error(json.error ?? "A report for this week already exists.", {
+            action: {
+              label: `Open ${json.existingReportTitle || "existing report"}`,
+              href: `/reports/${json.existingReportId}`,
+            },
           });
+          return;
         }
         throw new Error(json.error ?? "Could not create report.");
       }
@@ -376,7 +376,8 @@ export function HistoryClient({
         router.push(`/reports/${json.report!.id}`);
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create report.");
+      toast.error(err instanceof Error ? err.message : "Could not create report.");
+    } finally {
       setCreating(false);
       setDuplicatingId(null);
     }
@@ -387,14 +388,12 @@ export function HistoryClient({
     const fallback = [d.date_from, d.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
     setRenamingId(report.id);
     setRenameValue(report.title.trim() || fallback);
-    setError(null);
   }
 
   async function saveRename(id: string) {
     const nextTitle = renameValue.trim();
     if (!nextTitle) return;
     setSavingRename(true);
-    setError(null);
     try {
       const res = await fetch(`/api/reports/${id}`, {
         method: "PATCH",
@@ -405,8 +404,9 @@ export function HistoryClient({
       if (!res.ok) throw new Error(json.error ?? "Could not rename report.");
       setReports((prev) => prev.map((r) => (r.id === id ? { ...r, title: json.report?.title ?? nextTitle } : r)));
       setRenamingId(null);
+      toast.success("Report renamed.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Rename failed.");
+      toast.error(err instanceof Error ? err.message : "Rename failed.");
     } finally {
       setSavingRename(false);
     }
@@ -415,7 +415,7 @@ export function HistoryClient({
   async function handleConfirmDelete() {
     if (!confirmDelete || deletingId) return;
     const targetId = confirmDelete.id;
-    setError(null);
+    const targetTitle = confirmDelete.title;
     setDeletingId(targetId);
     try {
       const res = await fetch(`/api/reports/${targetId}`, { method: "DELETE" });
@@ -425,8 +425,9 @@ export function HistoryClient({
       }
       setReports((prev) => prev.filter((r) => r.id !== targetId));
       setConfirmDelete(null);
+      toast.success(`Deleted "${targetTitle}".`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed.");
+      toast.error(err instanceof Error ? err.message : "Delete failed.");
       setConfirmDelete(null);
     } finally {
       setDeletingId(null);
@@ -619,21 +620,6 @@ export function HistoryClient({
         )}
       </Card>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 flex flex-wrap items-center justify-between gap-2">
-          <span>{error}</span>
-          {conflictReport && (
-            <Link
-              href={`/reports/${conflictReport.id}`}
-              className="inline-flex items-center gap-1 rounded-lg bg-red-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-800 transition"
-            >
-              <ExternalLink className="h-3 w-3" />
-              <span>Open {conflictReport.title}</span>
-            </Link>
-          )}
-        </div>
-      )}
-
       {reports.length > 0 && (
         <div className="space-y-2.5">
           {/* Week Category filter pills */}
@@ -818,7 +804,7 @@ export function HistoryClient({
                             <Button
                               type="submit"
                               size="sm"
-                              disabled={savingRename || !renameValue.trim()}
+                              disabled={savingRename || !renameValue.trim() || renameValue.trim() === displayTitle}
                               title="Save title"
                             >
                               <Check className="h-3.5 w-3.5" />

@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/toast";
 
 interface DocxPreviewPanelProps {
   templateId: string;
@@ -102,9 +103,10 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
       setCopiedSummary(true);
+      toast.success("Copied report summary text.");
       window.setTimeout(() => setCopiedSummary(false), 1800);
     } catch {
-      // Ignore clipboard failures
+      toast.error("Could not copy to clipboard.");
     }
   }
 
@@ -269,6 +271,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     const copy = new Uint8Array(filled);
     saveAs(new Blob([copy], { type: DOCX_MIME }), finalName);
     setDownloadModalOpen(false);
+    toast.success(`Downloaded ${finalName}`);
   }
 
   return (

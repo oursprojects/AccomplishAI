@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   Activity,
   Bot,
-  CheckCircle2,
   Cpu,
   Eye,
   EyeOff,
@@ -41,6 +40,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/toast";
 
 export interface PoolSnapshot {
   inFlight: number;
@@ -103,8 +103,17 @@ export function AdminClient({
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [newLimit, setNewLimit] = useState("");
   const [newMaxReports, setNewMaxReports] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+
+  const aiControlsChanged =
+    activeTextModel !== aiSettings.activeTextModel ||
+    activeSttModel !== aiSettings.activeSttModel ||
+    maxBulletsPerDay !== aiSettings.maxBulletsPerDay ||
+    maxChatMessages !== aiSettings.maxChatMessages ||
+    globalRpmLimit !== aiSettings.globalRpmLimit;
+
+  const normalizedDefaultMaxReports = defaultMaxReports.trim() === "" ? null : Number(defaultMaxReports);
+  const defaultsChanged =
+    defaultLimit !== aiSettings.defaultDailyLimit || normalizedDefaultMaxReports !== aiSettings.defaultMaxReports;
 
   function syncResponse(json: {
     aiSettings: AiRuntimeSettings;
@@ -140,9 +149,7 @@ export function AdminClient({
 
   async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setModalError(null);
-    setNotice(null);
     setCreating(true);
     try {
       const res = await fetch("/api/admin/users", {
@@ -170,7 +177,7 @@ export function AdminClient({
         members: json.members,
         usageMonitor: json.usageMonitor,
       });
-      setNotice(
+      toast.success(
         json.needsConfirmWarning
           ? `Account created for ${newEmail.trim()}. Note: disable 'Confirm email' in Supabase Auth -> Providers -> Email so they can sign in right away.`
           : `Intern account created for ${newEmail.trim()}.`,
@@ -190,8 +197,7 @@ export function AdminClient({
 
   async function handleSaveDefault(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setNotice(null);
+    if (!defaultsChanged || savingDefault) return;
     setSavingDefault(true);
     try {
       const res = await fetch("/api/admin/users", {
@@ -200,7 +206,7 @@ export function AdminClient({
         body: JSON.stringify({
           action: "update_default_limit",
           defaultDailyLimit: defaultLimit,
-          defaultMaxReports: defaultMaxReports.trim() === "" ? null : Number(defaultMaxReports),
+          defaultMaxReports: normalizedDefaultMaxReports,
         }),
       });
       const json = (await res.json()) as {
@@ -217,7 +223,7 @@ export function AdminClient({
         members: json.members,
         usageMonitor: json.usageMonitor,
       });
-      setNotice(
+      toast.success(
         `Saved defaults: ${json.aiSettings.defaultDailyLimit} prompts/day · ${
           json.aiSettings.defaultMaxReports === null
             ? "Unlimited reports"
@@ -225,7 +231,7 @@ export function AdminClient({
         }.`,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save default limits.");
+      toast.error(err instanceof Error ? err.message : "Could not save default limits.");
     } finally {
       setSavingDefault(false);
     }
@@ -233,8 +239,7 @@ export function AdminClient({
 
   async function handleSaveAiControls(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setNotice(null);
+    if (!aiControlsChanged || savingAi) return;
     setSavingAi(true);
     try {
       const res = await fetch("/api/admin/users", {
@@ -265,17 +270,15 @@ export function AdminClient({
         usageMonitor: json.usageMonitor,
         poolStatus: json.poolStatus,
       });
-      setNotice(`AI settings updated: ${json.aiSettings.activeTextModel} & ${json.aiSettings.activeSttModel}.`);
+      toast.success(`AI settings updated: ${json.aiSettings.activeTextModel} & ${json.aiSettings.activeSttModel}.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update AI controls.");
+      toast.error(err instanceof Error ? err.message : "Could not update AI controls.");
     } finally {
       setSavingAi(false);
     }
   }
 
   async function handleSaveMember(member: AdminMember, nextBlocked = member.isBlocked) {
-    setError(null);
-    setNotice(null);
     setBusyId(member.userId);
     try {
       const rawPrompt = (draftLimits[member.userId] ?? "").trim();
@@ -308,17 +311,15 @@ export function AdminClient({
         members: json.members,
         usageMonitor: json.usageMonitor,
       });
-      setNotice(`Updated limits for ${member.email}.`);
+      toast.success(`Updated limits for ${member.email}.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed.");
+      toast.error(err instanceof Error ? err.message : "Update failed.");
     } finally {
       setBusyId(null);
     }
   }
 
   async function handleResetToday(member: AdminMember) {
-    setError(null);
-    setNotice(null);
     setBusyId(member.userId);
     try {
       const res = await fetch("/api/admin/users", {
@@ -340,9 +341,9 @@ export function AdminClient({
         members: json.members,
         usageMonitor: json.usageMonitor,
       });
-      setNotice(`Reset today's prompt usage for ${member.email}.`);
+      toast.success(`Reset today's prompt usage for ${member.email}.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Reset failed.");
+      toast.error(err instanceof Error ? err.message : "Reset failed.");
     } finally {
       setBusyId(null);
     }
@@ -423,16 +424,6 @@ export function AdminClient({
           <p className="text-[11px] text-[#7A746B] mt-1">{usageMonitor.requestsLast7Days} calls last 7 days</p>
         </Card>
       </div>
-
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>
-      )}
-      {notice && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{notice}</span>
-        </div>
-      )}
 
       {/* API Usage Monitor */}
       <Card className="p-4 sm:p-5 space-y-4">
@@ -640,9 +631,9 @@ export function AdminClient({
           </div>
 
           <div className="flex justify-end">
-            <Button type="submit" size="sm" disabled={savingAi}>
+            <Button type="submit" size="sm" disabled={savingAi || !aiControlsChanged}>
               <Save className="w-3.5 h-3.5" />
-              <span>{savingAi ? "Saving..." : "Save AI Controls"}</span>
+              <span>{savingAi ? "Saving..." : aiControlsChanged ? "Save AI Controls" : "Saved"}</span>
             </Button>
           </div>
         </form>
@@ -690,9 +681,9 @@ export function AdminClient({
               </label>
             </div>
 
-            <Button type="submit" size="sm" disabled={savingDefault}>
+            <Button type="submit" size="sm" disabled={savingDefault || !defaultsChanged}>
               <Save className="w-3.5 h-3.5" />
-              <span>{savingDefault ? "Saving..." : "Save Defaults"}</span>
+              <span>{savingDefault ? "Saving..." : defaultsChanged ? "Save Defaults" : "Saved"}</span>
             </Button>
           </div>
         </form>
@@ -711,6 +702,10 @@ export function AdminClient({
         <div className="divide-y divide-[#F2EFE8]">
           {members.map((m) => {
             const busy = busyId === m.userId;
+            const savedLimit = m.customDailyLimit === null ? "" : String(m.customDailyLimit);
+            const savedReports = m.customMaxReports === null ? "" : String(m.customMaxReports);
+            const memberChanged =
+              (draftLimits[m.userId] ?? "") !== savedLimit || (draftMaxReports[m.userId] ?? "") !== savedReports;
             return (
               <div
                 key={m.userId}
@@ -764,9 +759,9 @@ export function AdminClient({
                       />
                     </label>
 
-                    <Button type="button" size="sm" disabled={busy} onClick={() => handleSaveMember(m)}>
+                    <Button type="button" size="sm" disabled={busy || !memberChanged} onClick={() => handleSaveMember(m)}>
                       <Save className="w-3 h-3" />
-                      <span>Save</span>
+                      <span>{memberChanged ? "Save" : "Saved"}</span>
                     </Button>
 
                     <Button

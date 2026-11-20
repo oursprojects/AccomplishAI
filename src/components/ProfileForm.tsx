@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, CheckCircle2, PenLine, Save, UserRound } from "lucide-react";
+import { CalendarDays, PenLine, Save, UserRound } from "lucide-react";
 import type { Profile } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/toast";
 import { InternshipCalendar } from "./InternshipCalendar";
 
 type EditableProfile = Pick<
@@ -30,14 +31,14 @@ function deriveSignatureName(lastFirst: string): string {
 
 export function ProfileForm({ initial }: { initial: EditableProfile }) {
   const [form, setForm] = useState<EditableProfile>(initial);
+  const [savedBaseline, setSavedBaseline] = useState<EditableProfile>(initial);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+
+  const hasChanges = JSON.stringify(form) !== JSON.stringify(savedBaseline);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSaved(false);
+    if (!hasChanges || saving) return;
     setSaving(true);
     try {
       const res = await fetch("/api/profile", {
@@ -48,9 +49,10 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
       const json = (await res.json()) as { profile?: EditableProfile; error?: string };
       if (!res.ok || !json.profile) throw new Error(json.error ?? "Failed to save profile.");
       setForm(json.profile);
-      setSaved(true);
+      setSavedBaseline(json.profile);
+      toast.success("Profile & internship calendar defaults saved.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save profile.");
+      toast.error(err instanceof Error ? err.message : "Could not save profile.");
     } finally {
       setSaving(false);
     }
@@ -70,16 +72,6 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
             </p>
           </div>
         </div>
-
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">{error}</div>
-        )}
-        {saved && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span>Profile &amp; internship calendar defaults saved.</span>
-          </div>
-        )}
 
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E] mb-1">
@@ -233,9 +225,9 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
         </div>
 
         <div className="pt-2 flex justify-end">
-          <Button type="submit" variant="accent" size="lg" disabled={saving}>
+          <Button type="submit" variant="accent" size="lg" disabled={saving || !hasChanges}>
             <Save className="h-4 w-4" />
-            <span>{saving ? "Saving..." : "Save Profile Defaults"}</span>
+            <span>{saving ? "Saving..." : hasChanges ? "Save Profile Defaults" : "Saved"}</span>
           </Button>
         </div>
       </form>

@@ -32,6 +32,7 @@ import { DAYS, type ReportData } from "@/lib/report-schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { toast } from "@/components/ui/toast";
 
 export interface DashboardReportSummary {
   id: string;
@@ -83,7 +84,6 @@ export function DashboardClient({
 }: DashboardClientProps) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [, startNavTransition] = useTransition();
 
   const stats = useMemo(() => {
@@ -174,7 +174,6 @@ export function DashboardClient({
     title?: string;
   }) {
     if (!quota.canCreateReport || creating) return;
-    setError(null);
     if (opts?.weekStartDate || opts?.weekEndDate) {
       const targetMon = getReportWeekMondayIso(opts.weekStartDate, opts.weekEndDate);
       const existing = targetMon ? reportByMondayIso.get(targetMon) : undefined;
@@ -203,7 +202,7 @@ export function DashboardClient({
       if (!res.ok || !json.report) throw new Error(json.error ?? "Could not create report.");
       startNavTransition(() => router.push(`/reports/${json.report!.id}`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create report.");
+      toast.error(err instanceof Error ? err.message : "Could not create report.");
       setCreating(false);
     }
   }
@@ -264,10 +263,6 @@ export function DashboardClient({
           </Button>
         </div>
       </div>
-
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>
-      )}
 
       {/* Setup attention callouts */}
       {(needsProfileSetup || templateStatus !== "confirmed") && (

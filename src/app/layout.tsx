@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, UnifrakturMaguntia } from "next/font/google";
+import { Toaster } from "@/components/ui/toast";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,7 +34,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${oldEnglish.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#FAF9F5] text-[#1F1E1C]">{children}</body>
+      <body className="min-h-full flex flex-col bg-[#FAF9F5] text-[#1F1E1C]">
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }
