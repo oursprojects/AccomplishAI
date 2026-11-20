@@ -14,6 +14,8 @@ import {
   ChevronUp,
   Clock,
   CopyPlus,
+  Download,
+  Eye,
   ExternalLink,
   FilePlus2,
   FileText,
@@ -24,7 +26,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
+import { defaultReportFileName, DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
 import type { DetectedField } from "@/lib/docx/types";
 import {
   addDays,
@@ -55,6 +57,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { InternshipCalendar } from "./InternshipCalendar";
+import { QuickDocxPreviewModal } from "./QuickDocxPreviewModal";
 
 export interface ReportSummary {
   id: string;
@@ -129,13 +132,22 @@ export function HistoryClient({
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [isNavPending, startNavTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [previewReport, setPreviewReport] = useState<ReportSummary | null>(null);
+  const [cachedTemplateBytes, setCachedTemplateBytes] = useState<ArrayBuffer | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
 
   const isCreatingReport = creating || Boolean(duplicatingId) || isNavPending;
-  const isBusy = isCreatingReport || exportingAll || Boolean(deletingId) || savingAnchor || savingRename;
+  const isBusy =
+    isCreatingReport ||
+    exportingAll ||
+    Boolean(deletingId) ||
+    Boolean(downloadingId) ||
+    savingAnchor ||
+    savingRename;
 
   const reportByMondayIso = useMemo(() => {
     const map = new Map<string, ReportSummary>();
@@ -289,15 +301,40 @@ export function HistoryClient({
     }
   }
 
+  async function loadTemplateBytes(): Promise<ArrayBuffer> {
+    if (cachedTemplateBytes) return cachedTemplateBytes;
+    if (!exportTemplate) throw new Error("No active Word template configured.");
+    const res = await fetch(`/api/template-file?templateId=${encodeURIComponent(exportTemplate.templateId)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Could not load active Word template.");
+    const bytes = await res.arrayBuffer();
+    setCachedTemplateBytes(bytes);
+    return bytes;
+  }
+
+  async function handleQuickDownload(report: ReportSummary, displayTitle: string) {
+    if (!exportTemplate || isBusy) return;
+    setDownloadingId(report.id);
+    try {
+      const bytes = await loadTemplateBytes();
+      const filled = fillTemplate(bytes, report.structured_data, exportTemplate.fields);
+      const fileName = `${defaultReportFileName(report.structured_data, displayTitle)}.docx`;
+      const copy = new Uint8Array(filled);
+      saveAs(new Blob([copy], { type: DOCX_MIME }), fileName);
+      toast.success(`Downloaded ${fileName}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not download report.");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
   async function handleExportAllZip() {
     if (!exportTemplate || reports.length === 0 || exportingAll) return;
     setExportingAll(true);
     try {
-      const res = await fetch(`/api/template-file?templateId=${encodeURIComponent(exportTemplate.templateId)}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("Could not load active Word template.");
-      const templateBytes = await res.arrayBuffer();
+      const templateBytes = await loadTemplateBytes();
 
       const zip = new PizZip();
       const usedNames = new Map<string, number>();
@@ -870,7 +907,37 @@ export function HistoryClient({
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                        {exportTemplate && (
+                          <>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={isBusy}
+                              onClick={() => setPreviewReport(report)}
+                              title="Preview 1-page Word document without leaving My Reports"
+                            >
+                              <Eye className="h-3.5 w-3.5 text-[#D97757]" />
+                              <span>Preview</span>
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={isBusy}
+                              onClick={() => void handleQuickDownload(report, displayTitle)}
+                              title="Download filled .docx file directly"
+                            >
+                              {downloadingId === report.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Download className="h-3.5 w-3.5 text-[#57544E]" />
+                              )}
+                              <span>{downloadingId === report.id ? "Saving..." : "Download"}</span>
+                            </Button>
+                          </>
+                        )}
                         <Link
                           href={`/reports/${report.id}`}
                           className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#1F1E1C] px-3 text-xs font-medium text-white hover:bg-[#33312E] transition"
@@ -938,6 +1005,22 @@ export function HistoryClient({
             </section>
           ))}
         </div>
+      )}
+
+      {/* Quick Document Preview Modal directly from My Reports */}
+      {exportTemplate && previewReport && (
+        <QuickDocxPreviewModal
+          open={previewReport !== null}
+          onOpenChange={(open) => {
+            if (!open) setPreviewReport(null);
+          }}
+          templateId={exportTemplate.templateId}
+          fields={exportTemplate.fields}
+          data={previewReport.structured_data}
+          reportTitle={previewReport.title.trim() || undefined}
+          cachedTemplateBytes={cachedTemplateBytes}
+          onTemplateBytesLoaded={setCachedTemplateBytes}
+        />
       )}
 
       {/* System Delete Confirmation Modal (replaces native browser confirm) */}

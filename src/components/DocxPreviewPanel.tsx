@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { Check, Copy, Download, FileText, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
-import { DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
+import { defaultReportFileName, DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
 import { enhanceCsuPreviewChrome, PAPER_DIMENSIONS, type PaperSize } from "@/lib/docx/csu-template-chrome";
 import type { DetectedField } from "@/lib/docx/types";
 import { DAYS, type ReportData } from "@/lib/report-schema";
@@ -29,22 +29,6 @@ interface DocxPreviewPanelProps {
 }
 
 const PT_TO_PX = 96 / 72;
-
-function defaultFileName(data: ReportData, reportTitle?: string): string {
-  const custom = (reportTitle ?? "")
-    .trim()
-    .replace(/[^a-zA-Z0-9 _-]+/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  if (custom) return custom;
-
-  const slug = [data.date_from, data.date_to]
-    .filter(Boolean)
-    .join("_to_")
-    .replace(/[^a-zA-Z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug ? `Weekly-Accomplishment-Report_${slug}` : "2026-Weekly-Accomplishment-Report";
-}
 
 export function DocxPreviewPanel({ templateId, templateVersion, fields, data, reportTitle }: DocxPreviewPanelProps) {
   const inlineStageRef = useRef<HTMLDivElement | null>(null);
@@ -255,7 +239,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
   }, [loadedKey, targetKey, data, fields, paperSize, previewModalOpen, renderInto]);
 
   function openDownloadPrompt() {
-    setCustomFileName(defaultFileName(data, reportTitle));
+    setCustomFileName(defaultReportFileName(data, reportTitle));
     setDownloadModalOpen(true);
   }
 
@@ -267,7 +251,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
       .trim()
       .replace(/[<>:"/\\|?*]+/g, "-")
       .replace(/\.docx$/i, "");
-    const finalName = `${cleaned || defaultFileName(data, reportTitle)}.docx`;
+    const finalName = `${cleaned || defaultReportFileName(data, reportTitle)}.docx`;
     const copy = new Uint8Array(filled);
     saveAs(new Blob([copy], { type: DOCX_MIME }), finalName);
     setDownloadModalOpen(false);

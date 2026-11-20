@@ -171,3 +171,20 @@ export function fillTemplate(
 }
 
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** Computes a safe, clean .docx filename (without extension) from report title or dates. */
+export function defaultReportFileName(data: Partial<ReportData>, reportTitle?: string): string {
+  const custom = (reportTitle ?? "")
+    .trim()
+    .replace(/[^a-zA-Z0-9 _-]+/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (custom) return custom;
+
+  const slug = [data.date_from, data.date_to]
+    .filter(Boolean)
+    .join("_to_")
+    .replace(/[^a-zA-Z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug ? `Weekly-Accomplishment-Report_${slug}` : "2026-Weekly-Accomplishment-Report";
+}
