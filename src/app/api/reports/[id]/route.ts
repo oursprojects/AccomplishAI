@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { jsonError, parseJsonBody, safeServerError } from "@/lib/api-utils";
 import { getUser } from "@/lib/supabase/server";
-import { getReportWeekMondayIso, resolveWeekCategory } from "@/lib/internship-calendar";
-import { reportDataStrictSchema } from "@/lib/report-schema";
+import { getReportWeekMondayIso, normalizeDateToLongFormat, resolveWeekCategory } from "@/lib/internship-calendar";
+import { reportDataStrictSchema, type ReportData } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
 const chatMessageSchema = z.object({
@@ -21,13 +22,27 @@ const patchReportSchema = z.object({
 
 const uuidSchema = z.string().uuid();
 
+function normalizeStructuredReportData(d: ReportData): ReportData {
+  const normalized: ReportData = { ...d };
+  if (normalized.date_from) normalized.date_from = normalizeDateToLongFormat(normalized.date_from);
+  if (normalized.date_to) normalized.date_to = normalizeDateToLongFormat(normalized.date_to);
+  normalized.intern_name_last_first = normalized.intern_name_last_first.toUpperCase();
+  normalized.intern_name_first_last = normalized.intern_name_first_last.toUpperCase();
+  normalized.mon_verified_by = normalized.mon_verified_by.toUpperCase();
+  normalized.tue_verified_by = normalized.tue_verified_by.toUpperCase();
+  normalized.wed_verified_by = normalized.wed_verified_by.toUpperCase();
+  normalized.thu_verified_by = normalized.thu_verified_by.toUpperCase();
+  normalized.fri_verified_by = normalized.fri_verified_by.toUpperCase();
+  return normalized;
+}
+
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { supabase, user } = await getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return jsonError(401, "Unauthorized");
 
   const { id } = await ctx.params;
   if (!uuidSchema.safeParse(id).success) {
-    return NextResponse.json({ error: "Invalid report ID." }, { status: 400 });
+    return jsonError(400, "Invalid report ID.");
   }
 
   const { data, error } = await supabase
@@ -37,45 +52,41 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!data) return NextResponse.json({ error: "Report not found." }, { status: 404 });
+  if (error) return safeServerError("api/reports/[id] GET", error, "Could not load report.");
+  if (!data) return jsonError(404, "Report not found.");
   return NextResponse.json({ report: data });
 }
 
 export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { supabase, user } = await getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return jsonError(401, "Unauthorized");
 
   const { id } = await ctx.params;
   if (!uuidSchema.safeParse(id).success) {
-    return NextResponse.json({ error: "Invalid report ID." }, { status: 400 });
+    return jsonError(400, "Invalid report ID.");
   }
 
-  const parsed = patchReportSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid update payload." }, { status: 400 });
-  }
+  const body = await parseJsonBody(request, patchReportSchema, "Invalid update payload.");
+  if (body.response) return body.response;
 
   const updates: { title?: string; raw_notes?: string; structured_data?: Json; chat_messages?: Json } = {};
-  if (parsed.data.title !== undefined) updates.title = parsed.data.title;
-  if (parsed.data.rawNotes !== undefined) updates.raw_notes = parsed.data.rawNotes;
-  if (parsed.data.structuredData !== undefined) {
-    updates.structured_data = parsed.data.structuredData as unknown as Json;
+  if (body.data.title !== undefined) updates.title = body.data.title;
+  if (body.data.rawNotes !== undefined) updates.raw_notes = body.data.rawNotes;
+  const normalizedData = body.data.structuredData ? normalizeStructuredReportData(body.data.structuredData) : undefined;
+  if (normalizedData !== undefined) {
+    updates.structured_data = normalizedData as unknown as Json;
   }
-  if (parsed.data.chatMessages !== undefined) {
-    updates.chat_messages = parsed.data.chatMessages as unknown as Json;
+  if (body.data.chatMessages !== undefined) {
+    updates.chat_messages = body.data.chatMessages as unknown as Json;
   }
 
   if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+    return jsonError(400, "Nothing to update.");
   }
 
   // Enforce 1 report per Mon–Fri week when changing report dates
-  if (parsed.data.structuredData) {
-    const targetMondayIso = getReportWeekMondayIso(
-      parsed.data.structuredData.date_from,
-      parsed.data.structuredData.date_to,
-    );
+  if (normalizedData) {
+    const targetMondayIso = getReportWeekMondayIso(normalizedData.date_from, normalizedData.date_to);
     if (targetMondayIso) {
       const [{ data: otherReports }, { data: profile }] = await Promise.all([
         supabase
@@ -106,16 +117,14 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
 
       if (conflict) {
         const weekCat = resolveWeekCategory({
-          dateFrom: parsed.data.structuredData.date_from,
-          dateTo: parsed.data.structuredData.date_to,
+          dateFrom: normalizedData.date_from,
+          dateTo: normalizedData.date_to,
           startDateIso: profile?.internship_start_date,
         });
-        return NextResponse.json(
-          {
-            error: `Another report already covers ${weekCat.label}. Only 1 accomplishment report is allowed per week.`,
-            conflictReportId: conflict.id,
-          },
-          { status: 409 },
+        return jsonError(
+          409,
+          `Another report already covers ${weekCat.label}. Only 1 accomplishment report is allowed per week.`,
+          { conflictReportId: conflict.id },
         );
       }
     }
@@ -129,21 +138,21 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     .select("id, template_id, title, raw_notes, structured_data, chat_messages, created_at, updated_at")
     .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!data) return NextResponse.json({ error: "Report not found." }, { status: 404 });
+  if (error) return safeServerError("api/reports/[id] PATCH", error, "Could not update report.");
+  if (!data) return jsonError(404, "Report not found.");
   return NextResponse.json({ report: data });
 }
 
 export async function DELETE(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { supabase, user } = await getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return jsonError(401, "Unauthorized");
 
   const { id } = await ctx.params;
   if (!uuidSchema.safeParse(id).success) {
-    return NextResponse.json({ error: "Invalid report ID." }, { status: 400 });
+    return jsonError(400, "Invalid report ID.");
   }
 
   const { error } = await supabase.from("reports").delete().eq("id", id).eq("user_id", user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeServerError("api/reports/[id] DELETE", error, "Could not delete report.");
   return NextResponse.json({ ok: true });
 }

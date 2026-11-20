@@ -146,6 +146,75 @@ export async function getUserQuotaStatus(
   };
 }
 
+/** Fetches both QuotaStatus and AiRuntimeSettings in a single parallel batch (one admin_settings query). */
+export async function getQuotaAndAiSettings(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  email?: string | null,
+): Promise<{ quota: QuotaStatus; aiSettings: AiRuntimeSettings }> {
+  const admin = isAdminEmail(email);
+  const dayStart = getManilaDayStartIso();
+
+  const [{ data: settings }, { data: quotaRow }, { count: usedCount }, { count: reportCount }] = await Promise.all([
+    supabase
+      .from("admin_settings")
+      .select(
+        "default_daily_prompt_limit, default_max_reports, active_text_model, active_stt_model, max_bullets_per_day, max_chat_messages, global_rpm_limit",
+      )
+      .eq("id", 1)
+      .maybeSingle(),
+    supabase
+      .from("user_quotas")
+      .select("custom_daily_limit, custom_max_reports, is_blocked")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("prompt_usage_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("created_at", dayStart),
+    supabase
+      .from("reports")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId),
+  ]);
+
+  const defaultLimit = settings?.default_daily_prompt_limit ?? 15;
+  const dailyLimit = quotaRow?.custom_daily_limit ?? defaultLimit;
+  const usedToday = usedCount ?? 0;
+  const isBlocked = !admin && (quotaRow?.is_blocked ?? false);
+  const remaining = admin ? 9999 : Math.max(0, dailyLimit - usedToday);
+  const reportsCount = reportCount ?? 0;
+  const maxReports = admin ? null : (quotaRow?.custom_max_reports ?? settings?.default_max_reports ?? null);
+  const canCreateReport = admin || (!isBlocked && (maxReports === null || reportsCount < maxReports));
+
+  const textValid = ALLOWED_TEXT_MODELS.some((m) => m.id === settings?.active_text_model);
+  const sttValid = ALLOWED_STT_MODELS.some((m) => m.id === settings?.active_stt_model);
+
+  return {
+    quota: {
+      isAdmin: admin,
+      isBlocked,
+      dailyLimit,
+      usedToday,
+      remaining,
+      allowed: admin || (!isBlocked && usedToday < dailyLimit),
+      reportsCount,
+      maxReports,
+      canCreateReport,
+    },
+    aiSettings: {
+      defaultDailyLimit: defaultLimit,
+      defaultMaxReports: settings?.default_max_reports ?? null,
+      activeTextModel: (textValid ? settings!.active_text_model : "openai/gpt-oss-120b") as AllowedTextModel,
+      activeSttModel: (sttValid ? settings!.active_stt_model : "whisper-large-v3-turbo") as AllowedSttModel,
+      maxBulletsPerDay: settings?.max_bullets_per_day ?? 3,
+      maxChatMessages: settings?.max_chat_messages ?? 16,
+      globalRpmLimit: settings?.global_rpm_limit ?? 60,
+    },
+  };
+}
+
 export interface AdminMember {
   userId: string;
   email: string;

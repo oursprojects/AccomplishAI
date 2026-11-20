@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { jsonError, parseJsonBody, safeServerError } from "@/lib/api-utils";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
 import {
@@ -31,7 +32,7 @@ const createReportSchema = z.object({
 
 export async function GET() {
   const { supabase, user } = await getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return jsonError(401, "Unauthorized");
 
   const { data, error } = await supabase
     .from("reports")
@@ -40,19 +41,17 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(100);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeServerError("api/reports GET", error, "Could not load saved reports.");
   return NextResponse.json({ reports: data ?? [] });
 }
 
 export async function POST(request: Request) {
   const { supabase, user } = await getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return jsonError(401, "Unauthorized");
 
-  const rawBody = await request.json().catch(() => ({}));
-  const parsed = createReportSchema.safeParse(rawBody ?? {});
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid report payload.", issues: parsed.error.issues }, { status: 400 });
-  }
+  const body = await parseJsonBody(request, createReportSchema, "Invalid report payload.");
+  if (body.response) return body.response;
+  const parsed = { data: body.data };
 
   const quota = await getUserQuotaStatus(supabase, user.id, user.email);
   if (!quota.canCreateReport) {
@@ -187,6 +186,6 @@ export async function POST(request: Request) {
     .select("id, template_id, title, raw_notes, structured_data, chat_messages, created_at, updated_at")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeServerError("api/reports POST", error, "Could not create report.");
   return NextResponse.json({ report: data }, { status: 201 });
 }

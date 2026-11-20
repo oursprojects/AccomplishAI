@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { checkBurstRateLimit, getQuotaAndAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import { normalizeDateToLongFormat } from "@/lib/internship-calendar";
 import { sanitizeAccomplishmentLines } from "@/lib/report-task-format";
 import { groqErrorResponse, groqJson } from "@/lib/ai/groq";
@@ -25,7 +25,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const quotaBefore = await getUserQuotaStatus(supabase, user.id, user.email);
+  const [{ quota: quotaBefore, aiSettings }, { data: profile }, { data: latestReport }] = await Promise.all([
+    getQuotaAndAiSettings(supabase, user.id, user.email),
+    supabase
+      .from("profiles")
+      .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("reports")
+      .select("structured_data")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
   if (quotaBefore.isBlocked) {
     return NextResponse.json(
       { error: "Your AI prompt access is currently paused by the admin." },
@@ -42,29 +57,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const burst = await checkBurstRateLimit(supabase, user.id, quotaBefore.isAdmin);
+  const burst = await checkBurstRateLimit(supabase, user.id, quotaBefore.isAdmin, aiSettings.globalRpmLimit);
   if (!burst.allowed) {
     return NextResponse.json(
       { error: `Too many requests in one minute (${burst.count}/${burst.limit} RPM). Wait a few seconds.` },
-      { status: 429 },
+      { status: 429, headers: { "Retry-After": String(burst.retryAfterSeconds) } },
     );
   }
-
-  const [aiSettings, { data: profile }, { data: latestReport }] = await Promise.all([
-    getAiSettings(supabase),
-    supabase
-      .from("profiles")
-      .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours")
-      .eq("id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("reports")
-      .select("structured_data")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
 
   const systemPrompt = `You convert a student intern's raw typed or spoken notes into a concise JSON object for a 1-page university "Weekly Accomplishment Report" (Monday to Friday).
 

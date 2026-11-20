@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { jsonError, parseJsonBody, safeServerError } from "@/lib/api-utils";
 import { getUser } from "@/lib/supabase/server";
 import {
   ALLOWED_STT_MODELS,
@@ -52,8 +53,8 @@ const patchSchema = z.discriminatedUnion("action", [
 
 export async function GET() {
   const { supabase, user } = await getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdminEmail(user.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user) return jsonError(401, "Unauthorized");
+  if (!isAdminEmail(user.email)) return jsonError(403, "Forbidden");
 
   try {
     const data = await loadAdminDashboardData(supabase);
@@ -62,24 +63,19 @@ export async function GET() {
       poolStatus: getGroqPoolSnapshot(ALLOWED_TEXT_MODELS.map((m) => m.id)),
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to load admin data." },
-      { status: 500 },
-    );
+    return safeServerError("api/admin/users GET", err, "Failed to load admin data.");
   }
 }
 
 export async function POST(request: Request) {
   const { supabase, user } = await getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdminEmail(user.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user) return jsonError(401, "Unauthorized");
+  if (!isAdminEmail(user.email)) return jsonError(403, "Forbidden");
 
-  const parsed = createMemberSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid account details." }, { status: 400 });
-  }
+  const body = await parseJsonBody(request, createMemberSchema, "Invalid account details.");
+  if (body.response) return body.response;
 
-  const { email, password, customDailyLimit, customMaxReports } = parsed.data;
+  const { email, password, customDailyLimit, customMaxReports } = body.data;
 
   try {
     let createdUserId: string | null = null;
@@ -125,25 +121,20 @@ export async function POST(request: Request) {
     const data = await loadAdminDashboardData(supabase);
     return NextResponse.json({ ...data, needsConfirmWarning }, { status: 201 });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to create intern account." },
-      { status: 500 },
-    );
+    return safeServerError("api/admin/users POST", err, "Failed to create intern account.");
   }
 }
 
 export async function PATCH(request: Request) {
   const { supabase, user } = await getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdminEmail(user.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user) return jsonError(401, "Unauthorized");
+  if (!isAdminEmail(user.email)) return jsonError(403, "Forbidden");
 
-  const parsed = patchSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload." }, { status: 400 });
-  }
+  const bodyParsed = await parseJsonBody(request, patchSchema, "Invalid payload.");
+  if (bodyParsed.response) return bodyParsed.response;
 
   try {
-    const body = parsed.data;
+    const body = bodyParsed.data;
     if (body.action === "update_default_limit") {
       const { error } = await supabase
         .from("admin_settings")
@@ -196,9 +187,6 @@ export async function PATCH(request: Request) {
       poolStatus: getGroqPoolSnapshot(ALLOWED_TEXT_MODELS.map((m) => m.id)),
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Update failed." },
-      { status: 500 },
-    );
+    return safeServerError("api/admin/users PATCH", err, "Update failed.");
   }
 }

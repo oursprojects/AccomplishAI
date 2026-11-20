@@ -238,6 +238,9 @@ export function ReportChat({
       {/* Messages */}
       <div
         ref={scrollRef}
+        role="log"
+        aria-live="polite"
+        aria-label="Accomplish AI conversation"
         className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 min-h-[260px] max-h-[54vh] bg-[#FAF9F5]/70"
       >
         {messages.map((m) => (

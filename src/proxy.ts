@@ -32,12 +32,24 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!user && !isPublic && !pathname.startsWith("/api/")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("next", pathname);
+    if (pathname !== "/") url.searchParams.set("next", pathname);
+    else url.searchParams.delete("next");
+    return NextResponse.redirect(url);
+  }
+
+  // Redirect signed-in users away from /login cleanly
+  if (user && pathname === "/login") {
+    const nextParam = searchParams.get("next") ?? "/";
+    const safeNext =
+      nextParam.startsWith("/") && !nextParam.startsWith("//") && !nextParam.startsWith("/\\") ? nextParam : "/";
+    const url = request.nextUrl.clone();
+    url.pathname = safeNext;
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

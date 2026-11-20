@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 import { getUser } from "@/lib/supabase/server";
-import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { checkBurstRateLimit, getQuotaAndAiSettings } from "@/lib/admin";
 import { getGroq, GROQ_STT_FALLBACK_MODEL, GROQ_STT_MODEL, groqErrorResponse } from "@/lib/ai/groq";
 
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
@@ -10,10 +10,7 @@ export async function POST(request: Request) {
   const { supabase, user } = await getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [quota, aiSettings] = await Promise.all([
-    getUserQuotaStatus(supabase, user.id, user.email),
-    getAiSettings(supabase),
-  ]);
+  const { quota, aiSettings } = await getQuotaAndAiSettings(supabase, user.id, user.email);
 
   if (quota.isBlocked) {
     return NextResponse.json(

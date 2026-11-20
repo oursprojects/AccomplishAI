@@ -42,7 +42,7 @@ export function AuthForm() {
         setError(err.message);
         return;
       }
-      const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      const safeNext = next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
       router.push(safeNext);
       router.refresh();
     } finally {

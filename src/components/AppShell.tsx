@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -96,6 +96,15 @@ export function AppShell({
   const [navError, setNavError] = useState<string | null>(null);
   const [isNavTransition, startNavTransition] = useTransition();
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen]);
+
   function isNavActive(item: NavItem): boolean {
     if (pathname === item.href) return true;
     if (item.matchPrefix && pathname.startsWith(item.matchPrefix)) return true;
@@ -125,7 +134,18 @@ export function AppShell({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const json = (await res.json()) as { report?: { id: string }; error?: string };
+      const json = (await res.json()) as {
+        report?: { id: string };
+        error?: string;
+        existingReportId?: string;
+      };
+      if (res.status === 409 && json.existingReportId) {
+        setMobileOpen(false);
+        startNavTransition(() => {
+          router.push(`/reports/${json.existingReportId}`);
+        });
+        return;
+      }
       if (!res.ok || !json.report) {
         throw new Error(json.error ?? "Could not create a new report.");
       }
@@ -246,6 +266,7 @@ export function AppShell({
                     <Link
                       key={item.href}
                       href={item.href}
+                      aria-current={active ? "page" : undefined}
                       onClick={() => setMobileOpen(false)}
                       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                         active
@@ -352,6 +373,7 @@ export function AppShell({
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={active ? "page" : undefined}
                   title={collapsed ? item.label : undefined}
                   className={`flex items-center ${
                     collapsed ? "justify-center px-2" : "gap-3 px-3"

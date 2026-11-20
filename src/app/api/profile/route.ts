@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { jsonError, parseJsonBody, safeServerError } from "@/lib/api-utils";
 import { getUser } from "@/lib/supabase/server";
 
 const isoDateOptional = z
@@ -33,7 +34,7 @@ export async function GET() {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeServerError("api/profile GET", error, "Could not load profile.");
   return NextResponse.json({
     profile: data ?? {
       id: user.id,
@@ -50,25 +51,23 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   const { supabase, user } = await getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return jsonError(401, "Unauthorized");
 
-  const parsed = profileSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid profile data." }, { status: 400 });
-  }
+  const body = await parseJsonBody(request, profileSchema, "Invalid profile data.");
+  if (body.response) return body.response;
 
   const { data, error } = await supabase
     .from("profiles")
     .upsert(
       {
         id: user.id,
-        name_last_first: parsed.data.name_last_first.toUpperCase(),
-        name_first_last: parsed.data.name_first_last.toUpperCase(),
-        office: parsed.data.office || "DNX",
-        default_verifier: parsed.data.default_verifier.toUpperCase(),
-        default_daily_hours: parsed.data.default_daily_hours,
-        internship_start_date: parsed.data.internship_start_date ?? null,
-        target_ojt_hours: parsed.data.target_ojt_hours,
+        name_last_first: body.data.name_last_first.toUpperCase(),
+        name_first_last: body.data.name_first_last.toUpperCase(),
+        office: body.data.office || "DNX",
+        default_verifier: body.data.default_verifier.toUpperCase(),
+        default_daily_hours: body.data.default_daily_hours,
+        internship_start_date: body.data.internship_start_date ?? null,
+        target_ojt_hours: body.data.target_ojt_hours,
       },
       { onConflict: "id" },
     )
@@ -77,6 +76,6 @@ export async function PUT(request: Request) {
     )
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeServerError("api/profile PUT", error, "Could not save profile.");
   return NextResponse.json({ profile: data });
 }

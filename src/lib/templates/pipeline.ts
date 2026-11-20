@@ -93,6 +93,7 @@ export async function scanAndStoreTemplate(
  */
 export async function confirmTemplate(
   supabase: Supabase,
+  userId: string,
   templateId: string,
   assignments: FieldAssignment[],
 ): Promise<TemplateReview> {
@@ -100,6 +101,7 @@ export async function confirmTemplate(
     .from("templates")
     .select("id, original_path, storage_path")
     .eq("id", templateId)
+    .eq("user_id", userId)
     .single();
   if (error || !tpl) throw new Error("Template not found.");
 
@@ -117,6 +119,7 @@ export async function confirmTemplate(
     .from("templates")
     .update({ schema: fields as unknown as Json, status: "confirmed" })
     .eq("id", templateId)
+    .eq("user_id", userId)
     .select("id, name, status, updated_at")
     .single();
   if (upError) throw new Error(`Updating template failed: ${upError.message}`);

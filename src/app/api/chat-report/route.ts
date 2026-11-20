@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { checkBurstRateLimit, getQuotaAndAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import {
   buildInternshipWeeks,
   getReportWeekMondayIso,
@@ -224,10 +224,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: body.error.issues[0]?.message ?? "Invalid chat request." }, { status: 400 });
   }
 
-  const [aiSettings, quotaBefore] = await Promise.all([
-    getAiSettings(supabase),
-    getUserQuotaStatus(supabase, user.id, user.email),
-  ]);
+  const { quota: quotaBefore, aiSettings } = await getQuotaAndAiSettings(supabase, user.id, user.email);
 
   const maxChatMessages = aiSettings.maxChatMessages;
 
