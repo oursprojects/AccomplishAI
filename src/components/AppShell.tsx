@@ -172,6 +172,7 @@ export function AppShell({
   const [signingOut, setSigningOut] = useState(false);
   const [creatingReport, setCreatingReport] = useState(false);
   const [isNavTransition, startNavTransition] = useTransition();
+  const isShellBusy = creatingReport || isNavTransition || signingOut;
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -329,15 +330,19 @@ export function AppShell({
               <Button
                 type="button"
                 variant="accent"
-                disabled={creatingReport || (quota ? !quota.canCreateReport : false)}
+                disabled={isShellBusy || (quota ? !quota.canCreateReport : false)}
                 onClick={() => void handleCreateReport()}
                 className="w-full"
               >
-                {creatingReport ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FilePlus2 className="h-3.5 w-3.5" />}
-                <span>{creatingReport ? "Creating..." : "New Report"}</span>
+                {creatingReport || isNavTransition ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <FilePlus2 className="h-3.5 w-3.5" />
+                )}
+                <span>{creatingReport || isNavTransition ? "Creating..." : "New Report"}</span>
               </Button>
 
-              <nav className="space-y-1">
+              <nav className={`space-y-1 ${isShellBusy ? "pointer-events-none opacity-60" : ""}`}>
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = isNavActive(item);
@@ -435,16 +440,20 @@ export function AppShell({
           <Button
             type="button"
             variant="accent"
-            disabled={creatingReport || (quota ? !quota.canCreateReport : false)}
+            disabled={isShellBusy || (quota ? !quota.canCreateReport : false)}
             onClick={() => void handleCreateReport()}
             title="Create a new Weekly Accomplishment Report"
             className={`w-full ${collapsed ? "px-0" : ""}`}
           >
-            {creatingReport ? <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" /> : <FilePlus2 className="h-3.5 w-3.5 shrink-0" />}
-            {!collapsed && <span>{creatingReport ? "Creating..." : "New Report"}</span>}
+            {creatingReport || isNavTransition ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+            ) : (
+              <FilePlus2 className="h-3.5 w-3.5 shrink-0" />
+            )}
+            {!collapsed && <span>{creatingReport || isNavTransition ? "Creating..." : "New Report"}</span>}
           </Button>
 
-          <nav className="space-y-1">
+          <nav className={`space-y-1 ${isShellBusy ? "pointer-events-none opacity-60" : ""}`}>
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isNavActive(item);
@@ -488,7 +497,7 @@ export function AppShell({
           <Button
             type="button"
             variant="outline"
-            disabled={signingOut}
+            disabled={isShellBusy}
             onClick={() => void handleSignOut()}
             title="Sign out"
             className="w-full"

@@ -701,7 +701,7 @@ export function AdminClient({
 
         <div className="divide-y divide-[#F2EFE8]">
           {members.map((m) => {
-            const busy = busyId === m.userId;
+            const anyMutationBusy = creating || savingAi || savingDefault || busyId !== null;
             const savedLimit = m.customDailyLimit === null ? "" : String(m.customDailyLimit);
             const savedReports = m.customMaxReports === null ? "" : String(m.customMaxReports);
             const memberChanged =
@@ -759,16 +759,16 @@ export function AdminClient({
                       />
                     </label>
 
-                    <Button type="button" size="sm" disabled={busy || !memberChanged} onClick={() => handleSaveMember(m)}>
+                    <Button type="button" size="sm" disabled={anyMutationBusy || !memberChanged} onClick={() => handleSaveMember(m)}>
                       <Save className="w-3 h-3" />
-                      <span>{memberChanged ? "Save" : "Saved"}</span>
+                      <span>{busyId === m.userId ? "Saving..." : memberChanged ? "Save" : "Saved"}</span>
                     </Button>
 
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      disabled={busy || m.usedToday === 0}
+                      disabled={anyMutationBusy || m.usedToday === 0}
                       onClick={() => handleResetToday(m)}
                     >
                       <RotateCcw className="w-3 h-3" />
@@ -779,7 +779,7 @@ export function AdminClient({
                       type="button"
                       size="sm"
                       variant={m.isBlocked ? "default" : "destructive"}
-                      disabled={busy}
+                      disabled={anyMutationBusy}
                       onClick={() => handleSaveMember(m, !m.isBlocked)}
                       className={m.isBlocked ? "bg-emerald-600 hover:bg-emerald-700" : ""}
                     >

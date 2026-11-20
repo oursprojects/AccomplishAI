@@ -167,8 +167,9 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
                 <button
                   key={hrs}
                   type="button"
+                  disabled={saving}
                   onClick={() => setForm({ ...form, target_ojt_hours: hrs })}
-                  className={`rounded-md border px-2 py-0.5 text-[11px] font-medium cursor-pointer transition ${
+                  className={`rounded-md border px-2 py-0.5 text-[11px] font-medium cursor-pointer transition disabled:pointer-events-none disabled:opacity-50 ${
                     form.target_ojt_hours === hrs
                       ? "border-[#D97757] bg-[#FDF3EF] text-[#C86343]"
                       : "border-[#DDD7CB] bg-white text-[#57544E] hover:bg-[#F4F2EA]"
@@ -207,6 +208,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
                   type="button"
                   size="sm"
                   variant="ghost"
+                  disabled={saving}
                   onClick={() => setForm({ ...form, internship_start_date: null })}
                 >
                   Clear

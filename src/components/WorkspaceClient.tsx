@@ -349,6 +349,8 @@ export function WorkspaceClient({
   const profileMissingName = !profile.name_last_first || !profile.name_first_last;
   const fallbackTitle = [data.date_from, data.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
 
+  const workspaceBusy = saving || confirming || generatingFromNotes;
+
   return (
     <div className="space-y-4 pb-8">
       {/* Top report bar showing exact report being edited + Undo / Cancel / Save */}
@@ -385,7 +387,7 @@ export function WorkspaceClient({
             type="button"
             size="sm"
             variant="secondary"
-            disabled={!quota.allowed}
+            disabled={!quota.allowed || workspaceBusy}
             onClick={() => setQuickNotesOpen(true)}
             title="Paste a whole week of raw notes and fill the report in 1 prompt"
           >
@@ -393,18 +395,18 @@ export function WorkspaceClient({
             <span className="hidden sm:inline">Paste Notes</span>
           </Button>
           {undoStack.length > 0 && (
-            <Button type="button" size="sm" variant="outline" onClick={handleUndo}>
+            <Button type="button" size="sm" variant="outline" onClick={handleUndo} disabled={workspaceBusy}>
               <Undo2 className="h-3.5 w-3.5 text-[#D97757]" />
               <span>Undo</span>
             </Button>
           )}
           {hasChanges && (
-            <Button type="button" size="sm" variant="outline" onClick={handleCancelChanges} disabled={saving}>
+            <Button type="button" size="sm" variant="outline" onClick={handleCancelChanges} disabled={workspaceBusy}>
               <RotateCcw className="h-3.5 w-3.5" />
               <span>Cancel</span>
             </Button>
           )}
-          <Button type="button" size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
+          <Button type="button" size="sm" onClick={handleSave} disabled={workspaceBusy || !hasChanges}>
             {hasChanges ? <Save className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
             <span>{saving ? "Saving..." : !hasChanges ? "Saved" : "Save"}</span>
           </Button>

@@ -84,7 +84,9 @@ export function DashboardClient({
 }: DashboardClientProps) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
-  const [, startNavTransition] = useTransition();
+  const [creatingTarget, setCreatingTarget] = useState<string | null>(null);
+  const [isNavPending, startNavTransition] = useTransition();
+  const isBusy = creating || isNavPending;
 
   const stats = useMemo(() => {
     let maxTotal = 0;
@@ -172,8 +174,9 @@ export function DashboardClient({
     weekStartDate?: string;
     weekEndDate?: string;
     title?: string;
+    sourceKey?: string;
   }) {
-    if (!quota.canCreateReport || creating) return;
+    if (!quota.canCreateReport || isBusy) return;
     if (opts?.weekStartDate || opts?.weekEndDate) {
       const targetMon = getReportWeekMondayIso(opts.weekStartDate, opts.weekEndDate);
       const existing = targetMon ? reportByMondayIso.get(targetMon) : undefined;
@@ -184,11 +187,16 @@ export function DashboardClient({
     }
 
     setCreating(true);
+    setCreatingTarget(opts?.sourceKey ?? "primary");
     try {
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(opts ?? {}),
+        body: JSON.stringify({
+          ...(opts?.weekStartDate ? { weekStartDate: opts.weekStartDate } : {}),
+          ...(opts?.weekEndDate ? { weekEndDate: opts.weekEndDate } : {}),
+          ...(opts?.title ? { title: opts.title } : {}),
+        }),
       });
       const json = (await res.json()) as {
         report?: { id: string };
@@ -204,6 +212,7 @@ export function DashboardClient({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create report.");
       setCreating(false);
+      setCreatingTarget(null);
     }
   }
 
@@ -231,7 +240,10 @@ export function DashboardClient({
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Link
             href="/"
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#DDD7CB] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] transition"
+            aria-disabled={isBusy}
+            className={`inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#DDD7CB] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] transition ${
+              isBusy ? "pointer-events-none opacity-50" : ""
+            }`}
           >
             <FolderKanban className="h-4 w-4 text-[#D97757]" />
             <span>My Reports</span>
@@ -239,7 +251,7 @@ export function DashboardClient({
           <Button
             type="button"
             variant="accent"
-            disabled={!quota.canCreateReport || creating}
+            disabled={!quota.canCreateReport || isBusy}
             onClick={() =>
               void handleCreateWeekReport(
                 nextWeekPreview
@@ -247,14 +259,15 @@ export function DashboardClient({
                       weekStartDate: nextWeekPreview.fromText,
                       weekEndDate: nextWeekPreview.toText,
                       title: `Week ${nextWeekPreview.weekNumber}`,
+                      sourceKey: "primary",
                     }
-                  : undefined,
+                  : { sourceKey: "primary" },
               )
             }
           >
-            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
+            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
             <span>
-              {creating
+              {isBusy
                 ? "Creating..."
                 : nextWeekPreview
                   ? `Create Week ${nextWeekPreview.weekNumber}`
@@ -420,7 +433,7 @@ export function DashboardClient({
               </p>
             </div>
           ) : (
-            <div className="flex items-end gap-2 sm:gap-3 h-44 pt-4 px-1 overflow-x-auto">
+            <div className={`flex items-end gap-2 sm:gap-3 h-44 pt-4 px-1 overflow-x-auto ${isBusy ? "pointer-events-none opacity-60" : ""}`}>
               {weeklyChartItems.map((item) => {
                 const heightPct = Math.max(10, Math.round((item.hours / maxChartHours) * 100));
                 return (
@@ -477,9 +490,11 @@ export function DashboardClient({
               </Link>
             </div>
           ) : (
-            <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+            <div className={`space-y-1.5 max-h-52 overflow-y-auto pr-1 ${isBusy ? "pointer-events-none opacity-60" : ""}`}>
               {scheduleWeeks.map((wk) => {
                 const existing = reportByMondayIso.get(wk.mondayIso);
+                const weekKey = `week-${wk.weekNumber}`;
+                const creatingThisWeek = isBusy && creatingTarget === weekKey;
                 return existing ? (
                   <Link
                     key={wk.weekNumber}
@@ -510,17 +525,19 @@ export function DashboardClient({
                     </div>
                     <button
                       type="button"
-                      disabled={!quota.canCreateReport || creating}
+                      disabled={!quota.canCreateReport || isBusy}
                       onClick={() =>
                         void handleCreateWeekReport({
                           weekStartDate: wk.fromText,
                           weekEndDate: wk.toText,
                           title: `Week ${wk.weekNumber}`,
+                          sourceKey: weekKey,
                         })
                       }
-                      className="text-[11px] font-semibold text-[#C86343] hover:underline cursor-pointer disabled:opacity-50 shrink-0"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#C86343] hover:underline cursor-pointer disabled:pointer-events-none disabled:opacity-50 shrink-0"
                     >
-                      + Create
+                      {creatingThisWeek && <Loader2 className="h-3 w-3 animate-spin" />}
+                      <span>{creatingThisWeek ? "Creating..." : "+ Create"}</span>
                     </button>
                   </div>
                 );

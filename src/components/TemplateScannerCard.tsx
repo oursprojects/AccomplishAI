@@ -50,7 +50,8 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const hasMappingChanges = JSON.stringify(rows) !== baselineJson;
-  const confirmDisabled = saving || (review?.template.status === "confirmed" && !hasMappingChanges);
+  const isBusy = scanning || saving;
+  const confirmDisabled = isBusy || (review?.template.status === "confirmed" && !hasMappingChanges);
 
   async function scanDefault() {
     setScanning(true);
@@ -151,20 +152,24 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
           <button
             type="button"
             onClick={scanDefault}
-            disabled={scanning}
-            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60 transition cursor-pointer"
+            disabled={isBusy}
+            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50 transition cursor-pointer"
           >
             {scanning ? "Scanning XML..." : review ? "Re-scan Built-in Template" : "Auto-Scan 2026 Template"}
           </button>
 
-          <label className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer">
+          <label
+            className={`rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition ${
+              isBusy ? "pointer-events-none opacity-50" : "cursor-pointer"
+            }`}
+          >
             Upload .docx
             <input
               ref={fileRef}
               type="file"
               accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className="hidden"
-              disabled={scanning}
+              disabled={isBusy}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) scanUpload(file);

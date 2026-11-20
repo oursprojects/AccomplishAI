@@ -127,12 +127,15 @@ export function HistoryClient({
 
   const [creating, setCreating] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
-  const [, startNavTransition] = useTransition();
+  const [isNavPending, startNavTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
+
+  const isCreatingReport = creating || Boolean(duplicatingId) || isNavPending;
+  const isBusy = isCreatingReport || exportingAll || Boolean(deletingId) || savingAnchor || savingRename;
 
   const reportByMondayIso = useMemo(() => {
     const map = new Map<string, ReportSummary>();
@@ -455,7 +458,7 @@ export function HistoryClient({
               type="button"
               variant="outline"
               size="sm"
-              disabled={exportingAll}
+              disabled={isBusy}
               onClick={() => void handleExportAllZip()}
               title="Download all saved Weekly Accomplishment Reports bundled in a single .zip"
             >
@@ -467,7 +470,7 @@ export function HistoryClient({
           <Button
             type="button"
             variant="accent"
-            disabled={!canCreateReport || creating}
+            disabled={!canCreateReport || isBusy}
             onClick={() => void handleCreateReport()}
             title={
               nextWeekPreview
@@ -477,7 +480,7 @@ export function HistoryClient({
           >
             {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
             <span>
-              {creating
+              {isCreatingReport
                 ? "Creating..."
                 : nextWeekPreview
                   ? `New Week ${nextWeekPreview.weekNumber} Report`
@@ -554,7 +557,7 @@ export function HistoryClient({
                   <Input
                     type="date"
                     value={startDate ?? ""}
-                    disabled={savingAnchor}
+                    disabled={isBusy}
                     onChange={(e) => void saveAnchorDate(e.target.value)}
                     className="bg-white"
                   />
@@ -577,7 +580,7 @@ export function HistoryClient({
                     type="button"
                     size="sm"
                     variant="accent"
-                    disabled={!canCreateReport || creating}
+                    disabled={!canCreateReport || isBusy}
                     onClick={() =>
                       void handleCreateReport({
                         weekStartDate: nextWeekPreview.fromText,
@@ -587,14 +590,14 @@ export function HistoryClient({
                     }
                     className="w-full"
                   >
-                    <FilePlus2 className="h-3.5 w-3.5" />
-                    <span>Create Week {nextWeekPreview.weekNumber} Report</span>
+                    {isCreatingReport ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FilePlus2 className="h-3.5 w-3.5" />}
+                    <span>{isCreatingReport ? "Creating..." : `Create Week ${nextWeekPreview.weekNumber} Report`}</span>
                   </Button>
                 </div>
               )}
             </div>
 
-            <div className="md:col-span-7 rounded-xl border border-[#E6E2D8] bg-white p-3">
+            <div className={`md:col-span-7 rounded-xl border border-[#E6E2D8] bg-white p-3 ${isBusy ? "pointer-events-none opacity-60" : ""}`}>
               <InternshipCalendar
                 mode={startDate ? "week" : "anchor"}
                 startDateIso={startDate}
@@ -723,11 +726,11 @@ export function HistoryClient({
             <Button
               type="button"
               variant="accent"
-              disabled={!canCreateReport || creating}
+              disabled={!canCreateReport || isBusy}
               onClick={() => void handleCreateReport()}
             >
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
-              <span>{creating ? "Creating..." : "Create First Report"}</span>
+              {isCreatingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
+              <span>{isCreatingReport ? "Creating..." : "Create First Report"}</span>
             </Button>
           </div>
         </Card>
@@ -736,7 +739,10 @@ export function HistoryClient({
           <p className="text-sm font-medium text-[#1F1E1C]">No matching reports found</p>
         </Card>
       ) : (
-        <div className="space-y-5">
+        <div
+          aria-busy={isBusy}
+          className={`space-y-5 transition-opacity ${isCreatingReport ? "pointer-events-none opacity-70" : ""}`}
+        >
           {groupedVisibleReports.map((group) => (
             <section key={group.meta.key} className="space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] pb-1.5">
@@ -885,7 +891,7 @@ export function HistoryClient({
                             type="button"
                             size="sm"
                             variant="secondary"
-                            disabled={!canCreateReport || duplicatingId === report.id}
+                            disabled={!canCreateReport || isBusy}
                             onClick={() =>
                               void handleCreateReport({
                                 duplicateFromId: report.id,
@@ -905,7 +911,13 @@ export function HistoryClient({
                             ) : (
                               <CopyPlus className="h-3.5 w-3.5 text-[#D97757]" />
                             )}
-                            <span>{nextWkNum ? `Create Week ${nextWkNum}` : "Next Week"}</span>
+                            <span>
+                              {duplicatingId === report.id
+                                ? "Creating..."
+                                : nextWkNum
+                                  ? `Create Week ${nextWkNum}`
+                                  : "Next Week"}
+                            </span>
                           </Button>
                         )}
                         <Button
@@ -913,7 +925,7 @@ export function HistoryClient({
                           size="sm"
                           variant="destructive"
                           onClick={() => setConfirmDelete({ id: report.id, title: displayTitle })}
-                          disabled={deletingId === report.id}
+                          disabled={isBusy}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           <span>{deletingId === report.id ? "Deleting..." : "Delete"}</span>
