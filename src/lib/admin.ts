@@ -157,13 +157,47 @@ export interface AdminMember {
   createdAt: string;
 }
 
+export interface ApiUsageMonitor {
+  requestsLastMinute: number;
+  requestsToday: number;
+  requestsLast7Days: number;
+  byEndpoint: Array<{ kind: string; today: number; total: number }>;
+  byModel: Array<{ model: string; today: number; total: number }>;
+  dailySeries: Array<{ date: string; label: string; count: number }>;
+}
+
 export interface AdminDashboardData {
   aiSettings: AiRuntimeSettings;
   members: AdminMember[];
+  usageMonitor: ApiUsageMonitor;
+}
+
+export async function checkBurstRateLimit(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  isAdmin: boolean,
+): Promise<{ allowed: boolean; count: number; limit: number }> {
+  const oneMinAgo = new Date(Date.now() - 60_000).toISOString();
+  const limit = isAdmin ? 20 : 8;
+  const { count } = await supabase
+    .from("prompt_usage_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", oneMinAgo);
+  const used = count ?? 0;
+  return { allowed: used < limit, count: used, limit };
+}
+
+function manilaDateKey(isoOrDate: string | Date): string {
+  const d = typeof isoOrDate === "string" ? new Date(isoOrDate) : isoOrDate;
+  return new Date(d.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 export async function loadAdminDashboardData(supabase: SupabaseClient<Database>): Promise<AdminDashboardData> {
-  const dayStart = getManilaDayStartIso();
+  const now = new Date();
+  const dayStart = getManilaDayStartIso(now);
+  const oneMinAgoIso = new Date(now.getTime() - 60_000).toISOString();
+  const sevenDaysAgoIso = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const [aiSettings, { data: quotas, error: qErr }, { data: profiles }, { data: logs }, { data: reports }] =
     await Promise.all([
@@ -173,7 +207,7 @@ export async function loadAdminDashboardData(supabase: SupabaseClient<Database>)
         .select("user_id, email, custom_daily_limit, custom_max_reports, is_blocked, created_at")
         .order("created_at", { ascending: true }),
       supabase.from("profiles").select("id, name_last_first, office"),
-      supabase.from("prompt_usage_logs").select("user_id, created_at"),
+      supabase.from("prompt_usage_logs").select("user_id, kind, model, created_at"),
       supabase.from("reports").select("user_id"),
     ]);
 
@@ -182,10 +216,55 @@ export async function loadAdminDashboardData(supabase: SupabaseClient<Database>)
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
   const todayMap = new Map<string, number>();
   const totalMap = new Map<string, number>();
+
+  let requestsLastMinute = 0;
+  let requestsToday = 0;
+  let requestsLast7Days = 0;
+  const endpointStats = new Map<string, { today: number; total: number }>();
+  const modelStats = new Map<string, { today: number; total: number }>();
+  const daySeriesMap = new Map<string, number>();
+
+  const dailyKeys: Array<{ date: string; label: string }> = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const dateKey = manilaDateKey(d);
+    const label = new Date(`${dateKey}T12:00:00+08:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+    dailyKeys.push({ date: dateKey, label });
+    daySeriesMap.set(dateKey, 0);
+  }
+
   for (const log of logs ?? []) {
     totalMap.set(log.user_id, (totalMap.get(log.user_id) ?? 0) + 1);
-    if (log.created_at >= dayStart) {
+    const isToday = log.created_at >= dayStart;
+    if (isToday) {
       todayMap.set(log.user_id, (todayMap.get(log.user_id) ?? 0) + 1);
+      requestsToday++;
+    }
+    if (log.created_at >= oneMinAgoIso) {
+      requestsLastMinute++;
+    }
+    if (log.created_at >= sevenDaysAgoIso) {
+      requestsLast7Days++;
+    }
+
+    const kind = log.kind || "chat_report";
+    const ep = endpointStats.get(kind) ?? { today: 0, total: 0 };
+    ep.total++;
+    if (isToday) ep.today++;
+    endpointStats.set(kind, ep);
+
+    const modelName = log.model || "unknown";
+    const ms = modelStats.get(modelName) ?? { today: 0, total: 0 };
+    ms.total++;
+    if (isToday) ms.today++;
+    modelStats.set(modelName, ms);
+
+    const dk = manilaDateKey(log.created_at);
+    if (daySeriesMap.has(dk)) {
+      daySeriesMap.set(dk, (daySeriesMap.get(dk) ?? 0) + 1);
     }
   }
 
@@ -215,5 +294,21 @@ export async function loadAdminDashboardData(supabase: SupabaseClient<Database>)
     };
   });
 
-  return { aiSettings, members };
+  const usageMonitor: ApiUsageMonitor = {
+    requestsLastMinute,
+    requestsToday,
+    requestsLast7Days,
+    byEndpoint: Array.from(endpointStats.entries())
+      .map(([kind, counts]) => ({ kind, ...counts }))
+      .sort((a, b) => b.total - a.total),
+    byModel: Array.from(modelStats.entries())
+      .map(([model, counts]) => ({ model, ...counts }))
+      .sort((a, b) => b.total - a.total),
+    dailySeries: dailyKeys.map((d) => ({
+      ...d,
+      count: daySeriesMap.get(d.date) ?? 0,
+    })),
+  };
+
+  return { aiSettings, members, usageMonitor };
 }

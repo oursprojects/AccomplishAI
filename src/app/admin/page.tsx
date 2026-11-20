@@ -5,6 +5,7 @@ import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus, isAdminEmail, loadAdminDashboardData } from "@/lib/admin";
 import { AppShell } from "@/components/AppShell";
 import { AdminClient } from "@/components/AdminClient";
+import AdminLoading from "./loading";
 
 async function AdminContent() {
   await connection();
@@ -22,6 +23,7 @@ async function AdminContent() {
       <AdminClient
         initialAiSettings={dashboard.aiSettings}
         initialMembers={dashboard.members}
+        initialUsageMonitor={dashboard.usageMonitor}
       />
     </AppShell>
   );
@@ -29,13 +31,7 @@ async function AdminContent() {
 
 export default function AdminPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center text-sm text-[#6B665E] bg-[#FAF9F5]">
-          Loading admin console...
-        </div>
-      }
-    >
+    <Suspense fallback={<AdminLoading />}>
       <AdminContent />
     </Suspense>
   );

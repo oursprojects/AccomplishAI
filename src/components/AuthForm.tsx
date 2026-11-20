@@ -5,6 +5,9 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 export function AuthForm() {
   const router = useRouter();
@@ -52,7 +55,7 @@ export function AuthForm() {
       <div />
 
       <div className="mx-auto w-full max-w-md space-y-5">
-        <div className="rounded-3xl border border-[#E6E2D8] bg-white p-6 sm:p-8 shadow-sm space-y-6">
+        <Card className="rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
           <div className="text-center space-y-2">
             <div className="mx-auto flex items-center justify-center">
               <Image
@@ -85,7 +88,7 @@ export function AuthForm() {
               </label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A847A]" />
-                <input
+                <Input
                   id="email"
                   type="email"
                   required
@@ -93,7 +96,7 @@ export function AuthForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="intern@company.com"
-                  className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] pl-10 pr-3.5 py-2.5 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white transition"
+                  className="pl-10 py-2.5 h-10"
                 />
               </div>
             </div>
@@ -104,7 +107,7 @@ export function AuthForm() {
               </label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A847A]" />
-                <input
+                <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   required
@@ -113,7 +116,7 @@ export function AuthForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] pl-10 pr-10 py-2.5 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white transition"
+                  className="pl-10 pr-10 py-2.5 h-10"
                 />
                 <button
                   type="button"
@@ -126,21 +129,17 @@ export function AuthForm() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#D97757] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#C86343] disabled:opacity-60 transition cursor-pointer shadow-2xs"
-            >
+            <Button type="submit" variant="accent" size="lg" disabled={loading} className="w-full">
               <span>{loading ? "Signing in..." : "Sign in"}</span>
               <ArrowRight className="h-4 w-4" />
-            </button>
+            </Button>
           </form>
 
           <div className="rounded-xl bg-[#F4F2EA] border border-[#E6E2D8] px-3.5 py-2.5 flex items-center gap-2.5 text-xs text-[#57544E]">
             <ShieldCheck className="h-4 w-4 text-[#D97757] shrink-0" />
             <span>Intern accounts are created exclusively by your team administrator.</span>
           </div>
-        </div>
+        </Card>
       </div>
 
       <footer className="pt-6 text-center text-xs text-[#6B665E]">

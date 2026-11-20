@@ -7,29 +7,31 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   FileCheck2,
   FilePlus2,
-  History,
+  FolderKanban,
+  Loader2,
   LogOut,
   Menu,
-  MessageSquareText,
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
-  Sparkles,
   UserRound,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { QuotaStatus } from "@/lib/admin";
+import { QuotaGaugeIcon } from "@/components/icons/AccomplishIcons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  matchPrefix?: string;
 }
 
 const BASE_NAV: NavItem[] = [
-  { href: "/", label: "Report Chat", icon: MessageSquareText },
-  { href: "/history", label: "History", icon: History },
+  { href: "/", label: "My Reports", icon: FolderKanban, matchPrefix: "/reports" },
   { href: "/template", label: "Template", icon: FileCheck2 },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
@@ -37,20 +39,21 @@ const BASE_NAV: NavItem[] = [
 function AllowancePill({ quota }: { quota?: QuotaStatus }) {
   if (!quota) return null;
 
-  const badgeTone = quota.isAdmin
-    ? "bg-[#FDF3EF] text-[#C86343] border-[#F0D5C9]"
+  const variant = quota.isAdmin
+    ? "accent"
     : quota.isBlocked || quota.remaining === 0
-      ? "bg-red-50 text-red-700 border-red-200"
+      ? "destructive"
       : quota.remaining <= 3
-        ? "bg-amber-50 text-amber-800 border-amber-200"
-        : "bg-white text-[#1F1E1C] border-[#E5E2D9]";
+        ? "warning"
+        : "outline";
 
   return (
-    <div
+    <Badge
+      variant={variant}
       title="Remaining AI prompts today (resets 12:00 AM Manila time)"
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-2xs ${badgeTone}`}
+      className="py-1 shadow-2xs"
     >
-      <Sparkles className="h-3 w-3 text-[#D97757] shrink-0" />
+      <QuotaGaugeIcon className="h-3.5 w-3.5 text-[#D97757] shrink-0" />
       {quota.isAdmin ? (
         <span>Admin · Unlimited AI</span>
       ) : quota.isBlocked ? (
@@ -60,7 +63,7 @@ function AllowancePill({ quota }: { quota?: QuotaStatus }) {
           <strong>{quota.remaining}</strong>/{quota.dailyLimit} prompts left
         </span>
       )}
-    </div>
+    </Badge>
   );
 }
 
@@ -83,6 +86,17 @@ export function AppShell({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [creatingReport, setCreatingReport] = useState(false);
+  const [navError, setNavError] = useState<string | null>(null);
+  const [pendingNav, setPendingNav] = useState<{ fromPath: string; target: string } | null>(null);
+
+  const isNavigating = pendingNav !== null && pendingNav.fromPath === pathname;
+
+  function isNavActive(item: NavItem): boolean {
+    if (pathname === item.href) return true;
+    if (item.matchPrefix && pathname.startsWith(item.matchPrefix)) return true;
+    return false;
+  }
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -97,10 +111,42 @@ export function AppShell({
     }
   }
 
-  const currentLabel = navItems.find((i) => i.href === pathname)?.label ?? "Accomplish AI";
+  async function handleCreateReport() {
+    if (creatingReport) return;
+    setNavError(null);
+    setCreatingReport(true);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = (await res.json()) as { report?: { id: string }; error?: string };
+      if (!res.ok || !json.report) {
+        throw new Error(json.error ?? "Could not create a new report.");
+      }
+      setMobileOpen(false);
+      setPendingNav({ fromPath: pathname, target: `/reports/${json.report.id}` });
+      router.push(`/reports/${json.report.id}`);
+    } catch (err) {
+      setNavError(err instanceof Error ? err.message : "Could not create report.");
+    } finally {
+      setCreatingReport(false);
+    }
+  }
+
+  const currentLabel =
+    navItems.find((i) => isNavActive(i))?.label ?? "Accomplish AI";
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#FAF9F5] text-[#1F1E1C]">
+      {/* Subtle top progress bar during route transitions */}
+      {isNavigating && (
+        <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-[#F0D5C9] overflow-hidden">
+          <div className="h-full w-1/2 bg-[#D97757] animate-[pulse_0.9s_ease-in-out_infinite] rounded-full" />
+        </div>
+      )}
+
       {/* Mobile top bar */}
       <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-[#E5E2D9] bg-[#FAF9F5]/95 backdrop-blur-md px-3.5 py-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -112,29 +158,31 @@ export function AppShell({
           >
             <Menu className="h-4 w-4" />
           </button>
-          <div className="flex items-center gap-2 min-w-0">
+          <Link href="/" className="flex items-center gap-2 min-w-0">
             <Image
               src="/logo.png"
               alt="Accomplish AI"
-              width={36}
-              height={36}
+              width={40}
+              height={40}
               className="h-9 w-9 rounded-xl object-contain shrink-0"
             />
             <span className="text-sm font-semibold tracking-tight truncate">{currentLabel}</span>
-          </div>
+          </Link>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
           <AllowancePill quota={quota} />
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             disabled={signingOut}
             onClick={() => void handleSignOut()}
             title="Sign out"
-            className="inline-flex items-center justify-center rounded-xl border border-[#E5E2D9] bg-white p-2 text-xs font-medium text-[#57544E] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
+            className="rounded-xl"
           >
             <LogOut className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -148,17 +196,21 @@ export function AppShell({
           <aside className="relative z-10 flex w-72 max-w-[82vw] flex-col justify-between border-r border-[#E5E2D9] bg-[#F4F2EA] p-4 shadow-xl">
             <div className="space-y-5">
               <div className="flex items-center justify-between">
-                <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5">
+                <Link
+                  href="/"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2.5"
+                >
                   <Image
                     src="/logo.png"
                     alt="Accomplish AI"
-                    width={48}
-                    height={48}
+                    width={52}
+                    height={52}
                     className="h-12 w-12 rounded-xl object-contain shrink-0"
                   />
                   <div>
                     <span className="block text-sm font-semibold text-[#1F1E1C]">Accomplish AI</span>
-                    <span className="block text-[11px] text-[#66645E]">Weekly Report Assistant</span>
+                    <span className="block text-[11px] text-[#66645E]">Weekly Report Workspace</span>
                   </div>
                 </Link>
                 <button
@@ -171,24 +223,29 @@ export function AppShell({
                 </button>
               </div>
 
-              <Link
-                href="/?new=1"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center justify-center gap-2 rounded-xl bg-[#D97757] px-3 py-2 text-xs font-semibold text-white hover:bg-[#C86343] transition shadow-2xs"
+              <Button
+                type="button"
+                variant="accent"
+                disabled={creatingReport || (quota ? !quota.canCreateReport : false)}
+                onClick={() => void handleCreateReport()}
+                className="w-full"
               >
-                <FilePlus2 className="h-3.5 w-3.5" />
-                <span>New Report</span>
-              </Link>
+                {creatingReport ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FilePlus2 className="h-3.5 w-3.5" />}
+                <span>{creatingReport ? "Creating..." : "New Report"}</span>
+              </Button>
 
               <nav className="space-y-1">
                 {navItems.map((item) => {
                   const Icon = item.icon;
-                  const active = pathname === item.href;
+                  const active = isNavActive(item);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={() => {
+                        setMobileOpen(false);
+                        if (item.href !== pathname) setPendingNav({ fromPath: pathname, target: item.href });
+                      }}
                       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                         active
                           ? "bg-white text-[#1F1E1C] shadow-2xs border border-[#E5E2D9]"
@@ -208,24 +265,25 @@ export function AppShell({
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-[#1F1E1C] truncate">{userEmail}</span>
                   {isAdmin && (
-                    <span className="shrink-0 rounded-full bg-[#D97757]/15 px-2 py-0.5 text-[10px] font-semibold text-[#C96442]">
+                    <Badge variant="accent" className="text-[10px] px-2 py-0">
                       Admin
-                    </span>
+                    </Badge>
                   )}
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 disabled={signingOut}
                 onClick={() => {
                   setMobileOpen(false);
                   void handleSignOut();
                 }}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#E5E2D9] bg-white px-3 py-2 text-xs font-medium text-[#57544E] hover:bg-[#EAE7DD]/60 disabled:opacity-50 cursor-pointer"
+                className="w-full"
               >
                 <LogOut className="h-3.5 w-3.5" />
                 <span>{signingOut ? "Signing out..." : "Sign out"}</span>
-              </button>
+              </Button>
               <p className="text-center text-[10px] text-[#7A746B]">
                 Created by Mike Ryno Santiago — DNX Intern
               </p>
@@ -243,13 +301,19 @@ export function AppShell({
         <div className="space-y-4">
           <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between px-0.5"}`}>
             {!collapsed && (
-              <Link href="/" className="flex items-center gap-2.5 min-w-0">
+              <Link
+                href="/"
+                onClick={() => {
+                  if (pathname !== "/") setPendingNav({ fromPath: pathname, target: "/" });
+                }}
+                className="flex items-center gap-2.5 min-w-0"
+              >
                 <Image
                   src="/logo.png"
                   alt="Accomplish AI"
-                  width={44}
-                  height={44}
-                  className="h-11 w-11 shrink-0 rounded-xl object-contain"
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 shrink-0 rounded-xl object-contain"
                 />
                 <div className="min-w-0">
                   <span className="block text-sm font-semibold tracking-tight text-[#1F1E1C] truncate">
@@ -269,26 +333,30 @@ export function AppShell({
             </button>
           </div>
 
-          <Link
-            href="/?new=1"
-            title="Start a separate blank report"
-            className={`flex items-center justify-center ${
-              collapsed ? "px-2 py-2" : "gap-2 px-3 py-2"
-            } rounded-xl bg-[#D97757] text-xs font-semibold text-white hover:bg-[#C86343] transition shadow-2xs`}
+          <Button
+            type="button"
+            variant="accent"
+            disabled={creatingReport || (quota ? !quota.canCreateReport : false)}
+            onClick={() => void handleCreateReport()}
+            title="Create a new Weekly Accomplishment Report"
+            className={`w-full ${collapsed ? "px-0" : ""}`}
           >
-            <FilePlus2 className="h-3.5 w-3.5 shrink-0" />
-            {!collapsed && <span>New Report</span>}
-          </Link>
+            {creatingReport ? <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" /> : <FilePlus2 className="h-3.5 w-3.5 shrink-0" />}
+            {!collapsed && <span>{creatingReport ? "Creating..." : "New Report"}</span>}
+          </Button>
 
           <nav className="space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href;
+              const active = isNavActive(item);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   title={collapsed ? item.label : undefined}
+                  onClick={() => {
+                    if (item.href !== pathname) setPendingNav({ fromPath: pathname, target: item.href });
+                  }}
                   className={`flex items-center ${
                     collapsed ? "justify-center px-2" : "gap-3 px-3"
                   } rounded-xl py-2.5 text-sm font-medium transition ${
@@ -311,26 +379,25 @@ export function AppShell({
               <div className="flex items-center justify-between gap-1.5">
                 <span className="text-xs font-medium text-[#1F1E1C] truncate">{userEmail}</span>
                 {isAdmin && (
-                  <span className="shrink-0 rounded-full bg-[#D97757]/15 px-2 py-0.5 text-[10px] font-semibold text-[#C96442]">
+                  <Badge variant="accent" className="text-[10px] px-2 py-0">
                     Admin
-                  </span>
+                  </Badge>
                 )}
               </div>
             </div>
           )}
 
-          <button
+          <Button
             type="button"
+            variant="outline"
             disabled={signingOut}
             onClick={() => void handleSignOut()}
             title="Sign out"
-            className={`w-full flex items-center ${
-              collapsed ? "justify-center px-2" : "justify-center gap-2 px-3"
-            } rounded-xl border border-[#E5E2D9] bg-white py-2 text-xs font-medium text-[#57544E] hover:bg-[#EAE7DD]/60 disabled:opacity-50 transition cursor-pointer`}
+            className="w-full"
           >
             <LogOut className="h-3.5 w-3.5 shrink-0" />
             {!collapsed && <span>{signingOut ? "Signing out..." : "Sign out"}</span>}
-          </button>
+          </Button>
 
           {!collapsed && (
             <p className="pt-1 text-center text-[10px] leading-snug text-[#7A746B]">
@@ -343,12 +410,18 @@ export function AppShell({
       {/* Main workspace canvas with desktop header allowance bar */}
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="hidden md:flex sticky top-0 z-20 items-center justify-between border-b border-[#E5E2D9] bg-[#FAF9F5]/95 backdrop-blur-md px-6 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span className="text-sm font-semibold text-[#1F1E1C]">{currentLabel}</span>
             {quota && !quota.isAdmin && (
-              <span className="rounded-full bg-[#F4F2EA] border border-[#E5E2D9] px-2.5 py-0.5 text-[11px] font-medium text-[#6B665E]">
+              <Badge variant="default" className="font-medium">
                 {quota.reportsCount}
                 {quota.maxReports === null ? " saved reports" : `/${quota.maxReports} reports`}
+              </Badge>
+            )}
+            {isNavigating && (
+              <span className="inline-flex items-center gap-1 text-xs text-[#C86343]">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Opening...</span>
               </span>
             )}
           </div>
@@ -358,6 +431,14 @@ export function AppShell({
         </header>
 
         <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-5">
+          {navError && (
+            <div className="mx-auto max-w-7xl mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 flex items-center justify-between">
+              <span>{navError}</span>
+              <button type="button" onClick={() => setNavError(null)} className="text-xs underline cursor-pointer">
+                Dismiss
+              </button>
+            </div>
+          )}
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>

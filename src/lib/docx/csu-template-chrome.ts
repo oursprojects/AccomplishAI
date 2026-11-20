@@ -149,19 +149,29 @@ export function enhanceCsuPreviewChrome(
         tbl.style.maxWidth = "100%";
       });
 
-      // Fit <article> cleanly between <header> and <footer> so it NEVER overlaps or wraps to page 2
+      // Fit <article> cleanly between <header> and <footer> using untransformed CSS layout
+      // metrics (clientHeight/offsetHeight/scrollHeight) so parent zoom transforms on mobile
+      // never shrink the body content disproportionately.
       if (header && footer) {
-        const sectionRect = section.getBoundingClientRect();
-        const headerRect = header.getBoundingClientRect();
-        const footerRect = footer.getBoundingClientRect();
-        const padBottomPx = parseFloat(getComputedStyle(section).paddingBottom) || 16;
+        const ptToPx = 96 / 72;
+        const sectionStyle = getComputedStyle(section);
+        const headerStyle = getComputedStyle(header);
+        const footerStyle = getComputedStyle(footer);
+        const sectionHeightPx = section.clientHeight || dims.heightPt * ptToPx;
+        const padTopPx = parseFloat(sectionStyle.paddingTop) || 26 * ptToPx;
+        const padBottomPx = parseFloat(sectionStyle.paddingBottom) || 12 * ptToPx;
+        const headerHeightPx =
+          (header.offsetHeight || 110 * ptToPx) + (parseFloat(headerStyle.marginBottom) || 8 * ptToPx);
+        const footerHeightPx =
+          (footer.offsetHeight || 64 * ptToPx) + (parseFloat(footerStyle.marginTop) || 0);
+
         const availablePx = Math.max(
-          200,
-          sectionRect.height - (headerRect.bottom - sectionRect.top) - footerRect.height - padBottomPx - 10,
+          260,
+          sectionHeightPx - padTopPx - padBottomPx - headerHeightPx - footerHeightPx - 10,
         );
         const articleHeightPx = article.scrollHeight;
-        if (articleHeightPx > availablePx) {
-          const scale = Math.max(0.55, availablePx / articleHeightPx);
+        if (articleHeightPx > availablePx && articleHeightPx > 0) {
+          const scale = Math.max(0.68, availablePx / articleHeightPx);
           article.style.transform = `scale(${scale})`;
           article.style.transformOrigin = "top center";
           article.style.marginBottom = `-${Math.ceil(articleHeightPx * (1 - scale))}px`;

@@ -1,13 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Check, Edit3, Eye, FilePlus2, FileText, MessageSquareText, Save, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Edit3,
+  Eye,
+  FileText,
+  MessageSquareText,
+  RotateCcw,
+  Save,
+  Undo2,
+} from "lucide-react";
 import { emptyReport, type ReportData } from "@/lib/report-schema";
 import type { Profile } from "@/lib/supabase/database.types";
 import type { TemplateReview } from "@/lib/templates/pipeline";
 import type { QuotaStatus } from "@/lib/admin";
+import { AccomplishCheckIcon } from "@/components/icons/AccomplishIcons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ReportChat, type ChatTurn } from "./ReportChat";
 import { TemplateScannerCard } from "./TemplateScannerCard";
 import { ReportEditor } from "./ReportEditor";
@@ -24,155 +36,137 @@ interface WorkspaceClientProps {
     raw_notes: string;
     structured_data: ReportData;
     chat_messages: ChatTurn[];
-  } | null;
-  initialDraft: {
-    report_id: string | null;
-    structured_data: ReportData;
-    chat_messages: ChatTurn[];
-  } | null;
+  };
   initialQuota: QuotaStatus;
 }
 
 type WorkspaceTab = "chat" | "edit" | "preview";
 
-function seedData(
+function seedReportData(
   profile: WorkspaceClientProps["profile"],
   report: WorkspaceClientProps["initialReport"],
-  draft: WorkspaceClientProps["initialDraft"],
 ): ReportData {
-  if (report) return { ...emptyReport(), ...report.structured_data };
-  if (draft) {
-    return {
-      ...emptyReport(),
-      ...draft.structured_data,
-      intern_name_last_first: draft.structured_data.intern_name_last_first || profile.name_last_first || "",
-      intern_name_first_last: draft.structured_data.intern_name_first_last || profile.name_first_last || "",
-      office: draft.structured_data.office || profile.office || "DNX",
-    };
-  }
   return {
     ...emptyReport(),
-    intern_name_last_first: profile.name_last_first || "",
-    intern_name_first_last: profile.name_first_last || "",
-    office: profile.office || "DNX",
+    ...report.structured_data,
+    intern_name_last_first: report.structured_data.intern_name_last_first || profile.name_last_first || "",
+    intern_name_first_last: report.structured_data.intern_name_first_last || profile.name_first_last || "",
+    office: report.structured_data.office || profile.office || "DNX",
   };
 }
 
-function buildWelcomeMessage(
-  profile: WorkspaceClientProps["profile"],
-  report: WorkspaceClientProps["initialReport"],
-): ChatTurn {
-  if (report) {
-    return {
-      id: "welcome-existing",
-      role: "assistant",
-      content:
-        "Loaded your saved report. Tell me anything you'd like to add or adjust, and I'll update this report's preview.",
-    };
-  }
-
+function buildWelcomeMessage(profile: WorkspaceClientProps["profile"]): ChatTurn {
   const intro = profile.name_first_last
-    ? `Hi **${profile.name_first_last}**! Your name and office (**${profile.office || "DNX"}**) are pre-filled.`
-    : `Hi! Paste or speak your weekly notes *(English or Tagalog)* and I'll put them straight into your **2026 Weekly Accomplishment Report**.`;
+    ? `Hi **${profile.name_first_last}**! Your profile defaults (**${profile.office || "DNX"}**) are ready.`
+    : `Hi! Tell me what you accomplished this week *(English or Tagalog)* and I'll automatically update this report.`;
 
   return {
     id: "welcome",
     role: "assistant",
-    content: `${intro}\n\nYou only need to share what you have — any remaining fields can be left blank or edited manually in **Edit**.`,
+    content: `${intro}\n\nShare only what you have — I'll record your accomplished tasks into the preview and you can refine or undo anytime.`,
   };
 }
 
-function snapshotOf(title: string, data: ReportData, messages: ChatTurn[]): string {
-  return JSON.stringify({
-    title: title.trim(),
-    data,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
-  });
+function formSnapshotOf(title: string, data: ReportData): string {
+  return JSON.stringify({ title: title.trim(), data });
 }
 
 export function WorkspaceClient({
-  userId,
   profile,
   previousTotalHours = "",
   initialReview,
   initialReport,
-  initialDraft,
   initialQuota,
 }: WorkspaceClientProps) {
-  const router = useRouter();
   const [review, setReview] = useState<TemplateReview | null>(initialReview);
   const [quota, setQuota] = useState<QuotaStatus>(initialQuota);
-  const [title, setTitle] = useState<string>(() => initialReport?.title ?? "");
-  const [data, setData] = useState<ReportData>(() => seedData(profile, initialReport, initialDraft));
-  const [savedId, setSavedId] = useState<string | null>(initialReport?.id ?? initialDraft?.report_id ?? null);
-  const [messages, setMessages] = useState<ChatTurn[]>(() => {
-    if (initialReport?.chat_messages?.length) return initialReport.chat_messages;
-    if (initialDraft?.chat_messages?.length) return initialDraft.chat_messages;
-    return [buildWelcomeMessage(profile, initialReport)];
-  });
 
-  const [savedSnapshot, setSavedSnapshot] = useState<string>(() => {
-    if (initialReport) {
-      const initData = seedData(profile, initialReport, null);
-      const initMsgs = initialReport.chat_messages.length
-        ? initialReport.chat_messages
-        : [buildWelcomeMessage(profile, initialReport)];
-      return snapshotOf(initialReport.title ?? "", initData, initMsgs);
-    }
-    if (initialDraft && (initialDraft.chat_messages.length > 0 || Object.values(initialDraft.structured_data).some(Boolean))) {
-      return "";
-    }
-    const freshData = seedData(profile, null, null);
-    const freshMsgs = [buildWelcomeMessage(profile, null)];
-    return snapshotOf("", freshData, freshMsgs);
-  });
+  const initialSeeded = useMemo(() => seedReportData(profile, initialReport), [profile, initialReport]);
+  const [title, setTitle] = useState<string>(() => initialReport.title ?? "");
+  const [data, setData] = useState<ReportData>(() => initialSeeded);
+  const [undoStack, setUndoStack] = useState<Array<{ title: string; data: ReportData }>>([]);
 
-  const currentSnapshot = useMemo(() => snapshotOf(title, data, messages), [title, data, messages]);
+  const savedStateRef = useRef<{ title: string; data: ReportData }>({
+    title: initialReport.title ?? "",
+    data: initialSeeded,
+  });
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() =>
+    formSnapshotOf(initialReport.title ?? "", initialSeeded),
+  );
+
+  const [messages, setMessages] = useState<ChatTurn[]>(() =>
+    initialReport.chat_messages.length ? initialReport.chat_messages : [buildWelcomeMessage(profile)],
+  );
+
+  const currentSnapshot = useMemo(() => formSnapshotOf(title, data), [title, data]);
   const hasChanges = currentSnapshot !== savedSnapshot;
 
-  const [tab, setTab] = useState<WorkspaceTab>(initialReport ? "edit" : "chat");
-  const [desktopLeftMode, setDesktopLeftMode] = useState<"chat" | "edit">(initialReport ? "edit" : "chat");
+  const [tab, setTab] = useState<WorkspaceTab>("chat");
+  const [desktopLeftMode, setDesktopLeftMode] = useState<"chat" | "edit">("chat");
 
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Sync ongoing edits across devices (debounced)
-  useEffect(() => {
-    if (!hasChanges && !initialDraft) return;
-    const timer = window.setTimeout(() => {
-      const serialized = messages.map(({ id, role, content, toolActions }) => ({
-        id,
-        role,
-        content,
-        ...(toolActions ? { toolActions } : {}),
-      }));
+  function pushUndoSnapshot(prevTitle: string, prevData: ReportData) {
+    setUndoStack((prev) => [...prev.slice(-24), { title: prevTitle, data: prevData }]);
+  }
 
-      if (savedId) {
-        void fetch(`/api/reports/${savedId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: title.trim(),
-            structuredData: data,
-            chatMessages: serialized,
-          }),
-        }).catch(() => {});
-      }
+  function handleDataChange(next: ReportData) {
+    pushUndoSnapshot(title, data);
+    setData(next);
+  }
 
-      void fetch("/api/workspace-draft", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reportId: savedId,
-          structuredData: data,
-          chatMessages: serialized,
-        }),
-      }).catch(() => {});
-    }, 900);
-    return () => window.clearTimeout(timer);
-  }, [userId, savedId, title, data, messages, hasChanges, initialDraft]);
+  function handleTitleChange(nextTitle: string) {
+    setTitle(nextTitle);
+  }
+
+  function handleAiDataUpdate(next: ReportData) {
+    pushUndoSnapshot(title, data);
+    setData(next);
+    // AI route already persisted structuredData to DB, keep saved snapshot in sync
+    savedStateRef.current = { title, data: next };
+    setSavedSnapshot(formSnapshotOf(title, next));
+  }
+
+  async function persistReportPatch(nextTitle: string, nextData: ReportData, nextMsgs?: ChatTurn[]) {
+    const serialized = nextMsgs?.map(({ id, role, content, toolActions }) => ({
+      id,
+      role,
+      content,
+      ...(toolActions ? { toolActions } : {}),
+    }));
+    await fetch(`/api/reports/${initialReport.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: nextTitle.trim(),
+        structuredData: nextData,
+        ...(serialized ? { chatMessages: serialized } : {}),
+      }),
+    }).catch(() => {});
+  }
+
+  function handleUndo() {
+    if (undoStack.length === 0) return;
+    const prev = undoStack[undoStack.length - 1];
+    setUndoStack((stack) => stack.slice(0, -1));
+    setTitle(prev.title);
+    setData(prev.data);
+    setError(null);
+    setNotice("Reverted the last change.");
+    void persistReportPatch(prev.title, prev.data);
+  }
+
+  function handleCancelChanges() {
+    const baseline = savedStateRef.current;
+    pushUndoSnapshot(title, data);
+    setTitle(baseline.title);
+    setData(baseline.data);
+    setError(null);
+    setNotice("Cancelled unsaved edits and restored last saved version.");
+  }
 
   async function handleQuickConfirm() {
     if (!review) return;
@@ -207,7 +201,7 @@ export function WorkspaceClient({
         .filter((m) => m.role === "user")
         .map((m) => m.content)
         .join("\n");
-      const rawNotes = userNotes || initialReport?.raw_notes || "";
+      const rawNotes = userNotes || initialReport.raw_notes || "";
       const serializedMsgs = messages.map(({ id, role, content, toolActions }) => ({
         id,
         role,
@@ -215,43 +209,22 @@ export function WorkspaceClient({
         ...(toolActions ? { toolActions } : {}),
       }));
 
-      const url = savedId ? `/api/reports/${savedId}` : "/api/reports";
-      const method = savedId ? "PATCH" : "POST";
-      const res = await fetch(url, {
-        method,
+      const res = await fetch(`/api/reports/${initialReport.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
-          templateId: review?.template.id ?? null,
           rawNotes,
           structuredData: data,
           chatMessages: serializedMsgs,
         }),
       });
-      const json = (await res.json()) as { report?: { id: string }; quota?: QuotaStatus; error?: string };
-      if (json.quota) setQuota(json.quota);
+      const json = (await res.json()) as { report?: { id: string }; error?: string };
       if (!res.ok || !json.report) throw new Error(json.error ?? "Could not save report.");
 
-      setSavedId(json.report.id);
-      setSavedSnapshot(currentSnapshot);
-      if (!savedId) {
-        setQuota((prev) => ({
-          ...prev,
-          reportsCount: prev.reportsCount + 1,
-          canCreateReport: prev.isAdmin || prev.maxReports === null || prev.reportsCount + 1 < prev.maxReports,
-        }));
-      }
-      setNotice(savedId ? "Saved changes to report history." : "Report saved to history.");
-
-      void fetch("/api/workspace-draft", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reportId: json.report.id,
-          structuredData: data,
-          chatMessages: serializedMsgs,
-        }),
-      }).catch(() => {});
+      savedStateRef.current = { title: title.trim(), data };
+      setSavedSnapshot(formSnapshotOf(title.trim(), data));
+      setNotice("Saved changes to this report.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save report.");
     } finally {
@@ -259,60 +232,44 @@ export function WorkspaceClient({
     }
   }
 
-  /**
-   * Clears ONLY the chat messages so the context counter resets while all filled
-   * .docx report fields and saved state remain intact.
-   */
+  /** Clears ONLY chat messages while keeping all filled report fields intact. */
   function handleClearChat() {
     const freshMsgs: ChatTurn[] = [
       {
         id: "cleared-chat",
         role: "assistant",
         content:
-          "Conversation reset. **All existing fields in your report document were kept intact.** Send more updates anytime!",
+          "Conversation cleared. **All filled fields in your report document were kept intact.** Send more updates anytime!",
       },
     ];
     setMessages(freshMsgs);
-    setNotice("Conversation cleared. Your report fields remain filled.");
+    setNotice("Conversation cleared. Your document fields remain intact.");
     setError(null);
+    void persistReportPatch(title, data, freshMsgs);
+  }
 
-    const serialized = freshMsgs.map(({ id, role, content }) => ({ id, role, content }));
-    if (savedId) {
-      void fetch(`/api/reports/${savedId}`, {
+  // Auto-save debounced edits for this specific report
+  useEffect(() => {
+    if (!hasChanges) return;
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/reports/${initialReport.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatMessages: serialized }),
-      }).catch(() => {});
-    }
-    void fetch("/api/workspace-draft", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        reportId: savedId,
-        structuredData: data,
-        chatMessages: serialized,
-      }),
-    }).catch(() => {});
-  }
-
-  /** Starts a completely separate blank report and fresh conversation. */
-  function handleNewReport() {
-    const freshData = seedData(profile, null, null);
-    const freshMsgs = [buildWelcomeMessage(profile, null)];
-    setSavedId(null);
-    setTitle("");
-    setData(freshData);
-    setMessages(freshMsgs);
-    setSavedSnapshot(snapshotOf("", freshData, freshMsgs));
-    setNotice("Started a brand-new blank report and conversation.");
-    setError(null);
-    setTab("chat");
-    setDesktopLeftMode("chat");
-    void fetch("/api/workspace-draft", { method: "DELETE" }).catch(() => {});
-    if (initialReport) {
-      router.replace("/?new=1");
-    }
-  }
+        body: JSON.stringify({
+          title: title.trim(),
+          structuredData: data,
+        }),
+      })
+        .then((r) => {
+          if (r.ok) {
+            savedStateRef.current = { title: title.trim(), data };
+            setSavedSnapshot(formSnapshotOf(title.trim(), data));
+          }
+        })
+        .catch(() => {});
+    }, 1400);
+    return () => window.clearTimeout(timer);
+  }, [initialReport.id, title, data, hasChanges]);
 
   if (!review) {
     return (
@@ -333,52 +290,60 @@ export function WorkspaceClient({
   const fallbackTitle = [data.date_from, data.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
 
   return (
-    <div className="space-y-4 pb-6">
-      {/* Compact active report bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[#E6E2D8] bg-white px-4 py-2.5 shadow-2xs">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+    <div className="space-y-4 pb-8">
+      {/* Top report bar showing exact report being edited + Undo / Cancel / Save */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[#E6E2D8] bg-white px-3.5 sm:px-4 py-2.5 shadow-xs">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <Link
+            href="/"
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 text-xs font-medium text-[#4A463F] hover:bg-[#F4F2EA] transition shrink-0"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Reports</span>
+          </Link>
+
           <FileText className="h-4 w-4 text-[#D97757] shrink-0" />
-          <input
-            type="text"
-            maxLength={120}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={fallbackTitle}
-            aria-label="Report title"
-            className="min-w-0 w-full max-w-md bg-transparent text-sm font-semibold text-[#1F1E1C] placeholder:text-[#6B665E] outline-none border-b border-transparent focus:border-[#D97757] py-0.5 transition"
-          />
-          {savedId && (
-            <span className="hidden sm:inline-flex rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-medium text-emerald-700 shrink-0">
-              Saved Report
-            </span>
-          )}
+          <div className="min-w-0 flex-1">
+            <input
+              type="text"
+              maxLength={120}
+              value={title}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              placeholder={fallbackTitle}
+              aria-label="Report title"
+              className="w-full max-w-md bg-transparent text-sm font-semibold text-[#1F1E1C] placeholder:text-[#6B665E] outline-none border-b border-transparent focus:border-[#D97757] py-0.5 transition"
+            />
+          </div>
+
+          <Badge variant={hasChanges ? "warning" : "success"} className="hidden sm:inline-flex shrink-0">
+            {hasChanges ? "Unsaved edits" : "Synced"}
+          </Badge>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleNewReport}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-1.5 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] cursor-pointer"
-          >
-            <FilePlus2 className="h-3.5 w-3.5 text-[#D97757]" />
-            <span>New Report</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || !hasChanges}
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#33312E] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
-          >
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          {undoStack.length > 0 && (
+            <Button type="button" size="sm" variant="outline" onClick={handleUndo}>
+              <Undo2 className="h-3.5 w-3.5 text-[#D97757]" />
+              <span>Undo</span>
+            </Button>
+          )}
+          {hasChanges && (
+            <Button type="button" size="sm" variant="outline" onClick={handleCancelChanges} disabled={saving}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Cancel</span>
+            </Button>
+          )}
+          <Button type="button" size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
             {hasChanges ? <Save className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
-            <span>{saving ? "Saving..." : !hasChanges ? "Saved" : savedId ? "Update Report" : "Save Report"}</span>
-          </button>
+            <span>{saving ? "Saving..." : !hasChanges ? "Saved" : "Save"}</span>
+          </Button>
         </div>
       </div>
 
       {review.template.status === "pending_review" && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#D97757]/30 bg-[#FDF3EF] px-4 py-2.5 text-xs sm:text-sm text-[#1F1E1C]">
           <span className="inline-flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#C86343] shrink-0" />
+            <AccomplishCheckIcon className="h-4 w-4 text-[#C86343] shrink-0" />
             <span>
               Auto-detected <strong>{review.fields.length} fields</strong> from{" "}
               <code className="font-mono text-xs">{review.template.name}</code> — original design preserved.
@@ -388,21 +353,16 @@ export function WorkspaceClient({
             <Link href="/template" className="font-medium underline underline-offset-4 text-[#C86343]">
               Review Fields
             </Link>
-            <button
-              type="button"
-              disabled={confirming}
-              onClick={handleQuickConfirm}
-              className="rounded-xl bg-[#D97757] px-3 py-1 text-xs font-medium text-white hover:bg-[#C86343] disabled:opacity-60 cursor-pointer"
-            >
+            <Button type="button" size="sm" variant="accent" disabled={confirming} onClick={handleQuickConfirm}>
               {confirming ? "Saving..." : "Looks Good"}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {profileMissingName && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-2.5 text-xs sm:text-sm text-amber-900">
-          <span>Tip: Set your default intern name &amp; verifier in Profile (or tell the AI assistant in chat).</span>
+          <span>Tip: Set your default intern name &amp; verifier in Profile so new reports pre-fill automatically.</span>
           <Link href="/profile" className="font-semibold underline underline-offset-4">
             Open Profile
           </Link>
@@ -464,7 +424,7 @@ export function WorkspaceClient({
               }`}
             >
               <MessageSquareText className="h-3.5 w-3.5" />
-              <span>AI Chatbot Assistant</span>
+              <span>AI Report Assistant</span>
             </button>
             <button
               type="button"
@@ -484,19 +444,17 @@ export function WorkspaceClient({
             }`}
           >
             <ReportChat
+              reportId={initialReport.id}
               data={data}
               quota={quota}
-              savedId={savedId}
-              hasChanges={hasChanges}
               messages={messages}
+              canUndo={undoStack.length > 0}
+              onUndo={handleUndo}
               onMessagesChange={setMessages}
-              onDataChange={setData}
+              onAiDataUpdate={handleAiDataUpdate}
               onQuotaChange={setQuota}
               onClearChat={handleClearChat}
-              onNewReport={handleNewReport}
               onOpenPreview={() => setTab("preview")}
-              onSaveReport={handleSave}
-              saving={saving}
             />
           </div>
 
@@ -507,12 +465,14 @@ export function WorkspaceClient({
           >
             <ReportEditor
               title={title}
-              onTitleChange={setTitle}
+              onTitleChange={handleTitleChange}
               data={data}
-              onChange={setData}
+              onChange={handleDataChange}
               onSave={handleSave}
+              onUndo={handleUndo}
+              onCancelChanges={handleCancelChanges}
+              canUndo={undoStack.length > 0}
               saving={saving}
-              savedId={savedId}
               hasChanges={hasChanges}
               defaultVerifier={profile.default_verifier}
               defaultDailyHours={profile.default_daily_hours}
@@ -522,7 +482,7 @@ export function WorkspaceClient({
         </div>
 
         {/* Right column: Live 1-Page DOCX Preview */}
-        <div className={`${tab === "preview" ? "block" : "hidden lg:block"} lg:col-span-6 lg:sticky lg:top-6`}>
+        <div className={`${tab === "preview" ? "block" : "hidden lg:block"} lg:col-span-6 lg:sticky lg:top-[4.25rem]`}>
           <DocxPreviewPanel
             templateId={review.template.id}
             templateVersion={review.template.updated_at}
@@ -530,25 +490,6 @@ export function WorkspaceClient({
             data={data}
             reportTitle={title}
           />
-          <div className="mt-3 flex justify-end lg:hidden">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !hasChanges}
-              className="w-full min-h-[42px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#1F1E1C] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#33312E] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {hasChanges ? <Save className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-              <span>
-                {saving
-                  ? "Saving..."
-                  : !hasChanges
-                    ? "No Changes to Save"
-                    : savedId
-                      ? "Update Saved Report"
-                      : "Save Report to History"}
-              </span>
-            </button>
-          </div>
         </div>
       </div>
     </div>

@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import {
+  Activity,
   Bot,
   CheckCircle2,
   Cpu,
+  Eye,
+  EyeOff,
   FileStack,
+  Gauge,
   Mic,
   PauseCircle,
   PlayCircle,
   RotateCcw,
   Save,
   ShieldCheck,
-  Sparkles,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -23,15 +26,28 @@ import {
   type AiRuntimeSettings,
   type AllowedSttModel,
   type AllowedTextModel,
+  type ApiUsageMonitor,
 } from "@/lib/admin";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 interface AdminClientProps {
   initialAiSettings: AiRuntimeSettings;
   initialMembers: AdminMember[];
+  initialUsageMonitor: ApiUsageMonitor;
 }
 
-export function AdminClient({ initialAiSettings, initialMembers }: AdminClientProps) {
+const ENDPOINT_LABELS: Record<string, string> = {
+  chat_report: "Report Chat (LLM + Tools)",
+  generate_report: "Quick Fill / Generate",
+  transcribe: "Voice Transcription (STT)",
+};
+
+export function AdminClient({ initialAiSettings, initialMembers, initialUsageMonitor }: AdminClientProps) {
   const [aiSettings, setAiSettings] = useState<AiRuntimeSettings>(initialAiSettings);
+  const [usageMonitor, setUsageMonitor] = useState<ApiUsageMonitor>(initialUsageMonitor);
   const [defaultLimit, setDefaultLimit] = useState(initialAiSettings.defaultDailyLimit);
   const [defaultMaxReports, setDefaultMaxReports] = useState(
     initialAiSettings.defaultMaxReports === null ? "" : String(initialAiSettings.defaultMaxReports),
@@ -54,13 +70,19 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
   const [creating, setCreating] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [newLimit, setNewLimit] = useState("");
   const [newMaxReports, setNewMaxReports] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  function syncResponse(json: { aiSettings: AiRuntimeSettings; members: AdminMember[] }) {
+  function syncResponse(json: {
+    aiSettings: AiRuntimeSettings;
+    members: AdminMember[];
+    usageMonitor?: ApiUsageMonitor;
+  }) {
     setAiSettings(json.aiSettings);
+    if (json.usageMonitor) setUsageMonitor(json.usageMonitor);
     setDefaultLimit(json.aiSettings.defaultDailyLimit);
     setDefaultMaxReports(
       json.aiSettings.defaultMaxReports === null ? "" : String(json.aiSettings.defaultMaxReports),
@@ -96,13 +118,18 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
       const json = (await res.json()) as {
         aiSettings?: AiRuntimeSettings;
         members?: AdminMember[];
+        usageMonitor?: ApiUsageMonitor;
         needsConfirmWarning?: boolean;
         error?: string;
       };
       if (!res.ok || !json.members || !json.aiSettings) {
         throw new Error(json.error ?? "Failed to create intern account.");
       }
-      syncResponse({ aiSettings: json.aiSettings, members: json.members });
+      syncResponse({
+        aiSettings: json.aiSettings,
+        members: json.members,
+        usageMonitor: json.usageMonitor,
+      });
       setNotice(
         json.needsConfirmWarning
           ? `Account created for ${newEmail.trim()}. Note: disable 'Confirm email' in Supabase Auth -> Providers -> Email so they can sign in right away.`
@@ -110,6 +137,7 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
       );
       setNewEmail("");
       setNewPassword("");
+      setShowNewPassword(false);
       setNewLimit("");
       setNewMaxReports("");
     } catch (err) {
@@ -134,11 +162,20 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
           defaultMaxReports: defaultMaxReports.trim() === "" ? null : Number(defaultMaxReports),
         }),
       });
-      const json = (await res.json()) as { aiSettings?: AiRuntimeSettings; members?: AdminMember[]; error?: string };
+      const json = (await res.json()) as {
+        aiSettings?: AiRuntimeSettings;
+        members?: AdminMember[];
+        usageMonitor?: ApiUsageMonitor;
+        error?: string;
+      };
       if (!res.ok || !json.members || !json.aiSettings) {
         throw new Error(json.error ?? "Failed to update default limits.");
       }
-      syncResponse({ aiSettings: json.aiSettings, members: json.members });
+      syncResponse({
+        aiSettings: json.aiSettings,
+        members: json.members,
+        usageMonitor: json.usageMonitor,
+      });
       setNotice(
         `Saved defaults: ${json.aiSettings.defaultDailyLimit} prompts/day · ${
           json.aiSettings.defaultMaxReports === null
@@ -169,11 +206,20 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
           maxBulletsPerDay,
         }),
       });
-      const json = (await res.json()) as { aiSettings?: AiRuntimeSettings; members?: AdminMember[]; error?: string };
+      const json = (await res.json()) as {
+        aiSettings?: AiRuntimeSettings;
+        members?: AdminMember[];
+        usageMonitor?: ApiUsageMonitor;
+        error?: string;
+      };
       if (!res.ok || !json.members || !json.aiSettings) {
         throw new Error(json.error ?? "Failed to save AI controls.");
       }
-      syncResponse({ aiSettings: json.aiSettings, members: json.members });
+      syncResponse({
+        aiSettings: json.aiSettings,
+        members: json.members,
+        usageMonitor: json.usageMonitor,
+      });
       setNotice(`AI settings updated: ${json.aiSettings.activeTextModel} & ${json.aiSettings.activeSttModel}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update AI controls.");
@@ -203,11 +249,20 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
           isBlocked: nextBlocked,
         }),
       });
-      const json = (await res.json()) as { aiSettings?: AiRuntimeSettings; members?: AdminMember[]; error?: string };
+      const json = (await res.json()) as {
+        aiSettings?: AiRuntimeSettings;
+        members?: AdminMember[];
+        usageMonitor?: ApiUsageMonitor;
+        error?: string;
+      };
       if (!res.ok || !json.members || !json.aiSettings) {
         throw new Error(json.error ?? "Failed to update member.");
       }
-      syncResponse({ aiSettings: json.aiSettings, members: json.members });
+      syncResponse({
+        aiSettings: json.aiSettings,
+        members: json.members,
+        usageMonitor: json.usageMonitor,
+      });
       setNotice(`Updated limits for ${member.email}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed.");
@@ -226,11 +281,20 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset_today", userId: member.userId }),
       });
-      const json = (await res.json()) as { aiSettings?: AiRuntimeSettings; members?: AdminMember[]; error?: string };
+      const json = (await res.json()) as {
+        aiSettings?: AiRuntimeSettings;
+        members?: AdminMember[];
+        usageMonitor?: ApiUsageMonitor;
+        error?: string;
+      };
       if (!res.ok || !json.members || !json.aiSettings) {
         throw new Error(json.error ?? "Failed to reset today's count.");
       }
-      syncResponse({ aiSettings: json.aiSettings, members: json.members });
+      syncResponse({
+        aiSettings: json.aiSettings,
+        members: json.members,
+        usageMonitor: json.usageMonitor,
+      });
       setNotice(`Reset today's prompt usage for ${member.email}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reset failed.");
@@ -239,55 +303,75 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
     }
   }
 
-  const totalPromptsToday = members.reduce((acc, m) => acc + m.usedToday, 0);
   const totalReports = members.reduce((acc, m) => acc + m.reportsCount, 0);
   const totalInterns = members.filter((m) => !m.isAdmin).length;
+  const maxDayCount = Math.max(1, ...usageMonitor.dailySeries.map((d) => d.count));
+  const rpdPct = Math.min(100, Math.round((usageMonitor.requestsToday / 1000) * 100));
+  const rpmPct = Math.min(100, Math.round((usageMonitor.requestsLastMinute / 30) * 100));
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FDF3EF] px-2.5 py-0.5 text-xs font-semibold text-[#C86343] border border-[#F0D5C9]">
+          <Badge variant="accent">
             <ShieldCheck className="w-3.5 h-3.5" />
             Admin Console
-          </span>
+          </Badge>
           <h1 className="mt-1.5 text-xl sm:text-2xl font-bold tracking-tight text-[#1F1E1C]">
-            Interns, AI Models &amp; Quotas
+            Interns, AI Controls &amp; API Usage Monitor
           </h1>
           <p className="text-sm text-[#6B665E]">
-            Manage intern accounts, saved report allowances, daily AI prompt limits, and Groq model selection.
+            Monitor live Groq API utilization, enforce per-user prompt &amp; report limits, and manage intern logins.
           </p>
         </div>
       </div>
 
       {/* Summary metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-[#E6E2D8] bg-white p-4 shadow-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="p-4">
           <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
             <span>Registered Interns</span>
             <Users className="w-4 h-4 text-[#D97757]" />
           </div>
           <p className="mt-1 text-2xl font-bold text-[#1F1E1C]">{totalInterns}</p>
           <p className="text-[11px] text-[#7A746B] mt-0.5">{totalReports} total saved reports</p>
-        </div>
+        </Card>
 
-        <div className="rounded-2xl border border-[#E6E2D8] bg-white p-4 shadow-xs">
+        <Card className="p-4">
           <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
-            <span>AI Prompts Today (Manila)</span>
-            <Sparkles className="w-4 h-4 text-[#D97757]" />
+            <span>API Calls Today (Manila)</span>
+            <Activity className="w-4 h-4 text-[#D97757]" />
           </div>
-          <p className="mt-1 text-2xl font-bold text-[#1F1E1C]">{totalPromptsToday}</p>
-          <p className="text-[11px] text-[#7A746B] mt-0.5">Default: {aiSettings.defaultDailyLimit} prompts/day</p>
-        </div>
+          <p className="mt-1 text-2xl font-bold text-[#1F1E1C]">
+            {usageMonitor.requestsToday} <span className="text-xs font-normal text-[#7A746B]">/ 1,000 RPD</span>
+          </p>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-[#EFECE3] overflow-hidden">
+            <div className="h-full bg-[#D97757] rounded-full transition-all" style={{ width: `${rpdPct}%` }} />
+          </div>
+        </Card>
 
-        <div className="rounded-2xl border border-[#E6E2D8] bg-white p-4 shadow-xs">
+        <Card className="p-4">
+          <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
+            <span>Burst Rate (Last 60s)</span>
+            <Gauge className="w-4 h-4 text-[#D97757]" />
+          </div>
+          <p className="mt-1 text-2xl font-bold text-[#1F1E1C]">
+            {usageMonitor.requestsLastMinute} <span className="text-xs font-normal text-[#7A746B]">/ 30 RPM</span>
+          </p>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-[#EFECE3] overflow-hidden">
+            <div className="h-full bg-emerald-600 rounded-full transition-all" style={{ width: `${rpmPct}%` }} />
+          </div>
+        </Card>
+
+        <Card className="p-4">
           <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
             <span>Active Groq Models</span>
             <Cpu className="w-4 h-4 text-emerald-700" />
           </div>
           <p className="mt-1 text-xs font-mono font-semibold text-emerald-700 truncate">{aiSettings.activeTextModel}</p>
           <p className="text-[11px] font-mono text-[#6B665E] truncate mt-0.5">STT: {aiSettings.activeSttModel}</p>
-        </div>
+          <p className="text-[11px] text-[#7A746B] mt-1">{usageMonitor.requestsLast7Days} calls last 7 days</p>
+        </Card>
       </div>
 
       {error && (
@@ -300,212 +384,286 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
         </div>
       )}
 
-      {/* AI Model & Output Controls */}
-      <form
-        onSubmit={handleSaveAiControls}
-        className="rounded-2xl border border-[#E6E2D8] bg-white p-4 sm:p-5 shadow-xs space-y-4"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      {/* API Usage Monitor */}
+      <Card className="p-4 sm:p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
-              <Bot className="w-4 h-4 text-[#D97757]" />
-              AI Model &amp; Output Controls
+              <Activity className="w-4 h-4 text-[#D97757]" />
+              <span>API Usage &amp; Security Monitor</span>
             </h2>
             <p className="text-xs text-[#6B665E]">
-              Switch models cleanly for future releases or traffic spikes, with automatic fallback if a primary model hits Groq rate limits.
+              Protected by per-user 8 RPM burst guard + daily prompt caps across chat, generation, and voice STT.
             </p>
           </div>
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#F4F2EA] px-2.5 py-1 text-[11px] font-medium text-[#4A463F]">
-            Recommended: GPT-OSS 120B + Whisper v3 Turbo
-          </span>
+          <Badge variant="success">Burst Guard: 8 RPM / user</Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">Primary Chat / Report Model</label>
-            <select
-              value={activeTextModel}
-              onChange={(e) => setActiveTextModel(e.target.value as AllowedTextModel)}
-              className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
-            >
-              {ALLOWED_TEXT_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-[11px] text-[#7A746B]">
-              {ALLOWED_TEXT_MODELS.find((m) => m.id === activeTextModel)?.notes}
-            </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* 7-day chart */}
+          <div className="rounded-xl border border-[#EFECE3] bg-[#FAF9F5] p-3.5 space-y-2.5">
+            <p className="text-xs font-semibold text-[#4A463F]">Last 7 Days Activity (Manila)</p>
+            <div className="flex items-end gap-2 h-24 pt-2">
+              {usageMonitor.dailySeries.map((day) => {
+                const heightPct = Math.max(8, Math.round((day.count / maxDayCount) * 100));
+                return (
+                  <div key={day.date} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                    <span className="text-[10px] font-mono text-[#6B665E]">{day.count}</span>
+                    <div className="w-full flex-1 flex items-end">
+                      <div
+                        className="w-full rounded-t-md bg-[#D97757]/85 transition-all"
+                        style={{ height: `${heightPct}%` }}
+                        title={`${day.label}: ${day.count} requests`}
+                      />
+                    </div>
+                    <span className="text-[10px] text-[#7A746B] truncate">{day.label.split(" ")[1]}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1 flex items-center gap-1">
-              <Mic className="w-3.5 h-3.5 text-[#D97757]" />
-              Voice Transcription (STT) Model
-            </label>
-            <select
-              value={activeSttModel}
-              onChange={(e) => setActiveSttModel(e.target.value as AllowedSttModel)}
-              className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
-            >
-              {ALLOWED_STT_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-[11px] text-[#7A746B]">
-              {ALLOWED_STT_MODELS.find((m) => m.id === activeSttModel)?.notes}
-            </p>
+          {/* Endpoint breakdown */}
+          <div className="rounded-xl border border-[#EFECE3] bg-[#FAF9F5] p-3.5 space-y-2">
+            <p className="text-xs font-semibold text-[#4A463F]">Usage by Endpoint</p>
+            {usageMonitor.byEndpoint.length === 0 ? (
+              <p className="text-xs text-[#7A746B]">No API requests recorded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {usageMonitor.byEndpoint.map((ep) => (
+                  <div key={ep.kind} className="flex items-center justify-between text-xs">
+                    <span className="text-[#1F1E1C] font-medium truncate">
+                      {ENDPOINT_LABELS[ep.kind] ?? ep.kind}
+                    </span>
+                    <span className="font-mono text-[#6B665E] shrink-0">
+                      <strong className="text-[#1F1E1C]">{ep.today}</strong> today · {ep.total} total
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">Max Bullets per Day Cell</label>
-            <input
-              type="number"
-              min={1}
-              max={5}
-              value={maxBulletsPerDay}
-              onChange={(e) => setMaxBulletsPerDay(Math.max(1, Math.min(5, Number(e.target.value) || 3)))}
-              className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs font-semibold text-[#1F1E1C] outline-none focus:border-[#D97757]"
-            />
-            <p className="mt-1 text-[11px] text-[#7A746B]">
-              Keeps daily task tables compact inside the 1–2 page .docx layout (recommended: 3).
-            </p>
+          {/* Model breakdown */}
+          <div className="rounded-xl border border-[#EFECE3] bg-[#FAF9F5] p-3.5 space-y-2">
+            <p className="text-xs font-semibold text-[#4A463F]">Usage by Groq Model</p>
+            {usageMonitor.byModel.length === 0 ? (
+              <p className="text-xs text-[#7A746B]">No model telemetry recorded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {usageMonitor.byModel.map((m) => (
+                  <div key={m.model} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-mono text-[#1F1E1C] truncate">{m.model}</span>
+                    <span className="font-mono text-[#6B665E] shrink-0">
+                      <strong className="text-[#1F1E1C]">{m.today}</strong> today · {m.total}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+      </Card>
 
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={savingAi}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-4 py-2 text-xs font-semibold text-white hover:bg-[#33312E] disabled:opacity-60 transition cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {savingAi ? "Saving..." : "Save AI Controls"}
-          </button>
-        </div>
-      </form>
+      {/* AI Model & Output Controls */}
+      <Card className="p-4 sm:p-5">
+        <form onSubmit={handleSaveAiControls} className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
+                <Bot className="w-4 h-4 text-[#D97757]" />
+                <span>AI Model &amp; Output Controls</span>
+              </h2>
+              <p className="text-xs text-[#6B665E]">
+                Switch active Groq models cleanly for future releases or traffic spikes, with automatic fallback.
+              </p>
+            </div>
+            <Badge>GPT-OSS 120B + Whisper v3 Turbo</Badge>
+          </div>
 
-      {/* Create Intern Account (Admin Only) */}
-      <form
-        onSubmit={handleCreateAccount}
-        className="rounded-2xl border border-[#E6E2D8] bg-white p-4 sm:p-5 shadow-xs space-y-3"
-      >
-        <div>
-          <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
-            <UserPlus className="w-4 h-4 text-[#D97757]" />
-            Create Intern Account
-          </h2>
-          <p className="text-xs text-[#6B665E]">
-            Public sign-up is disabled. Only the admin account can provision new intern logins.
-          </p>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-[#4A463F] mb-1">Primary Chat / Report Model</label>
+              <select
+                value={activeTextModel}
+                onChange={(e) => setActiveTextModel(e.target.value as AllowedTextModel)}
+                className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
+              >
+                {ALLOWED_TEXT_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-[#7A746B]">
+                {ALLOWED_TEXT_MODELS.find((m) => m.id === activeTextModel)?.notes}
+              </p>
+            </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-          <input
-            type="email"
-            required
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            placeholder="intern@email.com"
-            className="sm:col-span-4 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757]"
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Temporary password (min 6 chars)"
-            className="sm:col-span-3 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757]"
-          />
-          <input
-            type="number"
-            min={0}
-            max={1000}
-            value={newLimit}
-            onChange={(e) => setNewLimit(e.target.value)}
-            placeholder={`Prompts (${defaultLimit}/d)`}
-            className="sm:col-span-2 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs text-[#1F1E1C] outline-none focus:border-[#D97757]"
-          />
-          <input
-            type="number"
-            min={1}
-            max={10000}
-            value={newMaxReports}
-            onChange={(e) => setNewMaxReports(e.target.value)}
-            placeholder="Max reports (∞)"
-            className="sm:col-span-2 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs text-[#1F1E1C] outline-none focus:border-[#D97757]"
-          />
-          <button
-            type="submit"
-            disabled={creating}
-            className="sm:col-span-1 rounded-xl bg-[#D97757] px-3 py-2 text-xs font-semibold text-white hover:bg-[#C86343] disabled:opacity-60 transition cursor-pointer"
-          >
-            {creating ? "..." : "Create"}
-          </button>
-        </div>
-      </form>
+            <div>
+              <label className="block text-xs font-medium text-[#4A463F] mb-1 flex items-center gap-1">
+                <Mic className="w-3.5 h-3.5 text-[#D97757]" />
+                Voice Transcription (STT) Model
+              </label>
+              <select
+                value={activeSttModel}
+                onChange={(e) => setActiveSttModel(e.target.value as AllowedSttModel)}
+                className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
+              >
+                {ALLOWED_STT_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-[#7A746B]">
+                {ALLOWED_STT_MODELS.find((m) => m.id === activeSttModel)?.notes}
+              </p>
+            </div>
 
-      {/* Global Default Allowances */}
-      <form
-        onSubmit={handleSaveDefault}
-        className="rounded-2xl border border-[#E6E2D8] bg-white p-4 sm:p-5 shadow-xs space-y-3"
-      >
-        <div>
-          <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
-            <FileStack className="w-4 h-4 text-[#D97757]" />
-            Global Default Limits (All Interns)
-          </h2>
-          <p className="text-xs text-[#6B665E]">
-            Daily prompt resets at 12:00 AM (Asia/Manila). Leave Max Saved Reports blank for unlimited reports.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-xs font-medium text-[#4A463F]">
-              Daily Prompts:
-              <input
-                type="number"
-                min={0}
-                max={1000}
-                value={defaultLimit}
-                onChange={(e) => setDefaultLimit(Number(e.target.value))}
-                className="w-20 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 py-1.5 text-sm font-semibold text-[#1F1E1C] outline-none focus:border-[#D97757]"
-              />
-              <span className="text-[#7A746B]">/ day</span>
-            </label>
-
-            <label className="flex items-center gap-2 text-xs font-medium text-[#4A463F]">
-              Max Saved Reports:
-              <input
+            <div>
+              <label className="block text-xs font-medium text-[#4A463F] mb-1">Max Bullets per Day Cell</label>
+              <Input
                 type="number"
                 min={1}
-                max={10000}
-                placeholder="Unlimited"
-                value={defaultMaxReports}
-                onChange={(e) => setDefaultMaxReports(e.target.value)}
-                className="w-28 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 py-1.5 text-sm font-semibold text-[#1F1E1C] outline-none focus:border-[#D97757]"
+                max={5}
+                value={maxBulletsPerDay}
+                onChange={(e) => setMaxBulletsPerDay(Math.max(1, Math.min(5, Number(e.target.value) || 3)))}
+                className="text-xs font-semibold"
               />
-            </label>
+              <p className="mt-1 text-[11px] text-[#7A746B]">
+                Keeps daily task tables compact inside the 1-page .docx layout (recommended: 3).
+              </p>
+            </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={savingDefault}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-4 py-2 text-xs font-semibold text-white hover:bg-[#33312E] disabled:opacity-60 transition cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {savingDefault ? "Saving..." : "Save Defaults"}
-          </button>
-        </div>
-      </form>
+          <div className="flex justify-end">
+            <Button type="submit" size="sm" disabled={savingAi}>
+              <Save className="w-3.5 h-3.5" />
+              <span>{savingAi ? "Saving..." : "Save AI Controls"}</span>
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Create Intern Account (Admin Only) */}
+      <Card className="p-4 sm:p-5">
+        <form onSubmit={handleCreateAccount} className="space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
+              <UserPlus className="w-4 h-4 text-[#D97757]" />
+              <span>Create Intern Account</span>
+            </h2>
+            <p className="text-xs text-[#6B665E]">
+              Public sign-up is disabled. Only the admin account can provision new intern logins.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+            <Input
+              type="email"
+              required
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="intern@email.com"
+              className="sm:col-span-4"
+            />
+            <div className="relative sm:col-span-3">
+              <Input
+                type={showNewPassword ? "text" : "password"}
+                required
+                minLength={6}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Temp password (min 6)"
+                className="pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword((v) => !v)}
+                aria-label={showNewPassword ? "Hide password" : "Show password"}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8A847A] hover:text-[#1F1E1C] cursor-pointer"
+              >
+                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <Input
+              type="number"
+              min={0}
+              max={1000}
+              value={newLimit}
+              onChange={(e) => setNewLimit(e.target.value)}
+              placeholder={`Prompts (${defaultLimit}/d)`}
+              className="sm:col-span-2 text-xs"
+            />
+            <Input
+              type="number"
+              min={1}
+              max={10000}
+              value={newMaxReports}
+              onChange={(e) => setNewMaxReports(e.target.value)}
+              placeholder="Max reports (∞)"
+              className="sm:col-span-2 text-xs"
+            />
+            <Button type="submit" variant="accent" disabled={creating} className="sm:col-span-1 w-full">
+              {creating ? "..." : "Create"}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Global Default Allowances */}
+      <Card className="p-4 sm:p-5">
+        <form onSubmit={handleSaveDefault} className="space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
+              <FileStack className="w-4 h-4 text-[#D97757]" />
+              <span>Global Default Limits (All Interns)</span>
+            </h2>
+            <p className="text-xs text-[#6B665E]">
+              Daily prompt allowance resets at 12:00 AM (Asia/Manila). Leave Max Saved Reports blank for unlimited.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#4A463F]">
+                Daily Prompts:
+                <Input
+                  type="number"
+                  min={0}
+                  max={1000}
+                  value={defaultLimit}
+                  onChange={(e) => setDefaultLimit(Number(e.target.value))}
+                  className="w-20 font-semibold"
+                />
+                <span className="text-[#7A746B]">/ day</span>
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-medium text-[#4A463F]">
+                Max Saved Reports:
+                <Input
+                  type="number"
+                  min={1}
+                  max={10000}
+                  placeholder="Unlimited"
+                  value={defaultMaxReports}
+                  onChange={(e) => setDefaultMaxReports(e.target.value)}
+                  className="w-28 font-semibold"
+                />
+              </label>
+            </div>
+
+            <Button type="submit" size="sm" disabled={savingDefault}>
+              <Save className="w-3.5 h-3.5" />
+              <span>{savingDefault ? "Saving..." : "Save Defaults"}</span>
+            </Button>
+          </div>
+        </form>
+      </Card>
 
       {/* Member list */}
-      <section className="rounded-2xl border border-[#E6E2D8] bg-white shadow-xs overflow-hidden">
+      <Card className="overflow-hidden">
         <div className="border-b border-[#EFECE3] px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-[#1F1E1C]">Members ({members.length})</h2>
           <span className="text-xs text-[#6B665E]">
@@ -526,17 +684,11 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-[#1F1E1C] truncate">{m.email}</p>
                     {m.isAdmin ? (
-                      <span className="rounded-full bg-[#FDF3EF] px-2 py-0.5 text-[11px] font-semibold text-[#C86343] border border-[#F0D5C9]">
-                        Admin · Unlimited
-                      </span>
+                      <Badge variant="accent">Admin · Unlimited</Badge>
                     ) : m.isBlocked ? (
-                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                        Paused
-                      </span>
+                      <Badge variant="destructive">Paused</Badge>
                     ) : (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                        Active
-                      </span>
+                      <Badge variant="success">Active</Badge>
                     )}
                   </div>
                   <p className="text-xs text-[#6B665E]">
@@ -552,79 +704,73 @@ export function AdminClient({ initialAiSettings, initialMembers }: AdminClientPr
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <label className="flex items-center gap-1 text-xs text-[#6B665E]">
                       Prompts:
-                      <input
+                      <Input
                         type="number"
                         min={0}
                         max={1000}
                         placeholder={String(defaultLimit)}
                         value={draftLimits[m.userId] ?? ""}
                         onChange={(e) => setDraftLimits((prev) => ({ ...prev, [m.userId]: e.target.value }))}
-                        className="w-16 rounded-lg border border-[#DDD7CB] bg-white px-2 py-1 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
+                        className="h-8 w-16 bg-white px-2 text-xs font-medium"
                       />
                     </label>
 
                     <label className="flex items-center gap-1 text-xs text-[#6B665E]">
                       Reports:
-                      <input
+                      <Input
                         type="number"
                         min={1}
                         max={10000}
                         placeholder={defaultMaxReports === "" ? "∞" : defaultMaxReports}
                         value={draftMaxReports[m.userId] ?? ""}
                         onChange={(e) => setDraftMaxReports((prev) => ({ ...prev, [m.userId]: e.target.value }))}
-                        className="w-16 rounded-lg border border-[#DDD7CB] bg-white px-2 py-1 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
+                        className="h-8 w-16 bg-white px-2 text-xs font-medium"
                       />
                     </label>
 
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => handleSaveMember(m)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-[#1F1E1C] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#33312E] disabled:opacity-50 cursor-pointer"
-                    >
+                    <Button type="button" size="sm" disabled={busy} onClick={() => handleSaveMember(m)}>
                       <Save className="w-3 h-3" />
-                      Save
-                    </button>
+                      <span>Save</span>
+                    </Button>
 
-                    <button
+                    <Button
                       type="button"
+                      size="sm"
+                      variant="outline"
                       disabled={busy || m.usedToday === 0}
                       onClick={() => handleResetToday(m)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-[#DDD7CB] bg-white px-2.5 py-1.5 text-xs font-medium text-[#4A463F] hover:bg-[#F4F2EA] disabled:opacity-40 cursor-pointer"
                     >
                       <RotateCcw className="w-3 h-3" />
-                      Reset Today
-                    </button>
+                      <span>Reset Today</span>
+                    </Button>
 
-                    <button
+                    <Button
                       type="button"
+                      size="sm"
+                      variant={m.isBlocked ? "default" : "destructive"}
                       disabled={busy}
                       onClick={() => handleSaveMember(m, !m.isBlocked)}
-                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition cursor-pointer disabled:opacity-50 ${
-                        m.isBlocked
-                          ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                          : "border border-red-200 text-red-700 hover:bg-red-50"
-                      }`}
+                      className={m.isBlocked ? "bg-emerald-600 hover:bg-emerald-700" : ""}
                     >
                       {m.isBlocked ? (
                         <>
                           <PlayCircle className="w-3 h-3" />
-                          Allow
+                          <span>Allow</span>
                         </>
                       ) : (
                         <>
                           <PauseCircle className="w-3 h-3" />
-                          Pause
+                          <span>Pause</span>
                         </>
                       )}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
             );
           })}
         </div>
-      </section>
+      </Card>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
-import { MAX_CHAT_MESSAGES, reportDataStrictSchema } from "@/lib/report-schema";
+import { emptyReport, MAX_CHAT_MESSAGES, reportDataStrictSchema } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
 const chatMessageSchema = z.object({
@@ -15,9 +15,10 @@ const chatMessageSchema = z.object({
 const createReportSchema = z.object({
   templateId: z.string().uuid().nullable().optional(),
   title: z.string().trim().max(120).optional().default(""),
-  rawNotes: z.string().max(15000).default(""),
-  structuredData: reportDataStrictSchema,
+  rawNotes: z.string().max(15000).optional().default(""),
+  structuredData: reportDataStrictSchema.optional(),
   chatMessages: z.array(chatMessageSchema).max(MAX_CHAT_MESSAGES + 10).optional(),
+  duplicateFromId: z.string().uuid().optional(),
 });
 
 export async function GET() {
@@ -39,7 +40,8 @@ export async function POST(request: Request) {
   const { supabase, user } = await getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const parsed = createReportSchema.safeParse(await request.json().catch(() => null));
+  const rawBody = await request.json().catch(() => ({}));
+  const parsed = createReportSchema.safeParse(rawBody ?? {});
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid report payload.", issues: parsed.error.issues }, { status: 400 });
   }
@@ -58,6 +60,48 @@ export async function POST(request: Request) {
     );
   }
 
+  let initialData = parsed.data.structuredData;
+  if (!initialData) {
+    const [{ data: profile }, { data: dupReport }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("name_last_first, name_first_last, office")
+        .eq("id", user.id)
+        .maybeSingle(),
+      parsed.data.duplicateFromId
+        ? supabase
+            .from("reports")
+            .select("structured_data")
+            .eq("id", parsed.data.duplicateFromId)
+            .eq("user_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    const seeded = emptyReport();
+    const dupSrc =
+      dupReport?.structured_data &&
+      typeof dupReport.structured_data === "object" &&
+      !Array.isArray(dupReport.structured_data)
+        ? (dupReport.structured_data as Record<string, unknown>)
+        : null;
+
+    seeded.intern_name_last_first =
+      (dupSrc && typeof dupSrc.intern_name_last_first === "string" && dupSrc.intern_name_last_first) ||
+      profile?.name_last_first ||
+      "";
+    seeded.intern_name_first_last =
+      (dupSrc && typeof dupSrc.intern_name_first_last === "string" && dupSrc.intern_name_first_last) ||
+      profile?.name_first_last ||
+      "";
+    seeded.office =
+      (dupSrc && typeof dupSrc.office === "string" && dupSrc.office) ||
+      profile?.office ||
+      "DNX";
+
+    initialData = seeded;
+  }
+
   const { data, error } = await supabase
     .from("reports")
     .insert({
@@ -65,7 +109,7 @@ export async function POST(request: Request) {
       template_id: parsed.data.templateId ?? null,
       title: parsed.data.title,
       raw_notes: parsed.data.rawNotes,
-      structured_data: parsed.data.structuredData as unknown as Json,
+      structured_data: initialData as unknown as Json,
       chat_messages: (parsed.data.chatMessages ?? []) as unknown as Json,
     })
     .select("id, template_id, title, raw_notes, structured_data, chat_messages, created_at, updated_at")

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { getAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import { groqErrorResponse, groqJson } from "@/lib/ai/groq";
 import { DAYS, REPORT_FIELD_META, REPORT_KEYS, reportDataSchema, type ReportData } from "@/lib/report-schema";
 
@@ -40,6 +40,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const burst = await checkBurstRateLimit(supabase, user.id, quotaBefore.isAdmin);
+  if (!burst.allowed) {
+    return NextResponse.json(
+      { error: `Too many requests in one minute (${burst.count}/${burst.limit} RPM). Wait a few seconds.` },
+      { status: 429 },
+    );
+  }
+
   const [aiSettings, { data: profile }, { data: latestReport }] = await Promise.all([
     getAiSettings(supabase),
     supabase
@@ -61,8 +69,8 @@ export async function POST(request: Request) {
 Return a single JSON object with ALL of these string keys (no nested objects/arrays):
 ${REPORT_KEYS.map((k) => `- "${k}": ${REPORT_FIELD_META[k].description}`).join("\n")}
 
-STRICT SUMMARIZATION, PAST-TENSE & TABLE-FIT RULES (the entire report MUST fit cleanly on ONE page):
-1. Summarize into **past-tense** formal action statements ONLY (e.g., "Attended orientation on company rules", "Configured network switches in the server room"). Never include markdown symbols, small talk, or extra commentary.
+STRICT ACCOMPLISHED-TASK, PAST-TENSE & TABLE-FIT RULES (the entire report MUST fit cleanly on ONE page):
+1. Include **STRICTLY actual tasks/work accomplished** in \`mon_accomplishments\`–\`fri_accomplishments\` as **past-tense** formal action statements (e.g., "Attended orientation on company rules", "Configured network switches in the server room"). NEVER include arrival times, departure/going-home times ("Arrived 7 AM", "Went home at 9 PM"), breaks, or commute notes. Never include markdown symbols or small talk.
 2. Keep each worked day to **1-${aiSettings.maxBulletsPerDay} concise lines** (maximum ~12 words / <= 95 chars per line).
 3. Separate multiple items for the same day/section with a single newline ("\\n"). Do NOT add bullet symbols ("-", "•", "1.").
 4. Leave unmentioned days completely blank (""). Never invent tasks.

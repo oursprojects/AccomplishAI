@@ -1,7 +1,12 @@
 "use client";
 
-import { Calculator, CalendarDays, Check, CheckCheck, Save, Sparkles, UserCheck } from "lucide-react";
+import { Calculator, CalendarDays, Check, CheckCheck, PenLine, RotateCcw, Save, Undo2, UserCheck } from "lucide-react";
 import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
+import { AccomplishCheckIcon } from "@/components/icons/AccomplishIcons";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const DAY_LABELS: Record<(typeof DAYS)[number], { short: string; full: string }> = {
   mon: { short: "M", full: "Monday" },
@@ -21,7 +26,7 @@ function formatLongDate(d: Date): string {
 
 function getWorkweekDates(offsetWeeks = 0): { from: string; to: string } {
   const now = new Date();
-  const day = now.getDay(); // 0=Sun..6=Sat
+  const day = now.getDay();
   const diffToMonday = (day === 0 ? -6 : 1 - day) + offsetWeeks * 7;
   const mon = new Date(now);
   mon.setDate(now.getDate() + diffToMonday);
@@ -36,8 +41,10 @@ interface ReportEditorProps {
   data: ReportData;
   onChange: (next: ReportData) => void;
   onSave: () => void;
+  onUndo: () => void;
+  onCancelChanges: () => void;
+  canUndo: boolean;
   saving: boolean;
-  savedId: string | null;
   hasChanges: boolean;
   defaultVerifier?: string;
   defaultDailyHours?: number;
@@ -50,8 +57,10 @@ export function ReportEditor({
   data,
   onChange,
   onSave,
+  onUndo,
+  onCancelChanges,
+  canUndo,
   saving,
-  savedId,
   hasChanges,
   defaultVerifier = "",
   defaultDailyHours = 8,
@@ -117,52 +126,57 @@ export function ReportEditor({
 
   return (
     <div className="space-y-4">
-      {/* Quick readiness strip */}
-      <div className="rounded-2xl border border-[#E6E2D8] bg-[#F7F6F0] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+      {/* Quick readiness & Undo / Cancel strip */}
+      <Card className="bg-[#F7F6F0] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-[#4A463F]">
           <CheckCheck className="h-4 w-4 text-[#D97757]" />
           <span>
-            <strong>{completedSections}/6</strong> main sections filled · <strong>{workedDaysCount}</strong> day
+            <strong>{completedSections}/6</strong> main sections · <strong>{workedDaysCount}</strong> day
             {workedDaysCount === 1 ? "" : "s"} logged
           </span>
         </div>
-        <span className="text-[11px] text-[#7A746B]">Blank fields stay clean for handwritten/wet-ink signing</span>
-      </div>
+        <div className="flex items-center gap-1.5">
+          {canUndo && (
+            <Button type="button" size="sm" variant="outline" onClick={onUndo}>
+              <Undo2 className="h-3 w-3 text-[#D97757]" />
+              <span>Undo</span>
+            </Button>
+          )}
+          {hasChanges && (
+            <Button type="button" size="sm" variant="outline" onClick={onCancelChanges}>
+              <RotateCcw className="h-3 w-3" />
+              <span>Cancel Edits</span>
+            </Button>
+          )}
+        </div>
+      </Card>
 
       {/* Header metadata */}
-      <div className="rounded-2xl border border-[#E6E2D8] bg-white p-4 shadow-xs space-y-3">
+      <Card className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-[#1F1E1C]">Report Title, Header &amp; Period</h3>
+          <h3 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
+            <PenLine className="h-3.5 w-3.5 text-[#D97757]" />
+            <span>Report Title, Header &amp; Period</span>
+          </h3>
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => applyWeek(0)}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#DDD7CB] bg-[#FAF9F5] px-2 py-1 text-[11px] font-medium text-[#4A463F] hover:bg-[#F4F2EA] cursor-pointer"
-              title="Fill Monday–Friday dates for this week"
-            >
+            <Button type="button" size="sm" variant="secondary" onClick={() => applyWeek(0)}>
               <CalendarDays className="h-3 w-3 text-[#D97757]" />
               <span>This Week</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => applyWeek(-1)}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#DDD7CB] bg-[#FAF9F5] px-2 py-1 text-[11px] font-medium text-[#4A463F] hover:bg-[#F4F2EA] cursor-pointer"
-              title="Fill Monday–Friday dates for last week"
-            >
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => applyWeek(-1)}>
               <span>Last Week</span>
-            </button>
+            </Button>
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-[#4A463F] mb-1">Report Name (shown in History)</label>
-          <input
+          <label className="block text-xs font-medium text-[#4A463F] mb-1">Report Name</label>
+          <Input
             type="text"
             maxLength={120}
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="e.g. Week 1 — DNX Landing Page (or leave blank to use dates)"
-            className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white"
           />
         </div>
 
@@ -171,66 +185,57 @@ export function ReportEditor({
             <label className="block text-xs font-medium text-[#4A463F] mb-1">
               Student Intern (LASTNAME, FIRSTNAME MI.)
             </label>
-            <input
+            <Input
               type="text"
               value={data.intern_name_last_first}
               onChange={(e) => setField("intern_name_last_first", e.target.value)}
               placeholder="DELA CRUZ, JUAN A."
-              className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-[#4A463F] mb-1">Office</label>
-            <input
+            <Input
               type="text"
               value={data.office}
               onChange={(e) => setField("office", e.target.value)}
               placeholder="DNX"
-              className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-[#4A463F] mb-1">From</label>
-            <input
+            <Input
               type="text"
               value={data.date_from}
               onChange={(e) => setField("date_from", e.target.value)}
               placeholder="November 16, 2026"
-              className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-[#4A463F] mb-1">To</label>
-            <input
+            <Input
               type="text"
               value={data.date_to}
               onChange={(e) => setField("date_to", e.target.value)}
               placeholder="November 20, 2026"
-              className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white"
             />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Daily M-F accomplishments */}
-      <div className="rounded-2xl border border-[#E6E2D8] bg-white p-4 shadow-xs space-y-3">
+      <Card className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-[#1F1E1C]">Daily Accomplishments (M – F)</h3>
             <p className="text-xs text-[#6B665E] mt-0.5">
-              Put one accomplishment per line — each line renders as a Word bullet.
+              One accomplished task per line — each line renders as a Word bullet.
             </p>
           </div>
           {canFillVerifier && workedDaysCount > 0 && (
-            <button
-              type="button"
-              onClick={applyVerifierToWorkedDays}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 py-1 text-[11px] font-medium text-[#4A463F] hover:bg-[#F4F2EA] cursor-pointer"
-              title="Copy verifier name into all empty worked days"
-            >
+            <Button type="button" size="sm" variant="secondary" onClick={applyVerifierToWorkedDays}>
               <UserCheck className="h-3 w-3 text-[#D97757]" />
               <span>Fill Verifiers</span>
-            </button>
+            </Button>
           )}
         </div>
 
@@ -247,108 +252,102 @@ export function ReportEditor({
                     </span>
                     <span className="text-xs font-semibold text-[#1F1E1C]">{DAY_LABELS[day].full}</span>
                   </div>
-                  <input
+                  <Input
                     type="text"
                     value={data[verKey]}
                     onChange={(e) => setField(verKey, e.target.value)}
                     placeholder="Verified by (optional)"
-                    className="w-40 sm:w-48 rounded-lg border border-[#DDD7CB] bg-white px-2.5 py-1 text-xs text-[#1F1E1C] outline-none focus:border-[#D97757]"
+                    className="h-8 w-40 sm:w-48 bg-white text-xs"
                   />
                 </div>
-                <textarea
+                <Textarea
                   rows={2}
                   value={data[accKey]}
                   onChange={(e) => setField(accKey, e.target.value)}
-                  placeholder={`What you accomplished on ${DAY_LABELS[day].full}...`}
-                  className="w-full rounded-xl border border-[#DDD7CB] bg-white px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] resize-y"
+                  placeholder={`Tasks accomplished on ${DAY_LABELS[day].full}...`}
+                  className="bg-white resize-y"
                 />
               </div>
             );
           })}
         </div>
-      </div>
+      </Card>
 
       {/* Hours & reflections */}
-      <div className="rounded-2xl border border-[#E6E2D8] bg-white p-4 shadow-xs space-y-3">
+      <Card className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-[#1F1E1C]">Hours, Reflections &amp; Signature</h3>
           <div className="flex flex-wrap items-center gap-1.5">
             {workedDaysCount > 0 && (
-              <button
+              <Button
                 type="button"
+                size="sm"
+                variant="secondary"
                 onClick={autoCalcHours}
-                className="inline-flex items-center gap-1 rounded-lg border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 py-1 text-[11px] font-medium text-[#4A463F] hover:bg-[#F4F2EA] cursor-pointer"
                 title={`Calculate ${workedDaysCount} worked day(s) × ${defaultDailyHours} hrs/day`}
               >
                 <Calculator className="h-3 w-3 text-[#D97757]" />
                 <span>Auto-calc Hours</span>
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              onClick={fillNoneReflections}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 py-1 text-[11px] font-medium text-[#4A463F] hover:bg-[#F4F2EA] cursor-pointer"
-              title="Fill 'None' into empty trainings, problems, or solutions"
-            >
-              <Sparkles className="h-3 w-3 text-[#D97757]" />
+            <Button type="button" size="sm" variant="secondary" onClick={fillNoneReflections}>
+              <AccomplishCheckIcon className="h-3 w-3 text-[#D97757]" />
               <span>Fill &ldquo;None&rdquo;</span>
-            </button>
+            </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-[#4A463F] mb-1">Hours Worked This Week</label>
-            <input
+            <Input
               type="text"
               value={data.hours_this_week}
               onChange={(e) => setField("hours_this_week", e.target.value)}
               placeholder="40"
-              className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-[#4A463F] mb-1">Total Hours Worked</label>
-            <input
+            <Input
               type="text"
               value={data.total_hours_worked}
               onChange={(e) => setField("total_hours_worked", e.target.value)}
               placeholder={previousTotalHours ? `Prev: ${previousTotalHours}` : "120"}
-              className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white"
             />
           </div>
         </div>
 
         <div>
           <label className="block text-xs font-medium text-[#4A463F] mb-1">New training/s took place this week</label>
-          <textarea
+          <Textarea
             rows={2}
             value={data.new_trainings}
             onChange={(e) => setField("new_trainings", e.target.value)}
             placeholder="One item per line (or None)"
-            className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white resize-y"
+            className="resize-y"
           />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-[#4A463F] mb-1">Problems encountered this week</label>
-          <textarea
+          <Textarea
             rows={2}
             value={data.problems_encountered}
             onChange={(e) => setField("problems_encountered", e.target.value)}
             placeholder="One item per line (or None)"
-            className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white resize-y"
+            className="resize-y"
           />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-[#4A463F] mb-1">Solutions done to solve the problem/s</label>
-          <textarea
+          <Textarea
             rows={2}
             value={data.solutions_done}
             onChange={(e) => setField("solutions_done", e.target.value)}
             placeholder="One item per line (or None)"
-            className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white resize-y"
+            className="resize-y"
           />
         </div>
 
@@ -356,38 +355,30 @@ export function ReportEditor({
           <label className="block text-xs font-medium text-[#4A463F] mb-1">
             Prepared by (FIRSTNAME MI. LASTNAME)
           </label>
-          <input
+          <Input
             type="text"
             value={data.intern_name_first_last}
             onChange={(e) => setField("intern_name_first_last", e.target.value)}
             placeholder="JUAN A. DELA CRUZ"
-            className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white"
           />
           <p className="mt-1 text-[11px] text-[#7A746B]">
             Noted by (NIÑO R. GUILLERMO) and the wet-ink Date line remain untouched on the official form.
           </p>
         </div>
 
-        <div className="pt-2 flex items-center justify-end">
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving || !hasChanges}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#1F1E1C] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#33312E] disabled:opacity-45 disabled:cursor-not-allowed transition cursor-pointer"
-          >
+        <div className="pt-2 flex flex-wrap items-center justify-end gap-2">
+          {hasChanges && (
+            <Button type="button" variant="outline" onClick={onCancelChanges} disabled={saving}>
+              <RotateCcw className="h-4 w-4" />
+              <span>Cancel</span>
+            </Button>
+          )}
+          <Button type="button" onClick={onSave} disabled={saving || !hasChanges}>
             {hasChanges ? <Save className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-            <span>
-              {saving
-                ? "Saving..."
-                : !hasChanges
-                  ? "No Changes to Save"
-                  : savedId
-                    ? "Update Saved Report"
-                    : "Save Report to History"}
-            </span>
-          </button>
+            <span>{saving ? "Saving..." : !hasChanges ? "All Changes Saved" : "Save Changes"}</span>
+          </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

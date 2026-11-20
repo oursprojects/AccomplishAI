@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { getAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import { groqErrorResponse } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage, type GroqTool } from "@/lib/ai/chat-tools";
 import type { Json } from "@/lib/supabase/database.types";
@@ -94,7 +94,7 @@ const TOOLS: GroqTool[] = [
     function: {
       name: "update_report_fields",
       description:
-        "Fill or update one or more fields on the Weekly Accomplishment Report. Only pass fields mentioned by the user or clearly derivable from profile defaults; do not overwrite existing fields with empty strings.",
+        "Fill, update, or clear fields on the Weekly Accomplishment Report. Only pass fields mentioned by the user; before clearing fields via clear_fields, verify whether they actually contain data.",
       parameters: {
         type: "object",
         properties: {
@@ -105,7 +105,7 @@ const TOOLS: GroqTool[] = [
                 type: "string",
                 description:
                   REPORT_FIELD_META[k].kind === "list"
-                    ? `${REPORT_FIELD_META[k].description}. Concise formal past-tense lines separated by \\n, max 12 words per line, NO bullet characters.`
+                    ? `${REPORT_FIELD_META[k].description}. Strictly accomplished tasks only (no arrival/departure times), past-tense formal lines separated by \\n, max 12 words per line, NO bullet characters.`
                     : REPORT_FIELD_META[k].description,
               },
             ]),
@@ -113,7 +113,7 @@ const TOOLS: GroqTool[] = [
           clear_fields: {
             type: "array",
             items: { type: "string", enum: [...REPORT_KEYS] },
-            description: "Optional list of field keys to clear to empty string.",
+            description: "Field keys to clear ONLY if they are currently non-empty.",
           },
         },
       },
@@ -124,7 +124,7 @@ const TOOLS: GroqTool[] = [
     function: {
       name: "save_profile_defaults",
       description:
-        "Save the intern's recurring name, office, or verifier defaults to their profile when they introduce themselves or ask to remember their details.",
+        "Save the intern's recurring name, office, or verifier defaults to their profile when they ask to remember them.",
       parameters: {
         type: "object",
         properties: {
@@ -140,7 +140,7 @@ const TOOLS: GroqTool[] = [
     type: "function",
     function: {
       name: "get_report_status",
-      description: "Inspect the current report data and see which fields are currently filled or blank.",
+      description: "Inspect the current report data to verify which fields are currently filled or already empty.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -211,6 +211,16 @@ export async function POST(request: Request) {
     );
   }
 
+  const burst = await checkBurstRateLimit(supabase, user.id, quotaBefore.isAdmin);
+  if (!burst.allowed) {
+    return NextResponse.json(
+      {
+        error: `Too many requests in one minute (${burst.count}/${burst.limit} RPM). Please wait a few seconds before sending again.`,
+      },
+      { status: 429 },
+    );
+  }
+
   const [aiSettings, { data: profile }, { data: latestReport }] = await Promise.all([
     getAiSettings(supabase),
     supabase
@@ -245,7 +255,7 @@ export async function POST(request: Request) {
       ? String((latestReport.structured_data as Record<string, unknown>).total_hours_worked ?? "")
       : "";
 
-  const systemPrompt = `You are **Accomplish AI**, a fast assistant that fills the student intern's official 1-page **"2026 Weekly Accomplishment Report"** (.docx).
+  const systemPrompt = `You are **Accomplish AI**, a friendly, helpful assistant dedicated strictly to helping a student intern complete their official 1-page **"2026 Weekly Accomplishment Report"** (.docx).
 
 Today's date: ${new Date().toISOString().slice(0, 10)}
 User profile defaults: ${JSON.stringify({
@@ -256,17 +266,20 @@ User profile defaults: ${JSON.stringify({
     default_daily_hours: profile?.default_daily_hours ?? 8,
     previous_report_total_hours: prevTotal,
   })}
-Current report fields: ${JSON.stringify(workingData)}
+Current report fields (exact live state): ${JSON.stringify(workingData)}
 
-CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
-1. Whenever the user gives notes (English, Tagalog, Taglish, raw text, or a formatted report) or says "just input it" / "translate in english", **IMMEDIATELY call \`update_report_fields\`** to put every provided field directly into the document.
-2. **NEVER require missing fields.** Some fields (such as *Verified By*, *Name*, *Dates*, *Hours*, or *Trainings/Problems/Solutions*) may be filled manually by the user later or signed in wet ink. Leave unmentioned fields blank—DO NOT list every empty field with ❌ or demand them.
-3. Keep tool values plain text (NO \`**\`, \`*\`, or \`-\` bullets), summarized into crisp **past-tense** formal English statements that fit inside the Word table:
+CORE BEHAVIOR & STRICT RULES:
+1. **Strictly Accomplished Tasks Only:** For \`mon_accomplishments\` through \`fri_accomplishments\`, record **ONLY actual work/tasks accomplished** (e.g., *"Attended internship orientation and role assignment meeting"*, *"Redesigned and published the DNX Solution landing page"*). **NEVER** put arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*, *"Dismissed at 4:30 PM"*), commute/boarding-house notes, or lunch breaks inside accomplishment entries.
+2. **Apply Immediately & Never Be Strict:** When the user shares notes (English, Tagalog, Taglish, raw notes) or asks for edits, immediately call \`update_report_fields\` and apply everything provided. Never demand empty optional fields (*Verified By*, dates, hours, reflections)—users can fill those manually later or leave them for wet ink.
+3. **Verify Before Clearing (No Fake Re-Clears):**
+   - Inspect \`Current report fields\` (or \`get_report_status\`) before saying something was cleared.
+   - If the user asks to clear a field that is **already empty (\`""\`)**, DO NOT call \`update_report_fields\` to clear it again and **DO NOT** display a Markdown table claiming it was cleared—warmly tell them it is **already cleared / empty**.
+   - Only show cleared items in a table if \`cleared\` in the tool result actually cleared non-empty text in this turn.
+4. **Past-Tense, Concise & Table-Fit:** Keep tool values plain text (no \`**\`, \`*\`, or \`-\` bullets), formalized into crisp **past-tense** English:
    - Max **1–${aiSettings.maxBulletsPerDay} short lines** per worked day (\`<= 12 words\` per line, separated by \`\\n\`).
    - Max **1–2 short lines** for \`new_trainings\`, \`problems_encountered\`, and \`solutions_done\`.
-   - If the user mentions company/office (e.g., \`DNX\`), update \`office\`. If they provide their name, fill \`intern_name_last_first\` and \`intern_name_first_last\`.
-4. Only refuse if the user asks something completely unrelated to their internship or this report (e.g., trivia, coding homework, jokes). Do NOT say "I can only help with your Weekly Accomplishment Report" on greetings ("hi") or report prompts.
-5. Format your chat reply cleanly in **Markdown** (**bold**, *italic*, and a compact **Markdown table** showing ONLY the fields you updated), plus 1 short sentence letting them know it's applied to the preview and any remaining fields can be edited manually or sent anytime.`;
+5. **Friendly & Strictly On-Topic:** Keep a warm, encouraging assistant tone, but **ONLY** assist with the Weekly Accomplishment Report, internship task summarization, and form editing. Politely decline unrelated topics (coding homework, trivia, general chat) and guide them back to their report.
+6. **Markdown Output:** Reply cleanly in Markdown (**bold**, *italic*, and a compact Markdown table **only when fields were actually updated or cleared in this turn**). Keep it helpful and concise.`;
 
   const recentMessages = body.data.messages.slice(-10);
   const loopMessages: GroqMessage[] = [
@@ -347,6 +360,9 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
 
         if (name === "update_report_fields") {
           const changed: string[] = [];
+          const cleared: string[] = [];
+          const alreadyEmpty: string[] = [];
+
           for (const key of REPORT_KEYS) {
             if (key in args && args[key] !== undefined && args[key] !== null) {
               const cleaned = cleanFieldValue(key, args[key], aiSettings.maxBulletsPerDay);
@@ -357,15 +373,22 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
               }
             }
           }
+
           if (Array.isArray(args.clear_fields)) {
             for (const rawKey of args.clear_fields) {
               if (isReportKey(rawKey)) {
-                workingData[rawKey] = "";
-                updatedKeys.add(rawKey);
-                changed.push(rawKey);
+                if (workingData[rawKey].trim() !== "") {
+                  workingData[rawKey] = "";
+                  updatedKeys.add(rawKey);
+                  changed.push(rawKey);
+                  cleared.push(rawKey);
+                } else {
+                  alreadyEmpty.push(rawKey);
+                }
               }
             }
           }
+
           if (profile?.default_verifier) {
             for (const d of DAYS) {
               if (workingData[`${d}_accomplishments`].trim() && !workingData[`${d}_verified_by`].trim()) {
@@ -374,10 +397,21 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
               }
             }
           }
-          if (changed.length > 0) {
-            toolActions.push(`Updated ${changed.length} field${changed.length === 1 ? "" : "s"}`);
+
+          const updatedCount = changed.filter((k) => !cleared.includes(k)).length;
+          if (updatedCount > 0) {
+            toolActions.push(`Updated ${updatedCount} field${updatedCount === 1 ? "" : "s"}`);
           }
-          toolResult = { updated: changed, status: computeStatus(workingData) };
+          if (cleared.length > 0) {
+            toolActions.push(`Cleared ${cleared.length} field${cleared.length === 1 ? "" : "s"}`);
+          }
+
+          toolResult = {
+            updated: changed,
+            cleared,
+            already_empty: alreadyEmpty,
+            status: computeStatus(workingData),
+          };
         } else if (name === "save_profile_defaults") {
           const patch: Record<string, string> = {};
           if (typeof args.name_last_first === "string" && args.name_last_first.trim()) {
@@ -398,7 +432,7 @@ CORE BEHAVIOR (DO NOT BE STRICT OR NAGGY):
           }
           toolResult = { saved: Object.keys(patch) };
         } else if (name === "get_report_status") {
-          toolResult = computeStatus(workingData);
+          toolResult = { ...computeStatus(workingData), current_data: workingData };
         }
 
         loopMessages.push({

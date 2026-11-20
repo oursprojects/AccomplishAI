@@ -7,13 +7,16 @@ import {
   Copy,
   Eraser,
   Eye,
-  FilePlus2,
-  Save,
   Send,
-  Sparkles,
+  Undo2,
 } from "lucide-react";
 import type { QuotaStatus } from "@/lib/admin";
 import { DAYS, MAX_CHAT_MESSAGES, type ReportData, type ReportKey } from "@/lib/report-schema";
+import { ReportPenIcon } from "@/components/icons/AccomplishIcons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { VoiceRecorder } from "./VoiceRecorder";
 import { ChatMarkdown } from "./ChatMarkdown";
 
@@ -26,19 +29,17 @@ export interface ChatTurn {
 }
 
 interface ReportChatProps {
+  reportId: string;
   data: ReportData;
   quota: QuotaStatus;
-  savedId: string | null;
-  hasChanges: boolean;
   messages: ChatTurn[];
+  canUndo: boolean;
+  onUndo: () => void;
   onMessagesChange: (next: ChatTurn[]) => void;
-  onDataChange: (next: ReportData) => void;
+  onAiDataUpdate: (next: ReportData) => void;
   onQuotaChange: (next: QuotaStatus) => void;
   onClearChat: () => void;
-  onNewReport: () => void;
   onOpenPreview: () => void;
-  onSaveReport: () => void;
-  saving: boolean;
 }
 
 function getMissingSummary(data: ReportData): string[] {
@@ -51,27 +52,18 @@ function getMissingSummary(data: ReportData): string[] {
   return missing;
 }
 
-const QUICK_REPLIES = [
-  "Translate Tagalog/Taglish & apply",
-  "Polish to formal past-tense",
-  "Shorten bullets to fit 1 page",
-  "No trainings, problems, or solutions",
-];
-
 export function ReportChat({
+  reportId,
   data,
   quota,
-  savedId,
-  hasChanges,
   messages,
+  canUndo,
+  onUndo,
   onMessagesChange,
-  onDataChange,
+  onAiDataUpdate,
   onQuotaChange,
   onClearChat,
-  onNewReport,
   onOpenPreview,
-  onSaveReport,
-  saving,
 }: ReportChatProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -79,6 +71,10 @@ export function ReportChat({
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const turnSeqRef = useRef(0);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, sending]);
 
   async function handleCopyReply(id: string, text: string) {
     try {
@@ -90,10 +86,6 @@ export function ReportChat({
     }
   }
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, sending]);
-
   const missing = getMissingSummary(data);
   const quotaBlocked = !quota.allowed;
   const contextCount = messages.length;
@@ -101,15 +93,15 @@ export function ReportChat({
   const contextNearLimit = !contextAtLimit && contextCount >= MAX_CHAT_MESSAGES - 4;
   const composerDisabled = sending || quotaBlocked || contextAtLimit;
 
-  async function sendMessage(textOverride?: string) {
-    const text = (textOverride ?? input).trim();
+  async function sendMessage() {
+    const text = input.trim();
     if (!text || composerDisabled) return;
 
     setError(null);
     const userTurn: ChatTurn = { id: `u-${++turnSeqRef.current}`, role: "user", content: text };
     const nextHistory = [...messages, userTurn];
     onMessagesChange(nextHistory);
-    if (!textOverride) setInput("");
+    setInput("");
     setSending(true);
 
     try {
@@ -117,7 +109,7 @@ export function ReportChat({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reportId: savedId,
+          reportId,
           messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
           currentData: data,
         }),
@@ -133,8 +125,8 @@ export function ReportChat({
       if (json.quota) onQuotaChange(json.quota);
       if (!res.ok || !json.reply) throw new Error(json.error ?? "Could not reach AI assistant.");
 
-      if (json.structuredData) {
-        onDataChange(json.structuredData);
+      if (json.structuredData && (json.updatedKeys?.length ?? 0) > 0) {
+        onAiDataUpdate(json.structuredData);
       }
 
       const assistantTurn: ChatTurn = {
@@ -153,62 +145,57 @@ export function ReportChat({
   }
 
   return (
-    <section className="rounded-2xl border border-[#E6E2D8] bg-white shadow-xs overflow-hidden flex flex-col">
+    <Card className="overflow-hidden flex flex-col">
       {/* Header */}
       <div className="border-b border-[#E6E2D8] px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-[#F7F6F0]">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#D97757] text-white shadow-2xs shrink-0">
-            <Sparkles className="h-4 w-4" />
+            <ReportPenIcon className="h-4 w-4" />
           </span>
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-[#1F1E1C] leading-tight">Report Assistant</h2>
             <p className="text-[11px] text-[#6B665E] truncate">
               {missing.length === 0
-                ? "All main fields filled — ready to download or save"
-                : "Share what you have — edit any blank fields manually anytime"}
+                ? "Auto-updates this report — all main sections filled"
+                : "Auto-updates this report from your English or Tagalog notes"}
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {/* Context counter pill */}
-          <span
-            title="Messages in current conversation context. Clearing chat keeps all filled document fields intact."
-            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
-              contextAtLimit
-                ? "bg-red-50 text-red-700 border-red-200"
-                : contextNearLimit
-                  ? "bg-amber-50 text-amber-800 border-amber-200"
-                  : "bg-white text-[#57544E] border-[#E0DDD3]"
-            }`}
+          <Badge
+            variant={contextAtLimit ? "destructive" : contextNearLimit ? "warning" : "outline"}
+            title="Messages in this report's chat context. Clear Chat keeps your filled document intact."
           >
             {contextCount}/{MAX_CHAT_MESSAGES} ctx
-          </span>
+          </Badge>
+
+          {canUndo && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onUndo}
+              disabled={sending}
+              title="Undo last change made to the report"
+            >
+              <Undo2 className="h-3 w-3 text-[#D97757]" />
+              <span>Undo</span>
+            </Button>
+          )}
 
           {messages.length > 1 && (
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={onClearChat}
               disabled={sending}
-              title="Delete chat messages only — keeps your filled .docx document intact"
-              className="inline-flex items-center gap-1 rounded-xl border border-[#DDD7CB] bg-white px-2.5 py-1 text-xs font-medium text-[#4A463F] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
+              title="Clear chat messages only — keeps your filled .docx document intact"
             >
               <Eraser className="h-3 w-3 text-[#D97757]" />
               <span>Clear Chat</span>
-            </button>
-          )}
-
-          {(savedId || messages.length > 1 || hasChanges) && (
-            <button
-              type="button"
-              onClick={onNewReport}
-              disabled={sending}
-              title="Start a separate blank report and fresh conversation"
-              className="inline-flex items-center gap-1 rounded-xl border border-[#DDD7CB] bg-white px-2.5 py-1 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
-            >
-              <FilePlus2 className="h-3 w-3 text-[#D97757]" />
-              <span>New Report</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -216,7 +203,7 @@ export function ReportChat({
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-4 space-y-3 min-h-[280px] max-h-[52vh] bg-[#FAF9F5]/70"
+        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-4 space-y-3 min-h-[280px] max-h-[54vh] bg-[#FAF9F5]/70"
       >
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
@@ -232,15 +219,12 @@ export function ReportChat({
             {m.role === "assistant" && (
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {m.toolActions?.map((act, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800"
-                  >
+                  <Badge key={idx} variant="success" className="font-medium">
                     <Check className="h-3 w-3" />
                     {act}
-                  </span>
+                  </Badge>
                 ))}
-                {m.id !== "welcome" && m.id !== "welcome-existing" && (
+                {m.id !== "welcome" && m.id !== "welcome-existing" && m.id !== "cleared-chat" && (
                   <button
                     type="button"
                     onClick={() => void handleCopyReply(m.id, m.content)}
@@ -269,8 +253,8 @@ export function ReportChat({
         {sending && (
           <div className="flex items-start">
             <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-[#E6E2D8] bg-white px-3.5 py-2.5 text-xs text-[#6B665E] animate-pulse">
-              <Sparkles className="h-3.5 w-3.5 text-[#D97757]" />
-              <span>Updating your document...</span>
+              <ReportPenIcon className="h-3.5 w-3.5 text-[#D97757]" />
+              <span>Updating this report...</span>
             </div>
           </div>
         )}
@@ -282,34 +266,15 @@ export function ReportChat({
           <span className="inline-flex items-center gap-1.5">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-700 shrink-0" />
             <span>
-              Chat context limit reached ({MAX_CHAT_MESSAGES} messages). Clear the chat to keep going — your document
-              data stays untouched.
+              Chat context limit reached ({MAX_CHAT_MESSAGES} messages). Clear the chat to continue — your filled
+              report fields stay untouched.
             </span>
           </span>
-          <button
-            type="button"
-            onClick={onClearChat}
-            className="rounded-lg bg-amber-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-800 cursor-pointer"
-          >
-            Clear Chat (Keep Document)
-          </button>
+          <Button type="button" size="sm" onClick={onClearChat} className="bg-amber-900 hover:bg-amber-800">
+            Clear Chat
+          </Button>
         </div>
       )}
-
-      {/* Quick helper chips */}
-      <div className="border-t border-[#ECEAE2] bg-white px-3.5 py-2 flex items-center gap-1.5 overflow-x-auto">
-        {QUICK_REPLIES.map((q) => (
-          <button
-            key={q}
-            type="button"
-            disabled={composerDisabled}
-            onClick={() => void sendMessage(q)}
-            className="shrink-0 rounded-full border border-[#E6E2D8] bg-[#FAF9F5] px-2.5 py-1 text-[11px] font-medium text-[#57544E] hover:bg-[#F4F2EA] disabled:opacity-50 cursor-pointer"
-          >
-            {q}
-          </button>
-        ))}
-      </div>
 
       {error && (
         <div className="mx-3.5 mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -317,7 +282,7 @@ export function ReportChat({
         </div>
       )}
 
-      {/* Composer */}
+      {/* Composer (no Update button — AI auto-updates the form) */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -325,7 +290,7 @@ export function ReportChat({
         }}
         className="border-t border-[#E6E2D8] bg-white p-3 space-y-2.5"
       >
-        <textarea
+        <Textarea
           rows={3}
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -339,9 +304,9 @@ export function ReportChat({
           placeholder={
             contextAtLimit
               ? "Click 'Clear Chat' to continue chatting — your document fields remain filled."
-              : "Tell me what you did this week (English or Tagalog)... Enter to send"
+              : "Describe what you accomplished (English or Tagalog)... Enter to send"
           }
-          className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-sm text-[#1F1E1C] outline-none focus:border-[#D97757] focus:bg-white resize-none disabled:opacity-60"
+          className="resize-none"
         />
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -351,35 +316,28 @@ export function ReportChat({
               disabled={composerDisabled}
               onTranscript={(text) => setInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text))}
             />
-            <button
+            <Button
               type="button"
-              onClick={onSaveReport}
-              disabled={saving || !hasChanges}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#DDD7CB] bg-white px-3 py-2 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {hasChanges ? <Save className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5 text-emerald-600" />}
-              <span>{saving ? "Saving..." : !hasChanges ? "Saved" : savedId ? "Update" : "Save"}</span>
-            </button>
-            <button
-              type="button"
+              size="sm"
+              variant="outline"
               onClick={onOpenPreview}
-              className="lg:hidden inline-flex items-center gap-1 rounded-xl border border-[#DDD7CB] bg-white px-3 py-2 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] cursor-pointer"
+              className="lg:hidden"
             >
               <Eye className="h-3.5 w-3.5" />
               <span>Preview</span>
-            </button>
+            </Button>
           </div>
 
-          <button
+          <Button
             type="submit"
+            variant="accent"
             disabled={composerDisabled || !input.trim()}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#D97757] px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-[#C86343] disabled:opacity-50 transition cursor-pointer shadow-2xs"
           >
             <Send className="h-3.5 w-3.5" />
             <span>{sending ? "Sending..." : "Send"}</span>
-          </button>
+          </Button>
         </div>
       </form>
-    </section>
+    </Card>
   );
 }

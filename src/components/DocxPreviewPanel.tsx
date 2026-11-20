@@ -7,6 +7,17 @@ import { DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
 import { enhanceCsuPreviewChrome, PAPER_DIMENSIONS, type PaperSize } from "@/lib/docx/csu-template-chrome";
 import type { DetectedField } from "@/lib/docx/types";
 import type { ReportData } from "@/lib/report-schema";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 interface DocxPreviewPanelProps {
   templateId: string;
@@ -42,6 +53,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
   const templateBytesRef = useRef<ArrayBuffer | null>(null);
   const latestFilledRef = useRef<Uint8Array | null>(null);
+  const lastStageWidthRef = useRef<number>(0);
 
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -102,12 +114,21 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     [pagePxW],
   );
 
-  // Fit inline preview cleanly to mobile/desktop viewport whenever visible or resized
+  // Fit inline preview cleanly to mobile/desktop viewport and re-enhance if stage became visible
   useEffect(() => {
     const sync = () => {
-      if (manualZoom) return;
-      const fit = computeFitZoom(inlineStageRef.current, 0.85);
-      if (fit !== null) setZoom(fit);
+      const width = inlineStageRef.current?.clientWidth ?? 0;
+      const becameVisible = lastStageWidthRef.current === 0 && width > 0;
+      lastStageWidthRef.current = width;
+
+      if (becameVisible && inlineContainerRef.current && latestFilledRef.current) {
+        enhanceCsuPreviewChrome(inlineContainerRef.current, latestFilledRef.current, paperSize);
+      }
+
+      if (!manualZoom) {
+        const fit = computeFitZoom(inlineStageRef.current, 0.85);
+        if (fit !== null) setZoom(fit);
+      }
     };
     sync();
     window.addEventListener("resize", sync);
@@ -120,7 +141,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
       window.removeEventListener("resize", sync);
       observer?.disconnect();
     };
-  }, [manualZoom, computeFitZoom]);
+  }, [manualZoom, computeFitZoom, paperSize]);
 
   // Fit modal preview cleanly when opened
   useEffect(() => {
@@ -207,14 +228,14 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
   return (
     <>
-      <div className="rounded-2xl border border-[#E6E4DD] bg-white shadow-xs overflow-hidden flex flex-col">
+      <Card className="overflow-hidden flex flex-col">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E4DD] bg-[#F7F6F0] px-3 sm:px-4 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] bg-[#F7F6F0] px-3 sm:px-4 py-2.5">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-[#C96442]" />
+            <FileText className="h-4 w-4 text-[#D97757]" />
             <h3 className="text-sm font-semibold text-[#1F1E1C]">Live Document Preview</h3>
             {(loadingTemplate || rendering) && (
-              <span className="inline-flex items-center rounded-full bg-[#D97757]/15 px-2 py-0.5 text-[11px] font-medium text-[#C96442] animate-pulse">
+              <span className="inline-flex items-center rounded-full bg-[#FDF3EF] px-2 py-0.5 text-[11px] font-medium text-[#C86343] animate-pulse">
                 {loadingTemplate ? "Loading..." : "Updating..."}
               </span>
             )}
@@ -225,21 +246,20 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
               aria-label="Paper size"
               value={paperSize}
               onChange={(e) => setPaperSize(e.target.value as PaperSize)}
-              className="rounded-xl border border-[#E0DDD3] bg-white px-2.5 py-1.5 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#1F1E1C]"
+              className="h-8 rounded-lg border border-[#DDD7CB] bg-white px-2.5 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
             >
               <option value="letter">{PAPER_DIMENSIONS.letter.label}</option>
               <option value="folio">{PAPER_DIMENSIONS.folio.label}</option>
             </select>
 
-            {/* Zoom controls visible on ALL viewports (including mobile) */}
-            <div className="flex items-center rounded-xl border border-[#E0DDD3] bg-white text-xs overflow-hidden">
+            <div className="flex items-center rounded-lg border border-[#DDD7CB] bg-white text-xs overflow-hidden h-8">
               <button
                 type="button"
                 onClick={() => {
                   setManualZoom(true);
                   setZoom((z) => Math.max(0.28, +(z - 0.08).toFixed(2)));
                 }}
-                className="p-1.5 text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                className="px-2 h-full text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
                 title="Zoom out"
                 aria-label="Zoom out"
               >
@@ -252,7 +272,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
                   setManualZoom(true);
                   setZoom((z) => Math.min(1.25, +(z + 0.08).toFixed(2)));
                 }}
-                className="p-1.5 text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                className="px-2 h-full text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
                 title="Zoom in"
                 aria-label="Zoom in"
               >
@@ -262,7 +282,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
                 <button
                   type="button"
                   onClick={() => setManualZoom(false)}
-                  className="border-l border-[#E0DDD3] px-1.5 py-1 text-[10px] font-medium text-[#C96442] hover:bg-[#F4F2EA] cursor-pointer"
+                  className="border-l border-[#DDD7CB] px-2 h-full text-[10px] font-medium text-[#C86343] hover:bg-[#F4F2EA] cursor-pointer"
                   title="Fit to screen"
                 >
                   Fit
@@ -270,28 +290,24 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
               )}
             </div>
 
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={() => {
                 setModalManualZoom(false);
                 setPreviewModalOpen(true);
               }}
               disabled={loadingTemplate}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#E0DDD3] bg-white px-3 py-1.5 text-xs font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] disabled:opacity-50 transition cursor-pointer"
             >
               <Maximize2 className="h-3.5 w-3.5" />
               <span>Preview Modal</span>
-            </button>
+            </Button>
 
-            <button
-              type="button"
-              onClick={openDownloadPrompt}
-              disabled={loadingTemplate}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#33312E] disabled:opacity-50 transition cursor-pointer"
-            >
+            <Button type="button" size="sm" onClick={openDownloadPrompt} disabled={loadingTemplate}>
               <Download className="h-3.5 w-3.5" />
               <span>Download .docx</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -304,7 +320,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
         {/* Transform-scaled stage so mobile & desktop render identically */}
         <div
           ref={inlineStageRef}
-          className="docx-preview-stage overflow-auto bg-[#ECEAE2] p-3 flex justify-center max-h-[75vh] lg:max-h-[calc(100vh-8.5rem)]"
+          className="docx-preview-stage overflow-auto bg-[#ECEAE2] p-3 flex justify-center max-h-[75vh] lg:max-h-[calc(100vh-9.5rem)]"
         >
           <div
             style={{
@@ -323,178 +339,166 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
             />
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Full-Screen / Large Preview Modal */}
-      {previewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F1E1C]/60 backdrop-blur-xs p-2 sm:p-5">
-          <div className="flex h-[94vh] w-full max-w-5xl flex-col rounded-2xl border border-[#E6E4DD] bg-[#FAF9F5] shadow-2xl overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E4DD] bg-white px-4 py-3">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-[#C96442]" />
-                <h2 className="text-sm font-semibold text-[#1F1E1C]">Document Preview</h2>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  aria-label="Modal paper size"
-                  value={paperSize}
-                  onChange={(e) => setPaperSize(e.target.value as PaperSize)}
-                  className="rounded-xl border border-[#E0DDD3] bg-white px-2.5 py-1.5 text-xs font-medium text-[#1F1E1C]"
-                >
-                  <option value="letter">{PAPER_DIMENSIONS.letter.label}</option>
-                  <option value="folio">{PAPER_DIMENSIONS.folio.label}</option>
-                </select>
-
-                <div className="flex items-center rounded-xl border border-[#E0DDD3] bg-white text-xs overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setModalManualZoom(true);
-                      setModalZoom((z) => Math.max(0.3, +(z - 0.1).toFixed(2)));
-                    }}
-                    className="p-1.5 text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
-                    aria-label="Zoom out"
-                  >
-                    <ZoomOut className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="px-2 text-[11px] font-mono text-[#1F1E1C]">
-                    {Math.round(modalZoom * 100)}%
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setModalManualZoom(true);
-                      setModalZoom((z) => Math.min(1.4, +(z + 0.1).toFixed(2)));
-                    }}
-                    className="p-1.5 text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
-                    aria-label="Zoom in"
-                  >
-                    <ZoomIn className="h-3.5 w-3.5" />
-                  </button>
-                  {modalManualZoom && (
-                    <button
-                      type="button"
-                      onClick={() => setModalManualZoom(false)}
-                      className="border-l border-[#E0DDD3] px-2 py-1 text-[10px] font-medium text-[#C96442] hover:bg-[#F4F2EA] cursor-pointer"
-                    >
-                      <RotateCcw className="h-3 w-3 inline mr-0.5" />
-                      Fit
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={openDownloadPrompt}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#33312E] cursor-pointer"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Download .docx</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPreviewModalOpen(false)}
-                  aria-label="Close preview modal"
-                  className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#E0DDD3] bg-white text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+      {/* Large Preview Modal */}
+      <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+        <DialogContent className="flex h-[92vh] w-full max-w-5xl flex-col bg-[#FAF9F5]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] bg-white px-4 py-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-[#D97757]" />
+              <h2 className="text-sm font-semibold text-[#1F1E1C]">Document Preview</h2>
             </div>
 
-            <div
-              ref={modalStageRef}
-              className="docx-preview-stage flex-1 overflow-auto bg-[#ECEAE2] p-4 flex justify-center"
-            >
-              <div
-                style={{
-                  width: `${Math.round(pagePxW * modalZoom)}px`,
-                  height: `${Math.round(pagePxH * modalZoom)}px`,
-                  flexShrink: 0,
-                }}
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                aria-label="Modal paper size"
+                value={paperSize}
+                onChange={(e) => setPaperSize(e.target.value as PaperSize)}
+                className="h-8 rounded-lg border border-[#DDD7CB] bg-white px-2.5 text-xs font-medium text-[#1F1E1C]"
               >
-                <div
-                  ref={modalContainerRef}
-                  style={{
-                    width: `${dims.widthPt}pt`,
-                    transform: `scale(${modalZoom})`,
-                    transformOrigin: "top left",
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+                <option value="letter">{PAPER_DIMENSIONS.letter.label}</option>
+                <option value="folio">{PAPER_DIMENSIONS.folio.label}</option>
+              </select>
 
-      {/* Custom Filename Download Modal */}
-      {downloadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F1E1C]/50 backdrop-blur-xs p-4">
-          <form
-            onSubmit={confirmDownload}
-            className="w-full max-w-md rounded-2xl border border-[#E6E4DD] bg-white p-5 shadow-xl space-y-4"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#D97757]/15 text-[#C96442]">
-                  <Download className="h-4 w-4" />
+              <div className="flex items-center rounded-lg border border-[#DDD7CB] bg-white text-xs overflow-hidden h-8">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalManualZoom(true);
+                    setModalZoom((z) => Math.max(0.3, +(z - 0.1).toFixed(2)));
+                  }}
+                  className="px-2 h-full text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                  aria-label="Zoom out"
+                >
+                  <ZoomOut className="h-3.5 w-3.5" />
+                </button>
+                <span className="px-2 text-[11px] font-mono text-[#1F1E1C]">
+                  {Math.round(modalZoom * 100)}%
                 </span>
-                <div>
-                  <h3 className="text-sm font-semibold text-[#1F1E1C]">Download Word Document</h3>
-                  <p className="text-xs text-[#66645E]">Choose a file name before saving your `.docx`.</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalManualZoom(true);
+                    setModalZoom((z) => Math.min(1.4, +(z + 0.1).toFixed(2)));
+                  }}
+                  className="px-2 h-full text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                  aria-label="Zoom in"
+                >
+                  <ZoomIn className="h-3.5 w-3.5" />
+                </button>
+                {modalManualZoom && (
+                  <button
+                    type="button"
+                    onClick={() => setModalManualZoom(false)}
+                    className="border-l border-[#DDD7CB] px-2 h-full text-[10px] font-medium text-[#C86343] hover:bg-[#F4F2EA] cursor-pointer"
+                  >
+                    <RotateCcw className="h-3 w-3 inline mr-0.5" />
+                    Fit
+                  </button>
+                )}
               </div>
-              <button
+
+              <Button type="button" size="sm" onClick={openDownloadPrompt}>
+                <Download className="h-3.5 w-3.5" />
+                <span>Download .docx</span>
+              </Button>
+
+              <Button
                 type="button"
-                onClick={() => setDownloadModalOpen(false)}
-                className="rounded-lg p-1 text-[#66645E] hover:bg-[#F4F2EA] cursor-pointer"
-                aria-label="Cancel download"
+                size="icon"
+                variant="outline"
+                onClick={() => setPreviewModalOpen(false)}
+                aria-label="Close preview modal"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
+          </div>
 
-            <div>
+          <div
+            ref={modalStageRef}
+            className="docx-preview-stage flex-1 overflow-auto bg-[#ECEAE2] p-4 flex justify-center"
+          >
+            <div
+              style={{
+                width: `${Math.round(pagePxW * modalZoom)}px`,
+                height: `${Math.round(pagePxH * modalZoom)}px`,
+                flexShrink: 0,
+              }}
+            >
+              <div
+                ref={modalContainerRef}
+                style={{
+                  width: `${dims.widthPt}pt`,
+                  transform: `scale(${modalZoom})`,
+                  transformOrigin: "top left",
+                }}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Filename Download Modal */}
+      <Dialog open={downloadModalOpen} onOpenChange={setDownloadModalOpen}>
+        <DialogContent>
+          <form onSubmit={confirmDownload}>
+            <DialogHeader>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FDF3EF] text-[#D97757]">
+                    <Download className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <DialogTitle>Download Word Document</DialogTitle>
+                    <DialogDescription>Choose a file name before saving your `.docx`.</DialogDescription>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setDownloadModalOpen(false)}
+                  aria-label="Cancel download"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </DialogHeader>
+
+            <div className="px-5 py-2">
               <label htmlFor="docx-filename" className="block text-xs font-medium text-[#57544E] mb-1.5">
                 File name
               </label>
-              <div className="flex items-center rounded-xl border border-[#E0DDD3] bg-[#FAF9F5] focus-within:border-[#1F1E1C] focus-within:bg-white overflow-hidden">
-                <input
+              <div className="flex items-center rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] focus-within:border-[#D97757] focus-within:bg-white overflow-hidden">
+                <Input
                   id="docx-filename"
                   type="text"
                   autoFocus
                   value={customFileName}
                   onChange={(e) => setCustomFileName(e.target.value)}
                   placeholder="Weekly-Accomplishment-Report"
-                  className="flex-1 bg-transparent px-3 py-2 text-sm text-[#1F1E1C] outline-none"
+                  className="border-0 bg-transparent focus:bg-transparent"
                 />
-                <span className="border-l border-[#E0DDD3] bg-[#F4F2EA] px-3 py-2 text-xs font-mono text-[#66645E]">
+                <span className="border-l border-[#DDD7CB] bg-[#F4F2EA] px-3 py-2 text-xs font-mono text-[#6B665E]">
                   .docx
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDownloadModalOpen(false)}
-                className="rounded-xl border border-[#E0DDD3] bg-white px-4 py-2 text-xs font-medium text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
-              >
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDownloadModalOpen(false)}>
                 Cancel
-              </button>
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1E1C] px-4 py-2 text-xs font-medium text-white hover:bg-[#33312E] cursor-pointer"
-              >
+              </Button>
+              <Button type="submit">
                 <Download className="h-3.5 w-3.5" />
                 <span>Download</span>
-              </button>
-            </div>
+              </Button>
+            </DialogFooter>
           </form>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
