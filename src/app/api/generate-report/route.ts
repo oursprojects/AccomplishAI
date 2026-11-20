@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import { normalizeDateToLongFormat } from "@/lib/internship-calendar";
+import { sanitizeAccomplishmentLines } from "@/lib/report-task-format";
 import { groqErrorResponse, groqJson } from "@/lib/ai/groq";
 import { DAYS, REPORT_FIELD_META, REPORT_KEYS, reportDataSchema, type ReportData } from "@/lib/report-schema";
 
@@ -71,7 +72,7 @@ Return a single JSON object with ALL of these string keys (no nested objects/arr
 ${REPORT_KEYS.map((k) => `- "${k}": ${REPORT_FIELD_META[k].description}`).join("\n")}
 
 STRICT ACCOMPLISHED-TASK, PAST-TENSE & TABLE-FIT RULES (the entire report MUST fit cleanly on ONE page):
-1. Include **STRICTLY actual tasks/work accomplished** in \`mon_accomplishments\`–\`fri_accomplishments\` as **past-tense** formal action statements (e.g., "Attended orientation on company rules", "Configured network switches in the server room"). NEVER include arrival times, departure/going-home times ("Arrived 7 AM", "Went home at 9 PM"), breaks, or commute notes. Never include markdown symbols or small talk.
+1. Every entry in \`mon_accomplishments\`–\`fri_accomplishments\` MUST begin with an English **past-tense** action verb (e.g., "Attended orientation on company rules", "Configured network switches") and include **STRICTLY actual work/tasks accomplished**. NEVER use present tense or \`-ing\` verbs. NEVER include arrival times, departure/going-home times ("Arrived 7 AM", "Went home at 9 PM"), breaks, or commute notes. Never include markdown symbols or small talk.
 2. Keep each worked day to **1-${aiSettings.maxBulletsPerDay} concise lines** (maximum ~12 words / <= 95 chars per line).
 3. Separate multiple items for the same day/section with a single newline ("\\n"). Do NOT add bullet symbols ("-", "•", "1.").
 4. Leave unmentioned days completely blank (""). Never invent tasks.
@@ -133,8 +134,16 @@ STRICT ACCOMPLISHED-TASK, PAST-TENSE & TABLE-FIT RULES (the entire report MUST f
     parsed.intern_name_last_first = parsed.intern_name_last_first.toUpperCase();
     parsed.intern_name_first_last = parsed.intern_name_first_last.toUpperCase();
     for (const d of DAYS) {
+      parsed[`${d}_accomplishments`] = sanitizeAccomplishmentLines(
+        parsed[`${d}_accomplishments`],
+        aiSettings.maxBulletsPerDay,
+        true,
+      );
       parsed[`${d}_verified_by`] = parsed[`${d}_verified_by`].toUpperCase();
     }
+    parsed.new_trainings = sanitizeAccomplishmentLines(parsed.new_trainings, 2, false);
+    parsed.problems_encountered = sanitizeAccomplishmentLines(parsed.problems_encountered, 2, false);
+    parsed.solutions_done = sanitizeAccomplishmentLines(parsed.solutions_done, 2, false);
     parsed.date_from = normalizeDateToLongFormat(parsed.date_from);
     parsed.date_to = normalizeDateToLongFormat(parsed.date_to);
 

@@ -8,6 +8,7 @@ import {
   parseHoursNumber,
   resolveWeekNumber,
 } from "@/lib/internship-calendar";
+import { sanitizeAccomplishmentLines } from "@/lib/report-task-format";
 import { groqErrorResponse } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage, type GroqTool } from "@/lib/ai/chat-tools";
 import type { Json } from "@/lib/supabase/database.types";
@@ -35,7 +36,6 @@ const requestSchema = z.object({
   currentData: reportDataStrictSchema,
 });
 
-const BULLET_PREFIX = /^\s*(?:[-*•▪◦·–—]|\d+[.)])\s+/gm;
 const INLINE_MARKDOWN = /[*_`]/g;
 
 function cleanFieldValue(key: ReportKey, raw: unknown, maxDayBullets: number): string {
@@ -46,12 +46,7 @@ function cleanFieldValue(key: ReportKey, raw: unknown, maxDayBullets: number): s
   if (REPORT_FIELD_META[key].kind === "list") {
     const isReflection = key === "new_trainings" || key === "problems_encountered" || key === "solutions_done";
     const maxLines = isReflection ? 2 : maxDayBullets;
-    return str
-      .split(/\r?\n/)
-      .map((l) => l.replace(BULLET_PREFIX, "").trim().slice(0, 100))
-      .filter(Boolean)
-      .slice(0, maxLines)
-      .join("\n");
+    return sanitizeAccomplishmentLines(str, maxLines, !isReflection);
   }
   const trimmed = str.trim().slice(0, 120);
   if (key === "date_from" || key === "date_to") {
@@ -357,12 +352,14 @@ CORE BEHAVIOR & STRICT RULES:
    - \`total_hours_worked\` = \`${prevTotalNum} + hours_this_week\`. Always compute and update \`total_hours_worked\` whenever \`hours_this_week\` is known or calculated!
 4. **Always Execute Real CRUD Tools:**
    - Whenever the user asks to **add, fill, translate, edit, update, replace, remove, delete, or clear** anything on the report, **ALWAYS call \`set_report_fields\` or \`clear_report_fields\`** BEFORE replying.
-5. **Strictly Accomplished Tasks Only:** For \`mon_accomplishments\` through \`fri_accomplishments\`, record **ONLY actual work/tasks accomplished**. **NEVER** put arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*), commute/boarding-house notes, or lunch breaks inside accomplishment entries.
+5. **Strictly Past-Tense & Task-Focused Only:**
+   - Every item in \`mon_accomplishments\`–\`fri_accomplishments\` MUST begin with an English **past-tense** action verb (e.g., *Attended, Assisted, Built, Configured, Created, Debugged, Designed, Developed, Implemented, Integrated, Merged, Prepared, Published, Redesigned, Refined, Reviewed, Tested, Updated*) and describe **ONLY accomplished work tasks**.
+   - **NEVER** use present tense or \`-ing\` verbs. **NEVER** include arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*, *"Dismissed at 4:30 PM"*), lunch breaks, or boarding-house/commute notes.
 6. **Verify Before Clearing (No Fake Re-Clears):**
    - If the requested field(s) are **already \`""\`**, DO NOT pretend you cleared them and DO NOT show a table of cleared items—simply reply warmly that those fields are **already cleared / empty**.
-7. **Past-Tense, Concise & Table-Fit:** Keep tool values plain text (no \`**\`, \`*\`, or \`-\` bullets), formalized into crisp **past-tense** English:
+7. **Concise & Table-Fit:** Keep tool values plain text (no \`**\`, \`*\`, or \`-\` bullets), formalized into crisp **past-tense** English:
    - Max **1–${aiSettings.maxBulletsPerDay} short lines** per worked day (\`<= 12 words\` per line, separated by \`\\n\`).
-   - Max **1–2 short lines** for \`new_trainings\`, \`problems_encountered\`, and \`solutions_done\`.
+   - Max **1–2 short lines** for \`new_trainings\`, \`problems_encountered\`, and \`solutions_done\` (also past-tense).
 8. **Friendly & Strictly On-Topic:** Keep a warm, encouraging tone strictly focused on the Weekly Accomplishment Report, internship calendar/hours, and form editing.
 9. **Clean Markdown Formatting (NO HTML Tags):**
    - Format replies in clean Markdown (**bold**, *italic*, and a compact Markdown table **only when fields were actually updated or cleared in this turn**).
