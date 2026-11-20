@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { normalizeDateToLongFormat } from "@/lib/internship-calendar";
 import { groqErrorResponse, groqJson } from "@/lib/ai/groq";
 import { DAYS, REPORT_FIELD_META, REPORT_KEYS, reportDataSchema, type ReportData } from "@/lib/report-schema";
 
@@ -128,6 +129,14 @@ STRICT ACCOMPLISHED-TASK, PAST-TENSE & TABLE-FIT RULES (the entire report MUST f
         }
       }
     }
+
+    parsed.intern_name_last_first = parsed.intern_name_last_first.toUpperCase();
+    parsed.intern_name_first_last = parsed.intern_name_first_last.toUpperCase();
+    for (const d of DAYS) {
+      parsed[`${d}_verified_by`] = parsed[`${d}_verified_by`].toUpperCase();
+    }
+    parsed.date_from = normalizeDateToLongFormat(parsed.date_from);
+    parsed.date_to = normalizeDateToLongFormat(parsed.date_to);
 
     await supabase.from("prompt_usage_logs").insert({
       user_id: user.id,

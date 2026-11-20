@@ -33,6 +33,7 @@ const patchSchema = z.discriminatedUnion("action", [
     activeTextModel: z.enum(textModelIds),
     activeSttModel: z.enum(sttModelIds),
     maxBulletsPerDay: z.coerce.number().int().min(1).max(5),
+    maxChatMessages: z.coerce.number().int().min(4).max(60),
   }),
   z.object({
     action: z.literal("update_member"),
@@ -159,6 +160,7 @@ export async function PATCH(request: Request) {
             active_text_model: body.activeTextModel,
             active_stt_model: body.activeSttModel,
             max_bullets_per_day: body.maxBulletsPerDay,
+            max_chat_messages: body.maxChatMessages,
           },
           { onConflict: "id" },
         );

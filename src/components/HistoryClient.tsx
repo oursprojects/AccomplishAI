@@ -20,7 +20,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { inferNextWeekRange, resolveWeekNumber } from "@/lib/internship-calendar";
+import { inferNextWeekRange, normalizeDateToLongFormat, resolveWeekNumber } from "@/lib/internship-calendar";
 import type { ReportData } from "@/lib/report-schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -256,8 +256,8 @@ export function HistoryClient({
               <p className="text-[11px] text-[#6B665E] truncate">
                 {startDate
                   ? nextWeekPreview
-                    ? `Week 1 started ${startDate} · Next up: Week ${nextWeekPreview.weekNumber} (${nextWeekPreview.fromText} – ${nextWeekPreview.toText})`
-                    : `Week 1 started ${startDate}`
+                    ? `Week 1 started ${normalizeDateToLongFormat(startDate)} · Next up: Week ${nextWeekPreview.weekNumber} (${nextWeekPreview.fromText} – ${nextWeekPreview.toText})`
+                    : `Week 1 started ${normalizeDateToLongFormat(startDate)}`
                   : "Pick the date your internship began so Week 1, Week 2, etc. and hours calculate automatically."}
               </p>
             </div>
@@ -349,14 +349,14 @@ export function HistoryClient({
       )}
 
       {reports.length > 0 && (
-        <div className="relative">
+        <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A847A]" />
           <Input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search saved reports by title, dates, office, or notes..."
-            className="bg-white pl-10"
+            placeholder="Search saved reports by title, dates, or office..."
+            className="bg-white pl-10 h-9"
           />
         </div>
       )}

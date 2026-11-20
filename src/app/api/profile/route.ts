@@ -60,10 +60,10 @@ export async function PUT(request: Request) {
     .upsert(
       {
         id: user.id,
-        name_last_first: parsed.data.name_last_first,
-        name_first_last: parsed.data.name_first_last,
+        name_last_first: parsed.data.name_last_first.toUpperCase(),
+        name_first_last: parsed.data.name_first_last.toUpperCase(),
         office: parsed.data.office || "DNX",
-        default_verifier: parsed.data.default_verifier,
+        default_verifier: parsed.data.default_verifier.toUpperCase(),
         default_daily_hours: parsed.data.default_daily_hours,
         internship_start_date: parsed.data.internship_start_date ?? null,
       },

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { MAX_CHAT_MESSAGES, reportDataStrictSchema } from "@/lib/report-schema";
+import { reportDataStrictSchema } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
 const chatMessageSchema = z.object({
@@ -15,7 +15,7 @@ const patchReportSchema = z.object({
   title: z.string().trim().max(120).optional(),
   rawNotes: z.string().max(15000).optional(),
   structuredData: reportDataStrictSchema.optional(),
-  chatMessages: z.array(chatMessageSchema).max(MAX_CHAT_MESSAGES + 10).optional(),
+  chatMessages: z.array(chatMessageSchema).max(100).optional(),
 });
 
 const uuidSchema = z.string().uuid();

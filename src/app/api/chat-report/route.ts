@@ -2,14 +2,18 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
-import { buildInternshipWeeks, parseHoursNumber, resolveWeekNumber } from "@/lib/internship-calendar";
+import {
+  buildInternshipWeeks,
+  normalizeDateToLongFormat,
+  parseHoursNumber,
+  resolveWeekNumber,
+} from "@/lib/internship-calendar";
 import { groqErrorResponse } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage, type GroqTool } from "@/lib/ai/chat-tools";
 import type { Json } from "@/lib/supabase/database.types";
 import {
   DAYS,
   isReportKey,
-  MAX_CHAT_MESSAGES,
   REPORT_FIELD_META,
   REPORT_KEYS,
   reportDataStrictSchema,
@@ -27,7 +31,7 @@ const requestSchema = z.object({
       }),
     )
     .min(1)
-    .max(MAX_CHAT_MESSAGES + 4),
+    .max(100),
   currentData: reportDataStrictSchema,
 });
 
@@ -49,7 +53,14 @@ function cleanFieldValue(key: ReportKey, raw: unknown, maxDayBullets: number): s
       .slice(0, maxLines)
       .join("\n");
   }
-  return str.trim().slice(0, 120);
+  const trimmed = str.trim().slice(0, 120);
+  if (key === "date_from" || key === "date_to") {
+    return normalizeDateToLongFormat(trimmed);
+  }
+  if (key === "intern_name_last_first" || key === "intern_name_first_last" || key.endsWith("_verified_by")) {
+    return trimmed.toUpperCase();
+  }
+  return trimmed;
 }
 
 function computeStatus(data: ReportData) {
@@ -97,7 +108,7 @@ const TOOLS: GroqTool[] = [
     function: {
       name: "set_report_fields",
       description:
-        "Create or update one or more fields on the Weekly Accomplishment Report. Pass ONLY the fields being set or updated with non-empty values. When adding or deleting a single line inside a multi-line field, pass the complete updated lines separated by \\n.",
+        "Create or update one or more fields on the Weekly Accomplishment Report. Pass ONLY the fields being set or updated with non-empty values. Use exact 'Month Day, Year' format (e.g. 'November 9, 2026') for date_from and date_to, and ALL CAPS for names.",
       parameters: {
         type: "object",
         properties: Object.fromEntries(
@@ -146,10 +157,10 @@ const TOOLS: GroqTool[] = [
       parameters: {
         type: "object",
         properties: {
-          name_last_first: { type: "string", description: "Format: LASTNAME, FIRSTNAME MI." },
-          name_first_last: { type: "string", description: "Format: FIRSTNAME MI. LASTNAME" },
+          name_last_first: { type: "string", description: "ALL CAPS format: LASTNAME, FIRSTNAME MI." },
+          name_first_last: { type: "string", description: "ALL CAPS format: FIRSTNAME MI. LASTNAME" },
           office: { type: "string" },
-          default_verifier: { type: "string" },
+          default_verifier: { type: "string", description: "ALL CAPS verifier name" },
           internship_start_date: {
             type: "string",
             description: "ISO date YYYY-MM-DD of when Week 1 began (e.g. 2026-11-09).",
@@ -216,16 +227,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: body.error.issues[0]?.message ?? "Invalid chat request." }, { status: 400 });
   }
 
-  if (body.data.messages.length > MAX_CHAT_MESSAGES) {
+  const [aiSettings, quotaBefore] = await Promise.all([
+    getAiSettings(supabase),
+    getUserQuotaStatus(supabase, user.id, user.email),
+  ]);
+
+  const maxChatMessages = aiSettings.maxChatMessages;
+
+  if (body.data.messages.length > maxChatMessages) {
     return NextResponse.json(
       {
-        error: `Conversation context limit reached (${MAX_CHAT_MESSAGES} messages). Click Clear Chat to start a fresh thread — your document fields stay safe.`,
+        error: `Conversation context limit reached (${maxChatMessages} messages). Click Clear Chat to start a fresh thread — your document fields stay safe.`,
       },
       { status: 400 },
     );
   }
 
-  const quotaBefore = await getUserQuotaStatus(supabase, user.id, user.email);
   if (quotaBefore.isBlocked) {
     return NextResponse.json(
       { error: "Your AI prompt access is currently paused by the admin." },
@@ -252,8 +269,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const [aiSettings, { data: profile }, { data: recentReports }] = await Promise.all([
-    getAiSettings(supabase),
+  const [{ data: profile }, { data: recentReports }] = await Promise.all([
     supabase
       .from("profiles")
       .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date")
@@ -269,16 +285,15 @@ export async function POST(request: Request) {
 
   const workingData: ReportData = { ...body.data.currentData };
   if (!workingData.intern_name_last_first && profile?.name_last_first) {
-    workingData.intern_name_last_first = profile.name_last_first;
+    workingData.intern_name_last_first = profile.name_last_first.toUpperCase();
   }
   if (!workingData.intern_name_first_last && profile?.name_first_last) {
-    workingData.intern_name_first_last = profile.name_first_last;
+    workingData.intern_name_first_last = profile.name_first_last.toUpperCase();
   }
   if (!workingData.office) {
     workingData.office = profile?.office || "DNX";
   }
 
-  // Find previous report (excluding the currently active reportId so it never reads itself)
   const previousReports = (recentReports ?? [])
     .filter((r) => !body.data.reportId || r.id !== body.data.reportId)
     .map((r) => {
@@ -327,28 +342,27 @@ Previous report summary (for cumulative hours & date continuity): ${JSON.stringi
 Current report fields (exact live state): ${JSON.stringify(workingData)}
 
 CORE BEHAVIOR & STRICT RULES:
-1. **Calendar-Aware Week Dates (Monday to Friday):**
+1. **Exact Date & Name Formatting:**
+   - Dates (\`date_from\`, \`date_to\`) MUST ALWAYS be formatted as **Month Day, Year** (e.g. **November 9, 2026** and **November 13, 2026**) — NEVER numeric like \`11-09-2026\` or \`2026-11-09\`.
+   - All person names (\`intern_name_last_first\`, \`intern_name_first_last\`, and \`mon_verified_by\`–\`fri_verified_by\`) MUST be **ALL CAPITAL LETTERS** (e.g. \`SANTIAGO, MIKE RYNO\`, \`MIKE RYNO SANTIAGO\`).
+2. **Calendar-Aware Week Dates (Monday to Friday):**
    - Every Weekly Accomplishment Report strictly covers **Monday (\`date_from\`) to Friday (\`date_to\`)**.
-   - Use \`Internship Mon–Fri Calendar\` above when resolving "1st week", "Week 2", "this week", etc. (e.g., if Week 1 started Monday November 9, 2026, Week 1 is **November 9, 2026** to **November 13, 2026**, Week 2 is **November 16, 2026** to **November 20, 2026**, etc.).
+   - Use \`Internship Mon–Fri Calendar\` above when resolving "1st week", "Week 2", "this week", etc.
    - If the user mentions when their internship began (e.g. *"we started November 9"*), call \`save_profile_defaults\` with \`internship_start_date: "YYYY-MM-DD"\` AND set \`date_from\`/\`date_to\` using that week's Monday–Friday.
-2. **Cumulative Total Hours Worked (\`total_hours_worked\`):**
-   - \`hours_this_week\` = hours worked in THIS week's report.
-   - \`total_hours_worked\` ("Total No. of Hours Worked (previous week/s plus this week)") = \`${prevTotalNum} + hours_this_week\`. Always compute and update \`total_hours_worked\` whenever \`hours_this_week\` is known or calculated!
-3. **Always Execute Real CRUD Tools:**
-   - Whenever the user asks to **add, fill, translate, edit, update, replace, remove, delete, or clear** anything on the report, **ALWAYS call \`set_report_fields\` or \`clear_report_fields\`** BEFORE replying. NEVER reply saying a field was updated or cleared without actually calling the tool!
-   - When adding a bullet to an existing day/section, keep existing lines and append the new line separated by \`\\n\`.
-   - When deleting one bullet from a multi-line day/section, call \`set_report_fields\` with the remaining lines only (or \`clear_report_fields\` if removing the entire field).
-4. **Strictly Accomplished Tasks Only:** For \`mon_accomplishments\` through \`fri_accomplishments\`, record **ONLY actual work/tasks accomplished**. **NEVER** put arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*, *"Dismissed at 4:30 PM"*), commute/boarding-house notes, or lunch breaks inside accomplishment entries.
-5. **Verify Before Clearing (No Fake Re-Clears):**
-   - Check \`Current report fields\` (or \`get_report_fields\`) before clearing.
+3. **Cumulative Total Hours Worked (\`total_hours_worked\`):**
+   - \`total_hours_worked\` = \`${prevTotalNum} + hours_this_week\`. Always compute and update \`total_hours_worked\` whenever \`hours_this_week\` is known or calculated!
+4. **Always Execute Real CRUD Tools:**
+   - Whenever the user asks to **add, fill, translate, edit, update, replace, remove, delete, or clear** anything on the report, **ALWAYS call \`set_report_fields\` or \`clear_report_fields\`** BEFORE replying.
+5. **Strictly Accomplished Tasks Only:** For \`mon_accomplishments\` through \`fri_accomplishments\`, record **ONLY actual work/tasks accomplished**. **NEVER** put arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*), commute/boarding-house notes, or lunch breaks inside accomplishment entries.
+6. **Verify Before Clearing (No Fake Re-Clears):**
    - If the requested field(s) are **already \`""\`**, DO NOT pretend you cleared them and DO NOT show a table of cleared items—simply reply warmly that those fields are **already cleared / empty**.
-6. **Past-Tense, Concise & Table-Fit:** Keep tool values plain text (no \`**\`, \`*\`, or \`-\` bullets), formalized into crisp **past-tense** English:
+7. **Past-Tense, Concise & Table-Fit:** Keep tool values plain text (no \`**\`, \`*\`, or \`-\` bullets), formalized into crisp **past-tense** English:
    - Max **1–${aiSettings.maxBulletsPerDay} short lines** per worked day (\`<= 12 words\` per line, separated by \`\\n\`).
    - Max **1–2 short lines** for \`new_trainings\`, \`problems_encountered\`, and \`solutions_done\`.
-7. **Friendly & Strictly On-Topic:** Keep a warm, encouraging assistant tone, but **ONLY** assist with the Weekly Accomplishment Report, internship calendar/hours, and form editing.
-8. **Clean Markdown Formatting (NO HTML Tags):**
+8. **Friendly & Strictly On-Topic:** Keep a warm, encouraging tone strictly focused on the Weekly Accomplishment Report, internship calendar/hours, and form editing.
+9. **Clean Markdown Formatting (NO HTML Tags):**
    - Format replies in clean Markdown (**bold**, *italic*, and a compact Markdown table **only when fields were actually updated or cleared in this turn**).
-   - **NEVER output \`<br>\`, \`<br/>\` or any raw HTML tags.** Inside a Markdown table cell with multiple items, separate items cleanly with \`; \` (semicolon).`;
+   - **NEVER output \`<br>\`, \`<br/>\` or any raw HTML tags.** Separate multiple items inside a table cell with \`; \`.`;
 
   const recentMessages = body.data.messages.slice(-10);
   const loopMessages: GroqMessage[] = [
@@ -406,7 +420,7 @@ CORE BEHAVIOR & STRICT RULES:
             content: reply,
             ...(toolActions.length ? { toolActions } : {}),
           },
-        ].slice(-MAX_CHAT_MESSAGES);
+        ].slice(-maxChatMessages);
 
         await Promise.all([
           supabase.from("prompt_usage_logs").insert({
@@ -460,7 +474,6 @@ CORE BEHAVIOR & STRICT RULES:
             }
           }
 
-          // Keep total_hours_worked = previous_total + hours_this_week automatically when hours_this_week changes
           if (changed.includes("hours_this_week") && !changed.includes("total_hours_worked")) {
             const weekHoursNum = parseHoursNumber(workingData.hours_this_week);
             if (weekHoursNum !== null) {
@@ -474,9 +487,10 @@ CORE BEHAVIOR & STRICT RULES:
           }
 
           if (profile?.default_verifier) {
+            const upperVerifier = profile.default_verifier.toUpperCase();
             for (const d of DAYS) {
               if (workingData[`${d}_accomplishments`].trim() && !workingData[`${d}_verified_by`].trim()) {
-                workingData[`${d}_verified_by`] = profile.default_verifier;
+                workingData[`${d}_verified_by`] = upperVerifier;
                 updatedKeys.add(`${d}_verified_by`);
               }
             }
@@ -513,16 +527,16 @@ CORE BEHAVIOR & STRICT RULES:
         } else if (name === "save_profile_defaults") {
           const patch: Record<string, string> = {};
           if (typeof args.name_last_first === "string" && args.name_last_first.trim()) {
-            patch.name_last_first = args.name_last_first.trim().slice(0, 120);
+            patch.name_last_first = args.name_last_first.trim().toUpperCase().slice(0, 120);
           }
           if (typeof args.name_first_last === "string" && args.name_first_last.trim()) {
-            patch.name_first_last = args.name_first_last.trim().slice(0, 120);
+            patch.name_first_last = args.name_first_last.trim().toUpperCase().slice(0, 120);
           }
           if (typeof args.office === "string" && args.office.trim()) {
             patch.office = args.office.trim().slice(0, 80);
           }
           if (typeof args.default_verifier === "string" && args.default_verifier.trim()) {
-            patch.default_verifier = args.default_verifier.trim().slice(0, 120);
+            patch.default_verifier = args.default_verifier.trim().toUpperCase().slice(0, 120);
           }
           if (
             typeof args.internship_start_date === "string" &&
@@ -561,7 +575,7 @@ CORE BEHAVIOR & STRICT RULES:
         content: fallbackReply,
         ...(toolActions.length ? { toolActions } : {}),
       },
-    ].slice(-MAX_CHAT_MESSAGES);
+    ].slice(-maxChatMessages);
 
     await Promise.all([
       supabase.from("prompt_usage_logs").insert({

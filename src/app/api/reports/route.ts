@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
-import { inferNextWeekRange } from "@/lib/internship-calendar";
-import { emptyReport, MAX_CHAT_MESSAGES, reportDataStrictSchema } from "@/lib/report-schema";
+import { inferNextWeekRange, normalizeDateToLongFormat } from "@/lib/internship-calendar";
+import { emptyReport, reportDataStrictSchema } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
 const chatMessageSchema = z.object({
@@ -18,7 +18,7 @@ const createReportSchema = z.object({
   title: z.string().trim().max(120).optional().default(""),
   rawNotes: z.string().max(15000).optional().default(""),
   structuredData: reportDataStrictSchema.optional(),
-  chatMessages: z.array(chatMessageSchema).max(MAX_CHAT_MESSAGES + 10).optional(),
+  chatMessages: z.array(chatMessageSchema).max(100).optional(),
   duplicateFromId: z.string().uuid().optional(),
   weekStartDate: z.string().trim().max(40).optional(),
   weekEndDate: z.string().trim().max(40).optional(),
@@ -97,22 +97,24 @@ export async function POST(request: Request) {
         ? (dupReport.structured_data as Record<string, unknown>)
         : null;
 
-    seeded.intern_name_last_first =
+    seeded.intern_name_last_first = (
       (dupSrc && typeof dupSrc.intern_name_last_first === "string" && dupSrc.intern_name_last_first) ||
       profile?.name_last_first ||
-      "";
-    seeded.intern_name_first_last =
+      ""
+    ).toUpperCase();
+    seeded.intern_name_first_last = (
       (dupSrc && typeof dupSrc.intern_name_first_last === "string" && dupSrc.intern_name_first_last) ||
       profile?.name_first_last ||
-      "";
+      ""
+    ).toUpperCase();
     seeded.office =
       (dupSrc && typeof dupSrc.office === "string" && dupSrc.office) ||
       profile?.office ||
       "DNX";
 
     if (parsed.data.weekStartDate && parsed.data.weekEndDate) {
-      seeded.date_from = parsed.data.weekStartDate;
-      seeded.date_to = parsed.data.weekEndDate;
+      seeded.date_from = normalizeDateToLongFormat(parsed.data.weekStartDate);
+      seeded.date_to = normalizeDateToLongFormat(parsed.data.weekEndDate);
     } else {
       const existingPeriods = (existingRows ?? []).map((r) => {
         const obj =

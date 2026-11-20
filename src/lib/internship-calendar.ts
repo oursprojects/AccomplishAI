@@ -54,7 +54,7 @@ export function formatShortDate(d: Date): string {
   return `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
 }
 
-/** Parses formats like "November 9, 2026", "Nov 9, 2026", or "2026-11-09". */
+/** Parses formats like "November 9, 2026", "Nov 9, 2026", "11-09-2026", "11/09/2026", or "2026-11-09". */
 export function parseDisplayDate(input?: string | null): Date | null {
   if (!input) return null;
   const trimmed = input.trim();
@@ -62,9 +62,26 @@ export function parseDisplayDate(input?: string | null): Date | null {
   const iso = parseIsoDate(trimmed);
   if (iso) return iso;
 
+  // Handle MM-DD-YYYY or MM/DD/YYYY explicitly to avoid timezone issues
+  const mdy = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (mdy) {
+    const [, mm, dd, yyyy] = mdy.map(Number);
+    const dt = makeLocalDate(yyyy, mm - 1, dd);
+    if (dt.getFullYear() === yyyy && dt.getMonth() === mm - 1 && dt.getDate() === dd) return dt;
+  }
+
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return null;
   return makeLocalDate(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+/** Normalizes any parseable date string to exact "November 9, 2026" format; falls back to trimmed input. */
+export function normalizeDateToLongFormat(input?: string | null): string {
+  if (!input) return "";
+  const trimmed = input.trim();
+  if (!trimmed) return "";
+  const parsed = parseDisplayDate(trimmed);
+  return parsed ? formatLongDate(parsed) : trimmed;
 }
 
 /** Returns the Monday of the week containing `d` (Mon=0..Sun=6 offset). */

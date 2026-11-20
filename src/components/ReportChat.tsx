@@ -11,13 +11,11 @@ import {
   Undo2,
 } from "lucide-react";
 import type { QuotaStatus } from "@/lib/admin";
-import { DAYS, MAX_CHAT_MESSAGES, type ReportData, type ReportKey } from "@/lib/report-schema";
+import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
 import { ReportPenIcon } from "@/components/icons/AccomplishIcons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { VoiceRecorder } from "./VoiceRecorder";
 import { ChatMarkdown } from "./ChatMarkdown";
 
 export interface ChatTurn {
@@ -32,6 +30,7 @@ interface ReportChatProps {
   reportId: string;
   data: ReportData;
   quota: QuotaStatus;
+  maxChatMessages: number;
   messages: ChatTurn[];
   canUndo: boolean;
   onUndo: () => void;
@@ -56,6 +55,7 @@ export function ReportChat({
   reportId,
   data,
   quota,
+  maxChatMessages,
   messages,
   canUndo,
   onUndo,
@@ -88,8 +88,8 @@ export function ReportChat({
   const missing = getMissingSummary(data);
   const quotaBlocked = !quota.allowed;
   const contextCount = messages.length;
-  const contextAtLimit = contextCount >= MAX_CHAT_MESSAGES;
-  const contextNearLimit = !contextAtLimit && contextCount >= MAX_CHAT_MESSAGES - 4;
+  const contextAtLimit = contextCount >= maxChatMessages;
+  const contextNearLimit = !contextAtLimit && contextCount >= Math.max(2, maxChatMessages - 4);
   const composerDisabled = sending || quotaBlocked || contextAtLimit;
 
   async function sendMessage() {
@@ -146,7 +146,7 @@ export function ReportChat({
   return (
     <Card className="overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="border-b border-[#E6E2D8] px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-[#F7F6F0]">
+      <div className="border-b border-[#E6E2D8] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 bg-[#F7F6F0]">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#D97757] text-white shadow-2xs shrink-0">
             <ReportPenIcon className="h-4 w-4" />
@@ -155,7 +155,7 @@ export function ReportChat({
             <h2 className="text-sm font-semibold text-[#1F1E1C] leading-tight">Report Assistant</h2>
             <p className="text-[11px] text-[#6B665E] truncate">
               {missing.length === 0
-                ? "Auto-updates this report — all main sections filled"
+                ? "Auto-updates this report — main sections filled"
                 : "Auto-updates this report from your English or Tagalog notes"}
             </p>
           </div>
@@ -164,9 +164,9 @@ export function ReportChat({
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge
             variant={contextAtLimit ? "destructive" : contextNearLimit ? "warning" : "outline"}
-            title="Messages in this report's chat context. Clear Chat keeps your filled document intact."
+            title="Messages in this report's chat context (configurable by Admin)."
           >
-            {contextCount}/{MAX_CHAT_MESSAGES} ctx
+            {contextCount}/{maxChatMessages} ctx
           </Badge>
 
           {canUndo && (
@@ -202,7 +202,7 @@ export function ReportChat({
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-4 space-y-3 min-h-[280px] max-h-[54vh] bg-[#FAF9F5]/70"
+        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 min-h-[260px] max-h-[54vh] bg-[#FAF9F5]/70"
       >
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
@@ -251,7 +251,7 @@ export function ReportChat({
 
         {sending && (
           <div className="flex items-start">
-            <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-[#E6E2D8] bg-white px-3.5 py-2.5 text-xs text-[#6B665E] animate-pulse">
+            <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-[#E6E2D8] bg-white px-3.5 py-2 text-xs text-[#6B665E] animate-pulse">
               <ReportPenIcon className="h-3.5 w-3.5 text-[#D97757]" />
               <span>Updating this report...</span>
             </div>
@@ -265,8 +265,8 @@ export function ReportChat({
           <span className="inline-flex items-center gap-1.5">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-700 shrink-0" />
             <span>
-              Chat context limit reached ({MAX_CHAT_MESSAGES} messages). Clear the chat to continue — your filled
-              report fields stay untouched.
+              Chat context limit reached ({maxChatMessages} messages). Clear the chat to continue — your report fields
+              stay untouched.
             </span>
           </span>
           <Button type="button" size="sm" onClick={onClearChat} className="bg-amber-900 hover:bg-amber-800">
@@ -281,60 +281,56 @@ export function ReportChat({
         </div>
       )}
 
-      {/* Composer (no Update button — AI auto-updates the form) */}
+      {/* Compact integrated composer (no mic, no bulky footer) */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void sendMessage();
         }}
-        className="border-t border-[#E6E2D8] bg-white p-3 space-y-2.5"
+        className="border-t border-[#E6E2D8] bg-white p-2.5"
       >
-        <Textarea
-          rows={3}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void sendMessage();
+        <div className="flex items-end gap-2 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 py-1.5 focus-within:border-[#D97757] focus-within:bg-white transition">
+          <textarea
+            rows={2}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void sendMessage();
+              }
+            }}
+            disabled={composerDisabled}
+            placeholder={
+              contextAtLimit
+                ? "Click 'Clear Chat' above to continue..."
+                : "Share your accomplishments or edits... (Enter to send)"
             }
-          }}
-          disabled={composerDisabled}
-          placeholder={
-            contextAtLimit
-              ? "Click 'Clear Chat' to continue chatting — your document fields remain filled."
-              : "Describe what you accomplished (English or Tagalog)... Enter to send"
-          }
-          className="resize-none"
-        />
+            className="flex-1 bg-transparent py-1 text-sm text-[#1F1E1C] placeholder:text-[#8A847A] outline-none resize-none max-h-28 disabled:opacity-60"
+          />
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <VoiceRecorder
-              compact
-              disabled={composerDisabled}
-              onTranscript={(text) => setInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text))}
-            />
+          <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
             <Button
               type="button"
               size="sm"
               variant="outline"
               onClick={onOpenPreview}
-              className="lg:hidden"
+              className="lg:hidden h-8 px-2.5"
+              title="View document preview"
             >
               <Eye className="h-3.5 w-3.5" />
-              <span>Preview</span>
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              variant="accent"
+              disabled={composerDisabled || !input.trim()}
+              className="h-8 px-3"
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>{sending ? "..." : "Send"}</span>
             </Button>
           </div>
-
-          <Button
-            type="submit"
-            variant="accent"
-            disabled={composerDisabled || !input.trim()}
-          >
-            <Send className="h-3.5 w-3.5" />
-            <span>{sending ? "Sending..." : "Send"}</span>
-          </Button>
         </div>
       </form>
     </Card>

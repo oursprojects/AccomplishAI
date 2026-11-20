@@ -55,6 +55,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
   const [activeTextModel, setActiveTextModel] = useState<AllowedTextModel>(initialAiSettings.activeTextModel);
   const [activeSttModel, setActiveSttModel] = useState<AllowedSttModel>(initialAiSettings.activeSttModel);
   const [maxBulletsPerDay, setMaxBulletsPerDay] = useState(initialAiSettings.maxBulletsPerDay);
+  const [maxChatMessages, setMaxChatMessages] = useState(initialAiSettings.maxChatMessages);
 
   const [members, setMembers] = useState<AdminMember[]>(initialMembers);
   const [draftLimits, setDraftLimits] = useState<Record<string, string>>(() =>
@@ -90,6 +91,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
     setActiveTextModel(json.aiSettings.activeTextModel);
     setActiveSttModel(json.aiSettings.activeSttModel);
     setMaxBulletsPerDay(json.aiSettings.maxBulletsPerDay);
+    setMaxChatMessages(json.aiSettings.maxChatMessages);
     setMembers(json.members);
     setDraftLimits(
       Object.fromEntries(json.members.map((m) => [m.userId, m.customDailyLimit === null ? "" : String(m.customDailyLimit)])),
@@ -204,6 +206,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
           activeTextModel,
           activeSttModel,
           maxBulletsPerDay,
+          maxChatMessages,
         }),
       });
       const json = (await res.json()) as {
@@ -481,7 +484,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
             <Badge>GPT-OSS 120B + Whisper v3 Turbo</Badge>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs font-medium text-[#4A463F] mb-1">Primary Chat / Report Model</label>
               <select
@@ -535,6 +538,21 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
                 Keeps daily task tables compact inside the 1-page .docx layout (recommended: 3).
               </p>
             </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[#4A463F] mb-1">Max Chat Context Messages</label>
+              <Input
+                type="number"
+                min={4}
+                max={60}
+                value={maxChatMessages}
+                onChange={(e) => setMaxChatMessages(Math.max(4, Math.min(60, Number(e.target.value) || 16)))}
+                className="text-xs font-semibold"
+              />
+              <p className="mt-1 text-[11px] text-[#7A746B]">
+                Messages kept per report chat before prompting Clear Chat (default: 16).
+              </p>
+            </div>
           </div>
 
           <div className="flex justify-end">
@@ -559,16 +577,16 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
             <Input
               type="email"
               required
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
               placeholder="intern@email.com"
-              className="sm:col-span-4"
+              className="md:col-span-4 h-9"
             />
-            <div className="relative sm:col-span-3">
+            <div className="relative md:col-span-3">
               <Input
                 type={showNewPassword ? "text" : "password"}
                 required
@@ -576,7 +594,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Temp password (min 6)"
-                className="pr-9"
+                className="pr-9 h-9"
               />
               <button
                 type="button"
@@ -594,7 +612,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
               value={newLimit}
               onChange={(e) => setNewLimit(e.target.value)}
               placeholder={`Prompts (${defaultLimit}/d)`}
-              className="sm:col-span-2 text-xs"
+              className="md:col-span-2 h-9 text-xs"
             />
             <Input
               type="number"
@@ -602,11 +620,11 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
               max={10000}
               value={newMaxReports}
               onChange={(e) => setNewMaxReports(e.target.value)}
-              placeholder="Max reports (∞)"
-              className="sm:col-span-2 text-xs"
+              placeholder="Reports (∞)"
+              className="md:col-span-1 h-9 text-xs"
             />
-            <Button type="submit" variant="accent" disabled={creating} className="sm:col-span-1 w-full">
-              {creating ? "..." : "Create"}
+            <Button type="submit" variant="accent" disabled={creating} className="md:col-span-2 h-9">
+              {creating ? "Creating..." : "Create Account"}
             </Button>
           </div>
         </form>

@@ -41,6 +41,7 @@ interface WorkspaceClientProps {
     chat_messages: ChatTurn[];
   };
   initialQuota: QuotaStatus;
+  maxChatMessages?: number;
 }
 
 type WorkspaceTab = "chat" | "edit" | "preview";
@@ -80,6 +81,7 @@ export function WorkspaceClient({
   initialReview,
   initialReport,
   initialQuota,
+  maxChatMessages = 16,
 }: WorkspaceClientProps) {
   const [review, setReview] = useState<TemplateReview | null>(initialReview);
   const [quota, setQuota] = useState<QuotaStatus>(initialQuota);
@@ -450,6 +452,7 @@ export function WorkspaceClient({
               reportId={initialReport.id}
               data={data}
               quota={quota}
+              maxChatMessages={maxChatMessages}
               messages={messages}
               canUndo={undoStack.length > 0}
               onUndo={handleUndo}

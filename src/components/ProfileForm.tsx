@@ -82,8 +82,9 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
           <Input
             type="text"
             value={form.name_last_first}
-            onChange={(e) => setForm({ ...form, name_last_first: e.target.value })}
+            onChange={(e) => setForm({ ...form, name_last_first: e.target.value.toUpperCase() })}
             placeholder="DELA CRUZ, JUAN A."
+            className="uppercase"
           />
         </div>
 
@@ -98,7 +99,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
                 size="sm"
                 variant="secondary"
                 onClick={() => {
-                  const formatted = deriveSignatureName(form.name_last_first);
+                  const formatted = deriveSignatureName(form.name_last_first).toUpperCase();
                   if (formatted) setForm({ ...form, name_first_last: formatted });
                 }}
                 className="h-6 px-2 text-[11px] text-[#C86343]"
@@ -111,8 +112,9 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
           <Input
             type="text"
             value={form.name_first_last}
-            onChange={(e) => setForm({ ...form, name_first_last: e.target.value })}
+            onChange={(e) => setForm({ ...form, name_first_last: e.target.value.toUpperCase() })}
             placeholder="JUAN A. DELA CRUZ"
+            className="uppercase"
           />
         </div>
 
@@ -151,8 +153,9 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
           <Input
             type="text"
             value={form.default_verifier}
-            onChange={(e) => setForm({ ...form, default_verifier: e.target.value })}
+            onChange={(e) => setForm({ ...form, default_verifier: e.target.value.toUpperCase() })}
             placeholder="Optional — leave blank for wet-ink initials"
+            className="uppercase"
           />
         </div>
 

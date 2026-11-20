@@ -13,7 +13,7 @@ import {
   UserCheck,
   X,
 } from "lucide-react";
-import { parseHoursNumber } from "@/lib/internship-calendar";
+import { normalizeDateToLongFormat, parseHoursNumber } from "@/lib/internship-calendar";
 import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
 import { AccomplishCheckIcon } from "@/components/icons/AccomplishIcons";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,10 @@ export function ReportEditor({
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   function setField(key: ReportKey, value: string) {
+    if (key === "intern_name_last_first" || key === "intern_name_first_last" || key.endsWith("_verified_by")) {
+      onChange({ ...data, [key]: value.toUpperCase() });
+      return;
+    }
     if (key === "hours_this_week") {
       const weekNum = parseHoursNumber(value);
       const prevNum = parseHoursNumber(previousTotalHours) ?? 0;
@@ -248,6 +252,10 @@ export function ReportEditor({
               type="text"
               value={data.date_from}
               onChange={(e) => setField("date_from", e.target.value)}
+              onBlur={() => {
+                const norm = normalizeDateToLongFormat(data.date_from);
+                if (norm !== data.date_from) setField("date_from", norm);
+              }}
               placeholder="November 9, 2026"
             />
           </div>
@@ -257,6 +265,10 @@ export function ReportEditor({
               type="text"
               value={data.date_to}
               onChange={(e) => setField("date_to", e.target.value)}
+              onBlur={() => {
+                const norm = normalizeDateToLongFormat(data.date_to);
+                if (norm !== data.date_to) setField("date_to", norm);
+              }}
               placeholder="November 13, 2026"
             />
           </div>

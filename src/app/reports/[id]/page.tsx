@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { getUserQuotaStatus } from "@/lib/admin";
+import { getAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import { ensureFastActiveTemplateReview } from "@/lib/templates/pipeline";
 import { reportDataSchema, type ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
@@ -48,7 +48,7 @@ async function ReportDetailContent({
     notFound();
   }
 
-  const [{ data: profile }, review, quota, reportRes, latestReportsRes] = await Promise.all([
+  const [{ data: profile }, review, quota, aiSettings, reportRes, latestReportsRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date")
@@ -56,6 +56,7 @@ async function ReportDetailContent({
       .maybeSingle(),
     ensureFastActiveTemplateReview(supabase, user.id).catch(() => null),
     getUserQuotaStatus(supabase, user.id, user.email),
+    getAiSettings(supabase),
     supabase
       .from("reports")
       .select("id, title, raw_notes, structured_data, chat_messages, created_at")
@@ -115,6 +116,7 @@ async function ReportDetailContent({
         initialReview={review}
         initialReport={initialReport}
         initialQuota={quota}
+        maxChatMessages={aiSettings.maxChatMessages}
       />
     </AppShell>
   );

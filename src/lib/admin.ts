@@ -43,6 +43,7 @@ export interface AiRuntimeSettings {
   activeTextModel: AllowedTextModel;
   activeSttModel: AllowedSttModel;
   maxBulletsPerDay: number;
+  maxChatMessages: number;
 }
 
 export function isAdminEmail(email?: string | null): boolean {
@@ -71,7 +72,7 @@ export interface QuotaStatus {
 export async function getAiSettings(supabase: SupabaseClient<Database>): Promise<AiRuntimeSettings> {
   const { data } = await supabase
     .from("admin_settings")
-    .select("default_daily_prompt_limit, default_max_reports, active_text_model, active_stt_model, max_bullets_per_day")
+    .select("default_daily_prompt_limit, default_max_reports, active_text_model, active_stt_model, max_bullets_per_day, max_chat_messages")
     .eq("id", 1)
     .maybeSingle();
 
@@ -84,6 +85,7 @@ export async function getAiSettings(supabase: SupabaseClient<Database>): Promise
     activeTextModel: (textValid ? data!.active_text_model : "openai/gpt-oss-120b") as AllowedTextModel,
     activeSttModel: (sttValid ? data!.active_stt_model : "whisper-large-v3-turbo") as AllowedSttModel,
     maxBulletsPerDay: data?.max_bullets_per_day ?? 3,
+    maxChatMessages: data?.max_chat_messages ?? 16,
   };
 }
 
