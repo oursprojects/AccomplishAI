@@ -144,10 +144,38 @@ export function enhanceCsuPreviewChrome(
       article.style.marginBottom = "0";
       article.style.flexShrink = "0";
 
-      // Ensure tables stay crisp and centered without clipping
-      article.querySelectorAll<HTMLTableElement>("table").forEach((tbl) => {
+      // Ensure tables stay crisp, centered, and keep Day cells & bullet indents well inside borders
+      const articleTables = article.querySelectorAll<HTMLTableElement>("table");
+      articleTables.forEach((tbl) => {
         tbl.style.maxWidth = "100%";
       });
+
+      const mainTbl = articleTables[1];
+      if (mainTbl) {
+        const rows = mainTbl.querySelectorAll<HTMLTableRowElement>("tr");
+        rows.forEach((row, rIdx) => {
+          const cells = row.querySelectorAll<HTMLTableCellElement>("td, th");
+          cells.forEach((td) => {
+            if (!td.style.paddingLeft || td.style.paddingLeft === "0px" || td.style.paddingLeft === "0pt") {
+              td.style.paddingLeft = "4.5pt";
+            }
+            if (!td.style.paddingRight || td.style.paddingRight === "0px" || td.style.paddingRight === "0pt") {
+              td.style.paddingRight = "4.5pt";
+            }
+          });
+          if (rIdx >= 1 && rIdx <= 5 && cells[0]) {
+            const dayTxt = (cells[0].textContent ?? "").trim();
+            if (/^[MTWTF]$/.test(dayTxt)) {
+              cells[0].style.textAlign = "center";
+              cells[0].querySelectorAll<HTMLElement>("p").forEach((p) => {
+                p.style.textAlign = "center";
+                p.style.marginLeft = "0";
+                p.style.textIndent = "0";
+              });
+            }
+          }
+        });
+      }
 
       // Fit <article> cleanly between <header> and <footer> using untransformed CSS layout
       // metrics (clientHeight/offsetHeight/scrollHeight) so parent zoom transforms on mobile
