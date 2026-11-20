@@ -10,13 +10,14 @@ const CHAT_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-
 function shouldFallback(err: unknown): boolean {
   if (!err || typeof err !== "object" || !("status" in err)) return false;
   const status = (err as { status?: number }).status;
-  return status === 429 || status === 404 || status === 503;
+  return status === 400 || status === 429 || status === 404 || status === 503;
 }
 
 /** Run a chat completion with tool calling and automatic model fallback across active Groq models. */
 export async function groqChatWithTools(opts: {
   messages: GroqMessage[];
   tools?: GroqTool[];
+  toolChoice?: "auto" | "required";
   temperature?: number;
   maxTokens?: number;
   preferredModel?: string;
@@ -28,13 +29,16 @@ export async function groqChatWithTools(opts: {
 
   for (const model of models) {
     try {
+      const supportsReasoningEffort = model.startsWith("openai/gpt-oss");
       const completion = await getGroq().chat.completions.create({
         model,
         temperature: opts.temperature ?? 0.2,
         max_completion_tokens: opts.maxTokens ?? 1500,
-        reasoning_effort: "low",
+        ...(supportsReasoningEffort ? { reasoning_effort: "low" as const } : {}),
         messages: opts.messages,
-        ...(opts.tools?.length ? { tools: opts.tools, tool_choice: "auto" as const } : {}),
+        ...(opts.tools?.length
+          ? { tools: opts.tools, tool_choice: opts.toolChoice ?? ("auto" as const) }
+          : {}),
       });
       return { completion, model };
     } catch (err) {

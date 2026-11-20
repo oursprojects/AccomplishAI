@@ -70,7 +70,6 @@ export function ReportChat({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const turnSeqRef = useRef(0);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -98,7 +97,7 @@ export function ReportChat({
     if (!text || composerDisabled) return;
 
     setError(null);
-    const userTurn: ChatTurn = { id: `u-${++turnSeqRef.current}`, role: "user", content: text };
+    const userTurn: ChatTurn = { id: `u-${crypto.randomUUID()}`, role: "user", content: text };
     const nextHistory = [...messages, userTurn];
     onMessagesChange(nextHistory);
     setInput("");
@@ -125,12 +124,12 @@ export function ReportChat({
       if (json.quota) onQuotaChange(json.quota);
       if (!res.ok || !json.reply) throw new Error(json.error ?? "Could not reach AI assistant.");
 
-      if (json.structuredData && (json.updatedKeys?.length ?? 0) > 0) {
+      if (json.structuredData && JSON.stringify(json.structuredData) !== JSON.stringify(data)) {
         onAiDataUpdate(json.structuredData);
       }
 
       const assistantTurn: ChatTurn = {
-        id: `a-${++turnSeqRef.current}`,
+        id: `a-${crypto.randomUUID()}`,
         role: "assistant",
         content: json.reply,
         toolActions: json.toolActions,

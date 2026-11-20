@@ -24,7 +24,7 @@ export class MissingGroqKeyError extends Error {
 
 function shouldFallback(err: unknown): boolean {
   if (!(err instanceof Groq.APIError)) return false;
-  return err.status === 429 || err.status === 404 || err.status === 503;
+  return err.status === 400 || err.status === 429 || err.status === 404 || err.status === 503;
 }
 
 /** Run a JSON-mode chat completion with automatic fallback across active Groq models. */
@@ -71,6 +71,7 @@ export type GroqTool = Groq.Chat.Completions.ChatCompletionTool;
 export async function groqChatWithTools(opts: {
   messages: GroqMessage[];
   tools?: GroqTool[];
+  toolChoice?: "auto" | "required";
   temperature?: number;
   maxTokens?: number;
   preferredModel?: string;
@@ -82,13 +83,16 @@ export async function groqChatWithTools(opts: {
 
   for (const model of models) {
     try {
+      const supportsReasoningEffort = model.startsWith("openai/gpt-oss");
       const completion = await getGroq().chat.completions.create({
         model,
         temperature: opts.temperature ?? 0.2,
         max_completion_tokens: opts.maxTokens ?? 1500,
-        reasoning_effort: "low",
+        ...(supportsReasoningEffort ? { reasoning_effort: "low" as const } : {}),
         messages: opts.messages,
-        ...(opts.tools?.length ? { tools: opts.tools, tool_choice: "auto" as const } : {}),
+        ...(opts.tools?.length
+          ? { tools: opts.tools, tool_choice: opts.toolChoice ?? ("auto" as const) }
+          : {}),
       });
       return { completion, model };
     } catch (err) {

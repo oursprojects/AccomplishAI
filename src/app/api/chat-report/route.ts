@@ -35,7 +35,9 @@ const INLINE_MARKDOWN = /[*_`]/g;
 
 function cleanFieldValue(key: ReportKey, raw: unknown, maxDayBullets: number): string {
   if (raw === null || raw === undefined) return "";
-  const str = (Array.isArray(raw) ? raw.map(String).join("\n") : String(raw)).replace(INLINE_MARKDOWN, "");
+  const str = (Array.isArray(raw) ? raw.map(String).join("\n") : String(raw))
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(INLINE_MARKDOWN, "");
   if (REPORT_FIELD_META[key].kind === "list") {
     const isReflection = key === "new_trainings" || key === "problems_encountered" || key === "solutions_done";
     const maxLines = isReflection ? 2 : maxDayBullets;
@@ -92,28 +94,43 @@ const TOOLS: GroqTool[] = [
   {
     type: "function",
     function: {
-      name: "update_report_fields",
+      name: "set_report_fields",
       description:
-        "Fill, update, or clear fields on the Weekly Accomplishment Report. Only pass fields mentioned by the user; before clearing fields via clear_fields, verify whether they actually contain data.",
+        "Create or update one or more fields on the Weekly Accomplishment Report. Pass ONLY the fields being set or updated with non-empty values. When adding or deleting a single line inside a multi-line field, pass the complete updated lines separated by \\n.",
+      parameters: {
+        type: "object",
+        properties: Object.fromEntries(
+          REPORT_KEYS.map((k) => [
+            k,
+            {
+              type: "string",
+              description:
+                REPORT_FIELD_META[k].kind === "list"
+                  ? `${REPORT_FIELD_META[k].description}. Strictly accomplished tasks only (no arrival/departure times), past-tense formal lines separated by \\n, max 12 words per line, NO bullet characters.`
+                  : REPORT_FIELD_META[k].description,
+            },
+          ]),
+        ),
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "clear_report_fields",
+      description:
+        "Delete/clear one or more report fields to empty string, or clear all fields when clear_all is true. Checks whether each requested field actually contains content first.",
       parameters: {
         type: "object",
         properties: {
-          ...Object.fromEntries(
-            REPORT_KEYS.map((k) => [
-              k,
-              {
-                type: "string",
-                description:
-                  REPORT_FIELD_META[k].kind === "list"
-                    ? `${REPORT_FIELD_META[k].description}. Strictly accomplished tasks only (no arrival/departure times), past-tense formal lines separated by \\n, max 12 words per line, NO bullet characters.`
-                    : REPORT_FIELD_META[k].description,
-              },
-            ]),
-          ),
-          clear_fields: {
+          fields: {
             type: "array",
             items: { type: "string", enum: [...REPORT_KEYS] },
-            description: "Field keys to clear ONLY if they are currently non-empty.",
+            description: "List of field keys to clear.",
+          },
+          clear_all: {
+            type: "boolean",
+            description: "Set true ONLY if the user explicitly asks to clear/wipe the entire report.",
           },
         },
       },
@@ -139,8 +156,8 @@ const TOOLS: GroqTool[] = [
   {
     type: "function",
     function: {
-      name: "get_report_status",
-      description: "Inspect the current report data to verify which fields are currently filled or already empty.",
+      name: "get_report_fields",
+      description: "Read all current report field values and check which fields are filled or already empty.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -173,6 +190,16 @@ async function persistConversation(
       chat_messages: nextHistory as unknown as Json,
     },
     { onConflict: "user_id" },
+  );
+}
+
+/** Detects when a reply claims to have changed/cleared fields without any mutation tool having executed. */
+function looksLikeUnappliedMutation(reply: string): boolean {
+  return (
+    /\|[^|\n]+\|[^|\n]+\|/.test(reply) ||
+    /\b(i(?:'ve| have)?\s+(?:updated|added|filled|applied|cleared|removed|deleted|set|edited|saved)|report field(?:s)? updated)\b/i.test(
+      reply,
+    )
   );
 }
 
@@ -269,17 +296,21 @@ User profile defaults: ${JSON.stringify({
 Current report fields (exact live state): ${JSON.stringify(workingData)}
 
 CORE BEHAVIOR & STRICT RULES:
-1. **Strictly Accomplished Tasks Only:** For \`mon_accomplishments\` through \`fri_accomplishments\`, record **ONLY actual work/tasks accomplished** (e.g., *"Attended internship orientation and role assignment meeting"*, *"Redesigned and published the DNX Solution landing page"*). **NEVER** put arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*, *"Dismissed at 4:30 PM"*), commute/boarding-house notes, or lunch breaks inside accomplishment entries.
-2. **Apply Immediately & Never Be Strict:** When the user shares notes (English, Tagalog, Taglish, raw notes) or asks for edits, immediately call \`update_report_fields\` and apply everything provided. Never demand empty optional fields (*Verified By*, dates, hours, reflections)—users can fill those manually later or leave them for wet ink.
+1. **Always Execute Real CRUD Tools:**
+   - Whenever the user asks to **add, fill, translate, edit, update, replace, remove, delete, or clear** anything on the report, **ALWAYS call \`set_report_fields\` or \`clear_report_fields\`** BEFORE replying. NEVER reply saying a field was updated or cleared without actually calling the tool!
+   - When adding a bullet to an existing day/section, keep existing lines and append the new line separated by \`\\n\`.
+   - When deleting one bullet from a multi-line day/section, call \`set_report_fields\` with the remaining lines only (or \`clear_report_fields\` if removing the entire field).
+2. **Strictly Accomplished Tasks Only:** For \`mon_accomplishments\` through \`fri_accomplishments\`, record **ONLY actual work/tasks accomplished** (e.g., *"Attended internship orientation and role assignment meeting"*, *"Redesigned and published the DNX Solution landing page"*). **NEVER** put arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*, *"Dismissed at 4:30 PM"*), commute/boarding-house notes, or lunch breaks inside accomplishment entries.
 3. **Verify Before Clearing (No Fake Re-Clears):**
-   - Inspect \`Current report fields\` (or \`get_report_status\`) before saying something was cleared.
-   - If the user asks to clear a field that is **already empty (\`""\`)**, DO NOT call \`update_report_fields\` to clear it again and **DO NOT** display a Markdown table claiming it was cleared—warmly tell them it is **already cleared / empty**.
-   - Only show cleared items in a table if \`cleared\` in the tool result actually cleared non-empty text in this turn.
+   - Check \`Current report fields\` (or \`get_report_fields\`) before clearing.
+   - If the requested field(s) are **already \`""\`**, DO NOT pretend you cleared them and DO NOT show a table of cleared items—simply reply warmly that those fields are **already cleared / empty**.
 4. **Past-Tense, Concise & Table-Fit:** Keep tool values plain text (no \`**\`, \`*\`, or \`-\` bullets), formalized into crisp **past-tense** English:
    - Max **1–${aiSettings.maxBulletsPerDay} short lines** per worked day (\`<= 12 words\` per line, separated by \`\\n\`).
    - Max **1–2 short lines** for \`new_trainings\`, \`problems_encountered\`, and \`solutions_done\`.
-5. **Friendly & Strictly On-Topic:** Keep a warm, encouraging assistant tone, but **ONLY** assist with the Weekly Accomplishment Report, internship task summarization, and form editing. Politely decline unrelated topics (coding homework, trivia, general chat) and guide them back to their report.
-6. **Markdown Output:** Reply cleanly in Markdown (**bold**, *italic*, and a compact Markdown table **only when fields were actually updated or cleared in this turn**). Keep it helpful and concise.`;
+5. **Friendly & Strictly On-Topic:** Keep a warm, encouraging assistant tone, but **ONLY** assist with the Weekly Accomplishment Report, internship task summarization, and form editing. Politely decline unrelated topics and guide them back to their report.
+6. **Clean Markdown Formatting (NO HTML Tags):**
+   - Format replies in clean Markdown (**bold**, *italic*, and a compact Markdown table **only when fields were actually updated or cleared in this turn**).
+   - **NEVER output \`<br>\`, \`<br/>\` or any raw HTML tags.** Inside a Markdown table cell with multiple items, separate items cleanly with \`; \` (semicolon) or list items in bullet points outside the table.`;
 
   const recentMessages = body.data.messages.slice(-10);
   const loopMessages: GroqMessage[] = [
@@ -290,16 +321,21 @@ CORE BEHAVIOR & STRICT RULES:
   const updatedKeys = new Set<ReportKey>();
   const toolActions: string[] = [];
   let usedModel = "";
+  let didMutateThisTurn = false;
+  let forcedToolRetryUsed = false;
+  let nextToolChoice: "auto" | "required" = "auto";
 
   try {
-    for (let step = 0; step < 3; step++) {
+    for (let step = 0; step < 5; step++) {
       const { completion, model } = await groqChatWithTools({
         messages: loopMessages,
         tools: TOOLS,
+        toolChoice: nextToolChoice,
         temperature: 0.2,
         maxTokens: 1500,
         preferredModel: usedModel || aiSettings.activeTextModel,
       });
+      nextToolChoice = "auto";
       usedModel = model;
 
       const msg = completion.choices[0]?.message;
@@ -307,7 +343,23 @@ CORE BEHAVIOR & STRICT RULES:
 
       const toolCalls = msg.tool_calls ?? [];
       if (toolCalls.length === 0) {
-        const reply = (msg.content ?? "").trim() || "Updated your report.";
+        const draftReply = (msg.content ?? "").trim();
+
+        // Anti-hallucination guard: if the LLM claimed it edited/updated/cleared fields
+        // without calling a mutation tool first, force a tool call immediately.
+        if (!didMutateThisTurn && !forcedToolRetryUsed && looksLikeUnappliedMutation(draftReply)) {
+          forcedToolRetryUsed = true;
+          loopMessages.push({ role: "assistant", content: draftReply });
+          loopMessages.push({
+            role: "system",
+            content:
+              "You described updating or clearing report fields without calling a tool. Call set_report_fields or clear_report_fields now so the report data is actually updated.",
+          });
+          nextToolChoice = "required";
+          continue;
+        }
+
+        const reply = (draftReply || "Updated your report.").replace(/<br\s*\/?>/gi, "; ");
         const status = computeStatus(workingData);
 
         const nextHistory = [
@@ -358,11 +410,8 @@ CORE BEHAVIOR & STRICT RULES:
 
         let toolResult: unknown = {};
 
-        if (name === "update_report_fields") {
+        if (name === "set_report_fields" || name === "update_report_fields") {
           const changed: string[] = [];
-          const cleared: string[] = [];
-          const alreadyEmpty: string[] = [];
-
           for (const key of REPORT_KEYS) {
             if (key in args && args[key] !== undefined && args[key] !== null) {
               const cleaned = cleanFieldValue(key, args[key], aiSettings.maxBulletsPerDay);
@@ -370,21 +419,7 @@ CORE BEHAVIOR & STRICT RULES:
                 workingData[key] = cleaned;
                 updatedKeys.add(key);
                 changed.push(key);
-              }
-            }
-          }
-
-          if (Array.isArray(args.clear_fields)) {
-            for (const rawKey of args.clear_fields) {
-              if (isReportKey(rawKey)) {
-                if (workingData[rawKey].trim() !== "") {
-                  workingData[rawKey] = "";
-                  updatedKeys.add(rawKey);
-                  changed.push(rawKey);
-                  cleared.push(rawKey);
-                } else {
-                  alreadyEmpty.push(rawKey);
-                }
+                didMutateThisTurn = true;
               }
             }
           }
@@ -398,20 +433,34 @@ CORE BEHAVIOR & STRICT RULES:
             }
           }
 
-          const updatedCount = changed.filter((k) => !cleared.includes(k)).length;
-          if (updatedCount > 0) {
-            toolActions.push(`Updated ${updatedCount} field${updatedCount === 1 ? "" : "s"}`);
+          if (changed.length > 0) {
+            toolActions.push(`Updated ${changed.length} field${changed.length === 1 ? "" : "s"}`);
           }
+          toolResult = { updated: changed, status: computeStatus(workingData) };
+        } else if (name === "clear_report_fields") {
+          const cleared: string[] = [];
+          const alreadyEmpty: string[] = [];
+          const targets: ReportKey[] = args.clear_all === true
+            ? [...REPORT_KEYS]
+            : Array.isArray(args.fields)
+              ? args.fields.filter(isReportKey)
+              : [];
+
+          for (const key of targets) {
+            if (workingData[key].trim() !== "") {
+              workingData[key] = "";
+              updatedKeys.add(key);
+              cleared.push(key);
+              didMutateThisTurn = true;
+            } else {
+              alreadyEmpty.push(key);
+            }
+          }
+
           if (cleared.length > 0) {
             toolActions.push(`Cleared ${cleared.length} field${cleared.length === 1 ? "" : "s"}`);
           }
-
-          toolResult = {
-            updated: changed,
-            cleared,
-            already_empty: alreadyEmpty,
-            status: computeStatus(workingData),
-          };
+          toolResult = { cleared, already_empty: alreadyEmpty, status: computeStatus(workingData) };
         } else if (name === "save_profile_defaults") {
           const patch: Record<string, string> = {};
           if (typeof args.name_last_first === "string" && args.name_last_first.trim()) {
@@ -431,7 +480,7 @@ CORE BEHAVIOR & STRICT RULES:
             toolActions.push("Saved profile defaults");
           }
           toolResult = { saved: Object.keys(patch) };
-        } else if (name === "get_report_status") {
+        } else if (name === "get_report_fields" || name === "get_report_status") {
           toolResult = { ...computeStatus(workingData), current_data: workingData };
         }
 
@@ -444,15 +493,33 @@ CORE BEHAVIOR & STRICT RULES:
     }
 
     const status = computeStatus(workingData);
-    await supabase.from("prompt_usage_logs").insert({
-      user_id: user.id,
-      kind: "chat_report",
-      model: usedModel || aiSettings.activeTextModel,
-    });
+    const fallbackReply =
+      toolActions.length > 0
+        ? "Your report has been updated in the preview."
+        : "No changes were needed.";
+
+    const nextHistory = [
+      ...body.data.messages.map((m, idx) => ({ id: `h-${idx}`, role: m.role, content: m.content })),
+      {
+        id: `a-${Date.now()}`,
+        role: "assistant" as const,
+        content: fallbackReply,
+        ...(toolActions.length ? { toolActions } : {}),
+      },
+    ].slice(-MAX_CHAT_MESSAGES);
+
+    await Promise.all([
+      supabase.from("prompt_usage_logs").insert({
+        user_id: user.id,
+        kind: "chat_report",
+        model: usedModel || aiSettings.activeTextModel,
+      }),
+      persistConversation(supabase, user.id, body.data.reportId, workingData, nextHistory),
+    ]);
     const quotaAfter = await getUserQuotaStatus(supabase, user.id, user.email);
 
     return NextResponse.json({
-      reply: "Your report has been updated in the preview.",
+      reply: fallbackReply,
       structuredData: workingData,
       updatedKeys: Array.from(updatedKeys),
       toolActions,
