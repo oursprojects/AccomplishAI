@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PizZip from "pizzip";
+import { saveAs } from "file-saver";
 import {
+  Archive,
   Calendar,
   CalendarDays,
   Check,
@@ -17,11 +20,20 @@ import {
   Loader2,
   Pencil,
   Search,
+  Target,
   Trash2,
   X,
 } from "lucide-react";
-import { inferNextWeekRange, normalizeDateToLongFormat, resolveWeekNumber } from "@/lib/internship-calendar";
-import type { ReportData } from "@/lib/report-schema";
+import { DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
+import type { DetectedField } from "@/lib/docx/types";
+import {
+  inferNextWeekRange,
+  normalizeDateToLongFormat,
+  parseDisplayDate,
+  parseHoursNumber,
+  resolveWeekNumber,
+} from "@/lib/internship-calendar";
+import { DAYS, type ReportData } from "@/lib/report-schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -37,23 +49,38 @@ export interface ReportSummary {
   updated_at: string;
 }
 
+type SortMode = "newest" | "oldest" | "week_asc";
+type StatusFilter = "all" | "ready" | "draft";
+
+function isReportReady(d: Partial<ReportData>): boolean {
+  const hasDates = Boolean(d.date_from?.trim() && d.date_to?.trim());
+  const hasTasks = DAYS.some((day) => Boolean(d[`${day}_accomplishments`]?.trim()));
+  const hasHours = Boolean(d.hours_this_week?.trim());
+  return hasDates && hasTasks && hasHours;
+}
+
 export function HistoryClient({
   initialReports,
   maxReports,
   canCreateReport,
   initialStartDate = null,
+  targetOjtHours = 486,
+  exportTemplate = null,
   profileSnapshot,
 }: {
   initialReports: ReportSummary[];
   maxReports: number | null;
   canCreateReport: boolean;
   initialStartDate?: string | null;
+  targetOjtHours?: number;
+  exportTemplate?: { templateId: string; fields: Pick<DetectedField, "key" | "kind">[] } | null;
   profileSnapshot?: {
     name_last_first: string;
     name_first_last: string;
     office: string;
     default_verifier: string;
     default_daily_hours: number;
+    target_ojt_hours: number;
   };
 }) {
   const router = useRouter();
@@ -63,6 +90,10 @@ export function HistoryClient({
   const [savingAnchor, setSavingAnchor] = useState(false);
 
   const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [exportingAll, setExportingAll] = useState(false);
+
   const [creating, setCreating] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -83,24 +114,57 @@ export function HistoryClient({
     })),
   });
 
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredReports = normalizedQuery
-    ? reports.filter((r) => {
-        const d = r.structured_data;
-        const haystack = [
-          r.title,
-          d.date_from,
-          d.date_to,
-          d.office,
-          d.intern_name_last_first,
-          r.raw_notes,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(normalizedQuery);
-      })
-    : reports;
+  // Compute OJT cumulative hours progress cleanly across reports
+  const ojtStats = useMemo(() => {
+    let maxTotal = 0;
+    let sumWeekly = 0;
+    for (const r of reports) {
+      const t = parseHoursNumber(r.structured_data.total_hours_worked);
+      const w = parseHoursNumber(r.structured_data.hours_this_week);
+      if (t !== null && t > maxTotal) maxTotal = t;
+      if (w !== null) sumWeekly += w;
+    }
+    const completed = Math.max(maxTotal, sumWeekly);
+    const pct = Math.min(100, Math.round((completed / Math.max(1, targetOjtHours)) * 100));
+    const remaining = Math.max(0, targetOjtHours - completed);
+    const avgPerWeek = reports.length > 0 && sumWeekly > 0 ? sumWeekly / reports.length : profileSnapshot?.default_daily_hours ? profileSnapshot.default_daily_hours * 5 : 40;
+    const estWeeksLeft = remaining > 0 ? Math.ceil(remaining / Math.max(8, avgPerWeek)) : 0;
+    return { completed, pct, remaining, estWeeksLeft };
+  }, [reports, targetOjtHours, profileSnapshot]);
+
+  const visibleReports = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const list = reports.filter((r) => {
+      if (statusFilter === "ready" && !isReportReady(r.structured_data)) return false;
+      if (statusFilter === "draft" && isReportReady(r.structured_data)) return false;
+      if (!normalizedQuery) return true;
+      const d = r.structured_data;
+      const haystack = [
+        r.title,
+        d.date_from,
+        d.date_to,
+        d.office,
+        d.intern_name_last_first,
+        r.raw_notes,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+
+    if (sortMode === "oldest") {
+      return [...list].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    }
+    if (sortMode === "week_asc") {
+      return [...list].sort((a, b) => {
+        const da = parseDisplayDate(a.structured_data.date_from)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const db = parseDisplayDate(b.structured_data.date_from)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return da - db;
+      });
+    }
+    return list;
+  }, [reports, query, sortMode, statusFilter]);
 
   async function saveAnchorDate(isoDate: string) {
     setSavingAnchor(true);
@@ -115,6 +179,7 @@ export function HistoryClient({
           office: profileSnapshot?.office || "DNX",
           default_verifier: profileSnapshot?.default_verifier ?? "",
           default_daily_hours: profileSnapshot?.default_daily_hours ?? 8,
+          target_ojt_hours: profileSnapshot?.target_ojt_hours ?? targetOjtHours,
           internship_start_date: isoDate || null,
         }),
       });
@@ -127,6 +192,45 @@ export function HistoryClient({
       setError(err instanceof Error ? err.message : "Could not save start date.");
     } finally {
       setSavingAnchor(false);
+    }
+  }
+
+  async function handleExportAllZip() {
+    if (!exportTemplate || reports.length === 0 || exportingAll) return;
+    setExportingAll(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/template-file?templateId=${encodeURIComponent(exportTemplate.templateId)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("Could not load active Word template.");
+      const templateBytes = await res.arrayBuffer();
+
+      const zip = new PizZip();
+      const usedNames = new Map<string, number>();
+
+      for (const r of reports) {
+        const d = r.structured_data;
+        const rawLabel = (r.title.trim() || [d.date_from, d.date_to].filter(Boolean).join("_to_") || r.id.slice(0, 8))
+          .replace(/[^a-zA-Z0-9 _-]+/g, "")
+          .replace(/\s+/g, "-");
+        const count = (usedNames.get(rawLabel) ?? 0) + 1;
+        usedNames.set(rawLabel, count);
+        const fileName = `${count > 1 ? `${rawLabel}-${count}` : rawLabel}.docx`;
+        const filled = fillTemplate(templateBytes, d, exportTemplate.fields);
+        zip.file(fileName, filled);
+      }
+
+      const blob = zip.generate({ type: "blob", mimeType: "application/zip" });
+      if (!(blob instanceof Blob)) {
+        saveAs(new Blob([blob as ArrayBuffer], { type: "application/zip" }), "AccomplishAI-Weekly-Reports.zip");
+      } else {
+        saveAs(blob, "AccomplishAI-Weekly-Reports.zip");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to export .zip (${DOCX_MIME}).`);
+    } finally {
+      setExportingAll(false);
     }
   }
 
@@ -222,27 +326,74 @@ export function HistoryClient({
           </p>
         </div>
 
-        <Button
-          type="button"
-          variant="accent"
-          disabled={!canCreateReport || creating}
-          onClick={() => void handleCreateReport()}
-          title={
-            nextWeekPreview
-              ? `Create Week ${nextWeekPreview.weekNumber} (${nextWeekPreview.fromText} – ${nextWeekPreview.toText})`
-              : "Create a brand-new Weekly Report"
-          }
-        >
-          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
-          <span>
-            {creating
-              ? "Creating..."
-              : nextWeekPreview
-                ? `New Week ${nextWeekPreview.weekNumber} Report`
-                : "New Report"}
-          </span>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {exportTemplate && reports.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={exportingAll}
+              onClick={() => void handleExportAllZip()}
+              title="Download all saved Weekly Accomplishment Reports bundled in a single .zip"
+            >
+              {exportingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5 text-[#D97757]" />}
+              <span>{exportingAll ? "Bundling..." : "Export All (.zip)"}</span>
+            </Button>
+          )}
+
+          <Button
+            type="button"
+            variant="accent"
+            disabled={!canCreateReport || creating}
+            onClick={() => void handleCreateReport()}
+            title={
+              nextWeekPreview
+                ? `Create Week ${nextWeekPreview.weekNumber} (${nextWeekPreview.fromText} – ${nextWeekPreview.toText})`
+                : "Create a brand-new Weekly Report"
+            }
+          >
+            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
+            <span>
+              {creating
+                ? "Creating..."
+                : nextWeekPreview
+                  ? `New Week ${nextWeekPreview.weekNumber} Report`
+                  : "New Report"}
+            </span>
+          </Button>
+        </div>
       </div>
+
+      {/* OJT Hours Progress Card */}
+      <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1.5 flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1F1E1C]">
+              <Target className="h-4 w-4 text-[#D97757]" />
+              <span>OJT Hours Progress</span>
+            </span>
+            <span className="text-xs font-mono font-semibold text-[#1F1E1C]">
+              {ojtStats.completed} / {targetOjtHours} hrs ({ojtStats.pct}%)
+            </span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-[#EFECE3] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-[#D97757] transition-all"
+              style={{ width: `${ojtStats.pct}%` }}
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#6B665E]">
+            <span>
+              {ojtStats.remaining === 0
+                ? "Target OJT hours reached!"
+                : `${ojtStats.remaining} hrs remaining (~${ojtStats.estWeeksLeft} week${ojtStats.estWeeksLeft === 1 ? "" : "s"} left)`}
+            </span>
+            <Link href="/profile" className="font-medium text-[#C86343] hover:underline">
+              Adjust target
+            </Link>
+          </div>
+        </div>
+      </Card>
 
       {/* Internship Calendar Schedule Card */}
       <Card className="overflow-hidden">
@@ -263,12 +414,7 @@ export function HistoryClient({
             </div>
           </div>
 
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setCalendarOpen((v) => !v)}
-          >
+          <Button type="button" size="sm" variant="outline" onClick={() => setCalendarOpen((v) => !v)}>
             {calendarOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             <span>{calendarOpen ? "Hide Calendar" : "Show Calendar"}</span>
           </Button>
@@ -349,15 +495,45 @@ export function HistoryClient({
       )}
 
       {reports.length > 0 && (
-        <div className="relative max-w-md">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A847A]" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search saved reports by title, dates, or office..."
-            className="bg-white pl-10 h-9"
-          />
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="relative flex-1 min-w-[220px] max-w-md">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A847A]" />
+            <Input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search reports by title, dates, or office..."
+              className="bg-white pl-10 h-9"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(["all", "ready", "draft"] as const).map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setStatusFilter(st)}
+                className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium capitalize cursor-pointer transition ${
+                  statusFilter === st
+                    ? "border-[#1F1E1C] bg-[#1F1E1C] text-white"
+                    : "border-[#DDD7CB] bg-white text-[#57544E] hover:bg-[#F4F2EA]"
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+
+            <select
+              aria-label="Sort reports"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+              className="h-8 rounded-lg border border-[#DDD7CB] bg-white px-2.5 text-xs font-medium text-[#1F1E1C] outline-none"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="week_asc">By Week Date</option>
+            </select>
+          </div>
         </div>
       )}
 
@@ -384,17 +560,18 @@ export function HistoryClient({
             </Button>
           </div>
         </Card>
-      ) : filteredReports.length === 0 ? (
+      ) : visibleReports.length === 0 ? (
         <Card className="border-dashed border-[#DDD7CB] p-8 text-center">
-          <p className="text-sm font-medium text-[#1F1E1C]">No reports match &ldquo;{query.trim()}&rdquo;</p>
+          <p className="text-sm font-medium text-[#1F1E1C]">No matching reports found</p>
         </Card>
       ) : (
         <div className="space-y-3">
-          {filteredReports.map((report) => {
+          {visibleReports.map((report) => {
             const d = report.structured_data;
             const dateFallback = [d.date_from, d.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
             const displayTitle = report.title.trim() || dateFallback;
             const wkNum = resolveWeekNumber(startDate, d.date_from ?? "");
+            const ready = isReportReady(d);
             const created = new Date(report.created_at).toLocaleDateString(undefined, {
               year: "numeric",
               month: "short",
@@ -455,6 +632,7 @@ export function HistoryClient({
                         {displayTitle}
                       </Link>
                       {wkNum !== null && <Badge variant="accent">Week {wkNum}</Badge>}
+                      <Badge variant={ready ? "success" : "warning"}>{ready ? "Ready" : "Draft"}</Badge>
                       <button
                         type="button"
                         onClick={() => startRename(report)}
@@ -466,7 +644,7 @@ export function HistoryClient({
                       </button>
                       {d.office && <Badge>{d.office}</Badge>}
                       {d.hours_this_week && (
-                        <Badge variant="success">
+                        <Badge variant="outline">
                           <Clock className="h-3 w-3" />
                           {d.hours_this_week} hrs{d.total_hours_worked ? ` (Total: ${d.total_hours_worked})` : ""}
                         </Badge>

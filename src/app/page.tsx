@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
+import { ensureFastActiveTemplateReview } from "@/lib/templates/pipeline";
 import type { ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
 import { HistoryClient, type ReportSummary } from "@/components/HistoryClient";
@@ -22,7 +23,7 @@ async function ReportsHomeContent({
     redirect(`/reports/${encodeURIComponent(reportId)}`);
   }
 
-  const [{ data }, { data: profile }, quota] = await Promise.all([
+  const [{ data }, { data: profile }, quota, review] = await Promise.all([
     supabase
       .from("reports")
       .select("id, title, raw_notes, structured_data, created_at, updated_at")
@@ -31,10 +32,13 @@ async function ReportsHomeContent({
       .limit(100),
     supabase
       .from("profiles")
-      .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date")
+      .select(
+        "name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date, target_ojt_hours",
+      )
       .eq("id", user.id)
       .maybeSingle(),
     getUserQuotaStatus(supabase, user.id, user.email),
+    ensureFastActiveTemplateReview(supabase, user.id).catch(() => null),
   ]);
 
   const reports: ReportSummary[] = (data ?? []).map((r) => ({
@@ -56,12 +60,22 @@ async function ReportsHomeContent({
         maxReports={quota.maxReports}
         canCreateReport={quota.canCreateReport}
         initialStartDate={profile?.internship_start_date ?? null}
+        targetOjtHours={profile?.target_ojt_hours ?? 486}
+        exportTemplate={
+          review
+            ? {
+                templateId: review.template.id,
+                fields: review.fields.map((f) => ({ key: f.key, kind: f.kind })),
+              }
+            : null
+        }
         profileSnapshot={{
           name_last_first: profile?.name_last_first ?? "",
           name_first_last: profile?.name_first_last ?? "",
           office: profile?.office ?? "DNX",
           default_verifier: profile?.default_verifier ?? "",
           default_daily_hours: profile?.default_daily_hours ?? 8,
+          target_ojt_hours: profile?.target_ojt_hours ?? 486,
         }}
       />
     </AppShell>

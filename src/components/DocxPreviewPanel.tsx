@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { saveAs } from "file-saver";
-import { Download, FileText, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Check, Copy, Download, FileText, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
 import { enhanceCsuPreviewChrome, PAPER_DIMENSIONS, type PaperSize } from "@/lib/docx/csu-template-chrome";
 import type { DetectedField } from "@/lib/docx/types";
-import type { ReportData } from "@/lib/report-schema";
+import { DAYS, type ReportData } from "@/lib/report-schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -68,6 +68,45 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [customFileName, setCustomFileName] = useState("");
+  const [copiedSummary, setCopiedSummary] = useState(false);
+
+  async function handleCopySummaryText() {
+    const dayNames = {
+      mon: "Monday",
+      tue: "Tuesday",
+      wed: "Wednesday",
+      thu: "Thursday",
+      fri: "Friday",
+    } as const;
+    const lines: string[] = [
+      `WEEKLY ACCOMPLISHMENT REPORT${reportTitle ? ` — ${reportTitle}` : ""}`,
+      `Intern: ${data.intern_name_last_first || "-"} | Office: ${data.office || "-"}`,
+      `Period: ${[data.date_from, data.date_to].filter(Boolean).join(" – ") || "-"}`,
+      "",
+    ];
+    for (const d of DAYS) {
+      const tasks = data[`${d}_accomplishments`]?.trim();
+      if (tasks) {
+        lines.push(`${dayNames[d]}:`);
+        for (const item of tasks.split(/\r?\n/)) {
+          if (item.trim()) lines.push(`• ${item.trim()}`);
+        }
+      }
+    }
+    if (data.hours_this_week || data.total_hours_worked) {
+      lines.push("", `Hours This Week: ${data.hours_this_week || "-"} | Total Hours: ${data.total_hours_worked || "-"}`);
+    }
+    if (data.new_trainings?.trim()) lines.push(`New Trainings: ${data.new_trainings.trim()}`);
+    if (data.problems_encountered?.trim()) lines.push(`Problems: ${data.problems_encountered.trim()}`);
+    if (data.solutions_done?.trim()) lines.push(`Solutions: ${data.solutions_done.trim()}`);
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setCopiedSummary(true);
+      window.setTimeout(() => setCopiedSummary(false), 1800);
+    } catch {
+      // Ignore clipboard failures
+    }
+  }
 
   const targetKey = `${templateId}:${templateVersion}`;
   const loadingTemplate = loadedKey !== targetKey && !error;
@@ -289,6 +328,11 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
                 </button>
               )}
             </div>
+
+            <Button type="button" size="sm" variant="outline" onClick={() => void handleCopySummaryText()}>
+              {copiedSummary ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+              <span>{copiedSummary ? "Copied" : "Copy Text"}</span>
+            </Button>
 
             <Button
               type="button"

@@ -5,13 +5,16 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Check,
+  ClipboardPaste,
   Edit3,
   Eye,
   FileText,
+  Loader2,
   MessageSquareText,
   RotateCcw,
   Save,
   Undo2,
+  X,
 } from "lucide-react";
 import { emptyReport, type ReportData } from "@/lib/report-schema";
 import type { Profile } from "@/lib/supabase/database.types";
@@ -20,6 +23,15 @@ import type { QuotaStatus } from "@/lib/admin";
 import { AccomplishCheckIcon } from "@/components/icons/AccomplishIcons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { ReportChat, type ChatTurn } from "./ReportChat";
 import { TemplateScannerCard } from "./TemplateScannerCard";
 import { ReportEditor } from "./ReportEditor";
@@ -111,8 +123,52 @@ export function WorkspaceClient({
 
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [quickNotesOpen, setQuickNotesOpen] = useState(false);
+  const [quickNotesText, setQuickNotesText] = useState("");
+  const [generatingFromNotes, setGeneratingFromNotes] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  async function handleQuickFillNotes(e: React.FormEvent) {
+    e.preventDefault();
+    if (!quickNotesText.trim() || generatingFromNotes) return;
+    setError(null);
+    setNotice(null);
+    setGeneratingFromNotes(true);
+    try {
+      const res = await fetch("/api/generate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rawNotes: quickNotesText.trim(),
+          templateId: review?.template.id,
+        }),
+      });
+      const json = (await res.json()) as {
+        structuredData?: ReportData;
+        quota?: QuotaStatus;
+        error?: string;
+      };
+      if (json.quota) setQuota(json.quota);
+      if (!res.ok || !json.structuredData) {
+        throw new Error(json.error ?? "Failed to fill report from notes.");
+      }
+      pushUndoSnapshot(title, data);
+      const merged: ReportData = {
+        ...json.structuredData,
+        date_from: json.structuredData.date_from || data.date_from,
+        date_to: json.structuredData.date_to || data.date_to,
+      };
+      setData(merged);
+      setQuickNotesOpen(false);
+      setQuickNotesText("");
+      setNotice("Filled report from your raw notes — review the live preview or click Undo anytime.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not process raw notes.");
+    } finally {
+      setGeneratingFromNotes(false);
+    }
+  }
 
   function pushUndoSnapshot(prevTitle: string, prevData: ReportData) {
     setUndoStack((prev) => [...prev.slice(-24), { title: prevTitle, data: prevData }]);
@@ -326,6 +382,17 @@ export function WorkspaceClient({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={!quota.allowed}
+            onClick={() => setQuickNotesOpen(true)}
+            title="Paste a whole week of raw notes and fill the report in 1 prompt"
+          >
+            <ClipboardPaste className="h-3.5 w-3.5 text-[#D97757]" />
+            <span className="hidden sm:inline">Paste Notes</span>
+          </Button>
           {undoStack.length > 0 && (
             <Button type="button" size="sm" variant="outline" onClick={handleUndo}>
               <Undo2 className="h-3.5 w-3.5 text-[#D97757]" />
@@ -499,6 +566,57 @@ export function WorkspaceClient({
           />
         </div>
       </div>
+
+      {/* 1-Click Batch Paste Notes Modal */}
+      <Dialog open={quickNotesOpen} onOpenChange={setQuickNotesOpen}>
+        <DialogContent className="max-w-lg">
+          <form onSubmit={handleQuickFillNotes}>
+            <DialogHeader>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <DialogTitle>1-Click Fill from Raw Weekly Notes</DialogTitle>
+                  <DialogDescription>
+                    Paste your Monday–Friday notes (English or Tagalog) to convert everything into past-tense tasks in a
+                    single AI prompt.
+                  </DialogDescription>
+                </div>
+                <Button type="button" size="icon" variant="ghost" onClick={() => setQuickNotesOpen(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </DialogHeader>
+            <div className="px-5 py-2">
+              <Textarea
+                rows={7}
+                autoFocus
+                required
+                value={quickNotesText}
+                onChange={(e) => setQuickNotesText(e.target.value)}
+                placeholder="Paste your Monday to Friday notes here..."
+                className="resize-y"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={generatingFromNotes}
+                onClick={() => setQuickNotesOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="accent" disabled={generatingFromNotes || !quickNotesText.trim()}>
+                {generatingFromNotes ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ClipboardPaste className="h-3.5 w-3.5" />
+                )}
+                <span>{generatingFromNotes ? "Filling Report..." : "Fill Report"}</span>
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

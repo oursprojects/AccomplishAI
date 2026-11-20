@@ -18,6 +18,7 @@ const profileSchema = z.object({
   default_verifier: z.string().trim().max(120).default(""),
   default_daily_hours: z.coerce.number().min(0).max(24).default(8),
   internship_start_date: isoDateOptional,
+  target_ojt_hours: z.coerce.number().int().min(40).max(5000).default(486),
 });
 
 export async function GET() {
@@ -27,7 +28,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date, updated_at",
+      "id, name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date, target_ojt_hours, updated_at",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -42,6 +43,7 @@ export async function GET() {
       default_verifier: "",
       default_daily_hours: 8,
       internship_start_date: null,
+      target_ojt_hours: 486,
     },
   });
 }
@@ -66,11 +68,12 @@ export async function PUT(request: Request) {
         default_verifier: parsed.data.default_verifier.toUpperCase(),
         default_daily_hours: parsed.data.default_daily_hours,
         internship_start_date: parsed.data.internship_start_date ?? null,
+        target_ojt_hours: parsed.data.target_ojt_hours,
       },
       { onConflict: "id" },
     )
     .select(
-      "id, name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date, updated_at",
+      "id, name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date, target_ojt_hours, updated_at",
     )
     .single();
 

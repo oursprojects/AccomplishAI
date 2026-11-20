@@ -10,7 +10,13 @@ import { InternshipCalendar } from "./InternshipCalendar";
 
 type EditableProfile = Pick<
   Profile,
-  "name_last_first" | "name_first_last" | "office" | "default_verifier" | "default_daily_hours" | "internship_start_date"
+  | "name_last_first"
+  | "name_first_last"
+  | "office"
+  | "default_verifier"
+  | "default_daily_hours"
+  | "internship_start_date"
+  | "target_ojt_hours"
 >;
 
 function deriveSignatureName(lastFirst: string): string {
@@ -156,6 +162,37 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
             onChange={(e) => setForm({ ...form, default_verifier: e.target.value.toUpperCase() })}
             placeholder="Optional — leave blank for wet-ink initials"
             className="uppercase"
+          />
+        </div>
+
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E]">
+              Required OJT Hours Target
+            </label>
+            <div className="flex items-center gap-1">
+              {[240, 300, 400, 486, 500].map((hrs) => (
+                <button
+                  key={hrs}
+                  type="button"
+                  onClick={() => setForm({ ...form, target_ojt_hours: hrs })}
+                  className={`rounded-md border px-2 py-0.5 text-[11px] font-medium cursor-pointer transition ${
+                    form.target_ojt_hours === hrs
+                      ? "border-[#D97757] bg-[#FDF3EF] text-[#C86343]"
+                      : "border-[#DDD7CB] bg-white text-[#57544E] hover:bg-[#F4F2EA]"
+                  }`}
+                >
+                  {hrs}h
+                </button>
+              ))}
+            </div>
+          </div>
+          <Input
+            type="number"
+            min={40}
+            max={5000}
+            value={form.target_ojt_hours}
+            onChange={(e) => setForm({ ...form, target_ojt_hours: Number(e.target.value) || 486 })}
           />
         </div>
 

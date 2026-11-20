@@ -17,6 +17,7 @@ export type Database = {
           default_verifier: string;
           default_daily_hours: number;
           internship_start_date: string | null;
+          target_ojt_hours: number;
           created_at: string;
           updated_at: string;
         };
@@ -28,6 +29,7 @@ export type Database = {
           default_verifier?: string;
           default_daily_hours?: number;
           internship_start_date?: string | null;
+          target_ojt_hours?: number;
           created_at?: string;
           updated_at?: string;
         };

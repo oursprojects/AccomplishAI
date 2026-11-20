@@ -15,7 +15,9 @@ async function ProfileContent() {
   const [{ data }, quota] = await Promise.all([
     supabase
       .from("profiles")
-      .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date")
+      .select(
+        "name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date, target_ojt_hours",
+      )
       .eq("id", user.id)
       .maybeSingle(),
     getUserQuotaStatus(supabase, user.id, user.email),
@@ -28,6 +30,7 @@ async function ProfileContent() {
     default_verifier: "",
     default_daily_hours: 8,
     internship_start_date: null,
+    target_ojt_hours: 486,
   };
 
   return (
