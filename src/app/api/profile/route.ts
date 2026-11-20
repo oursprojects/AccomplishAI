@@ -2,12 +2,22 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 
+const isoDateOptional = z
+  .union([
+    z.literal(""),
+    z.null(),
+    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD date format."),
+  ])
+  .optional()
+  .transform((v) => (v ? v : null));
+
 const profileSchema = z.object({
   name_last_first: z.string().trim().max(120),
   name_first_last: z.string().trim().max(120),
-  office: z.string().trim().max(80).default("YML"),
+  office: z.string().trim().max(80).default("DNX"),
   default_verifier: z.string().trim().max(120).default(""),
   default_daily_hours: z.coerce.number().min(0).max(24).default(8),
+  internship_start_date: isoDateOptional,
 });
 
 export async function GET() {
@@ -16,7 +26,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, name_last_first, name_first_last, office, default_verifier, default_daily_hours, updated_at")
+    .select(
+      "id, name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date, updated_at",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -26,9 +38,10 @@ export async function GET() {
       id: user.id,
       name_last_first: "",
       name_first_last: "",
-      office: "YML",
+      office: "DNX",
       default_verifier: "",
       default_daily_hours: 8,
+      internship_start_date: null,
     },
   });
 }
@@ -49,13 +62,16 @@ export async function PUT(request: Request) {
         id: user.id,
         name_last_first: parsed.data.name_last_first,
         name_first_last: parsed.data.name_first_last,
-        office: parsed.data.office || "YML",
+        office: parsed.data.office || "DNX",
         default_verifier: parsed.data.default_verifier,
         default_daily_hours: parsed.data.default_daily_hours,
+        internship_start_date: parsed.data.internship_start_date ?? null,
       },
       { onConflict: "id" },
     )
-    .select("id, name_last_first, name_first_last, office, default_verifier, default_daily_hours, updated_at")
+    .select(
+      "id, name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date, updated_at",
+    )
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

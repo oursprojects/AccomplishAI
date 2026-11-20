@@ -1,12 +1,34 @@
 "use client";
 
-import { Calculator, CalendarDays, Check, CheckCheck, PenLine, RotateCcw, Save, Undo2, UserCheck } from "lucide-react";
+import { useState } from "react";
+import {
+  Calculator,
+  CalendarDays,
+  Check,
+  CheckCheck,
+  PenLine,
+  RotateCcw,
+  Save,
+  Undo2,
+  UserCheck,
+  X,
+} from "lucide-react";
+import { parseHoursNumber } from "@/lib/internship-calendar";
 import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
 import { AccomplishCheckIcon } from "@/components/icons/AccomplishIcons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { InternshipCalendar } from "./InternshipCalendar";
 
 const DAY_LABELS: Record<(typeof DAYS)[number], { short: string; full: string }> = {
   mon: { short: "M", full: "Monday" },
@@ -49,6 +71,7 @@ interface ReportEditorProps {
   defaultVerifier?: string;
   defaultDailyHours?: number;
   previousTotalHours?: string;
+  internshipStartDate?: string | null;
 }
 
 export function ReportEditor({
@@ -65,8 +88,23 @@ export function ReportEditor({
   defaultVerifier = "",
   defaultDailyHours = 8,
   previousTotalHours = "",
+  internshipStartDate = null,
 }: ReportEditorProps) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
   function setField(key: ReportKey, value: string) {
+    if (key === "hours_this_week") {
+      const weekNum = parseHoursNumber(value);
+      const prevNum = parseHoursNumber(previousTotalHours) ?? 0;
+      if (weekNum !== null) {
+        onChange({
+          ...data,
+          hours_this_week: value,
+          total_hours_worked: String(prevNum + weekNum),
+        });
+        return;
+      }
+    }
     onChange({ ...data, [key]: value });
   }
 
@@ -92,8 +130,8 @@ export function ReportEditor({
     const workedDays = DAYS.filter((d) => data[`${d}_accomplishments`].trim().length > 0).length;
     const hoursPerDay = Number(defaultDailyHours) > 0 ? Number(defaultDailyHours) : 8;
     const weekHours = workedDays * hoursPerDay;
-    const prevNum = parseFloat(previousTotalHours);
-    const totalHours = Number.isFinite(prevNum) ? prevNum + weekHours : weekHours;
+    const prevNum = parseHoursNumber(previousTotalHours) ?? 0;
+    const totalHours = prevNum + weekHours;
     onChange({
       ...data,
       hours_this_week: weekHours > 0 ? String(weekHours) : data.hours_this_week,
@@ -158,9 +196,12 @@ export function ReportEditor({
             <PenLine className="h-3.5 w-3.5 text-[#D97757]" />
             <span>Report Title, Header &amp; Period</span>
           </h3>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button type="button" size="sm" variant="accent" onClick={() => setCalendarOpen(true)}>
+              <CalendarDays className="h-3 w-3" />
+              <span>Week Calendar</span>
+            </Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => applyWeek(0)}>
-              <CalendarDays className="h-3 w-3 text-[#D97757]" />
               <span>This Week</span>
             </Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => applyWeek(-1)}>
@@ -202,21 +243,21 @@ export function ReportEditor({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">From</label>
+            <label className="block text-xs font-medium text-[#4A463F] mb-1">From (Monday)</label>
             <Input
               type="text"
               value={data.date_from}
               onChange={(e) => setField("date_from", e.target.value)}
-              placeholder="November 16, 2026"
+              placeholder="November 9, 2026"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">To</label>
+            <label className="block text-xs font-medium text-[#4A463F] mb-1">To (Friday)</label>
             <Input
               type="text"
               value={data.date_to}
               onChange={(e) => setField("date_to", e.target.value)}
-              placeholder="November 20, 2026"
+              placeholder="November 13, 2026"
             />
           </div>
         </div>
@@ -276,7 +317,14 @@ export function ReportEditor({
       {/* Hours & reflections */}
       <Card className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-[#1F1E1C]">Hours, Reflections &amp; Signature</h3>
+          <div>
+            <h3 className="text-sm font-semibold text-[#1F1E1C]">Hours, Reflections &amp; Signature</h3>
+            {previousTotalHours && (
+              <p className="text-[11px] text-[#6B665E]">
+                Previous cumulative total: <strong>{previousTotalHours} hrs</strong> (automatically added to this week)
+              </p>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {workedDaysCount > 0 && (
               <Button
@@ -284,7 +332,7 @@ export function ReportEditor({
                 size="sm"
                 variant="secondary"
                 onClick={autoCalcHours}
-                title={`Calculate ${workedDaysCount} worked day(s) × ${defaultDailyHours} hrs/day`}
+                title={`Calculate ${workedDaysCount} worked day(s) × ${defaultDailyHours} hrs/day + previous total`}
               >
                 <Calculator className="h-3 w-3 text-[#D97757]" />
                 <span>Auto-calc Hours</span>
@@ -308,12 +356,14 @@ export function ReportEditor({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">Total Hours Worked</label>
+            <label className="block text-xs font-medium text-[#4A463F] mb-1">
+              Total Hours Worked (Prev + This Week)
+            </label>
             <Input
               type="text"
               value={data.total_hours_worked}
               onChange={(e) => setField("total_hours_worked", e.target.value)}
-              placeholder={previousTotalHours ? `Prev: ${previousTotalHours}` : "120"}
+              placeholder={previousTotalHours ? `${previousTotalHours} + week` : "40"}
             />
           </div>
         </div>
@@ -379,6 +429,44 @@ export function ReportEditor({
           </Button>
         </div>
       </Card>
+
+      {/* Mon-Fri Week Calendar Picker Modal */}
+      <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <DialogTitle>Select Report Week (Monday – Friday)</DialogTitle>
+                <DialogDescription>
+                  Click any date or week button to fill From (Monday) and To (Friday).
+                </DialogDescription>
+              </div>
+              <Button type="button" size="icon" variant="ghost" onClick={() => setCalendarOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="px-5 py-2">
+            <InternshipCalendar
+              mode="week"
+              startDateIso={internshipStartDate}
+              selectedFromText={data.date_from}
+              onSelectWeek={(wk) => {
+                onChange({ ...data, date_from: wk.fromText, date_to: wk.toText });
+                if (wk.weekNumber && (!title.trim() || /^Week \d+$/i.test(title.trim()))) {
+                  onTitleChange(`Week ${wk.weekNumber}`);
+                }
+                setCalendarOpen(false);
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCalendarOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

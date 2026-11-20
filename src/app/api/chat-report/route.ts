@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { buildInternshipWeeks, parseHoursNumber, resolveWeekNumber } from "@/lib/internship-calendar";
 import { groqErrorResponse } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage, type GroqTool } from "@/lib/ai/chat-tools";
 import type { Json } from "@/lib/supabase/database.types";
@@ -141,7 +142,7 @@ const TOOLS: GroqTool[] = [
     function: {
       name: "save_profile_defaults",
       description:
-        "Save the intern's recurring name, office, or verifier defaults to their profile when they ask to remember them.",
+        "Save the intern's recurring name, office, verifier, or internship_start_date (YYYY-MM-DD) when they introduce themselves or mention when their internship began.",
       parameters: {
         type: "object",
         properties: {
@@ -149,6 +150,10 @@ const TOOLS: GroqTool[] = [
           name_first_last: { type: "string", description: "Format: FIRSTNAME MI. LASTNAME" },
           office: { type: "string" },
           default_verifier: { type: "string" },
+          internship_start_date: {
+            type: "string",
+            description: "ISO date YYYY-MM-DD of when Week 1 began (e.g. 2026-11-09).",
+          },
         },
       },
     },
@@ -193,7 +198,6 @@ async function persistConversation(
   );
 }
 
-/** Detects when a reply claims to have changed/cleared fields without any mutation tool having executed. */
 function looksLikeUnappliedMutation(reply: string): boolean {
   return (
     /\|[^|\n]+\|[^|\n]+\|/.test(reply) ||
@@ -248,20 +252,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const [aiSettings, { data: profile }, { data: latestReport }] = await Promise.all([
+  const [aiSettings, { data: profile }, { data: recentReports }] = await Promise.all([
     getAiSettings(supabase),
     supabase
       .from("profiles")
-      .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours")
+      .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
       .from("reports")
-      .select("structured_data")
+      .select("id, title, structured_data, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(12),
   ]);
 
   const workingData: ReportData = { ...body.data.currentData };
@@ -275,12 +278,31 @@ export async function POST(request: Request) {
     workingData.office = profile?.office || "DNX";
   }
 
-  const prevTotal =
-    latestReport?.structured_data &&
-    typeof latestReport.structured_data === "object" &&
-    !Array.isArray(latestReport.structured_data)
-      ? String((latestReport.structured_data as Record<string, unknown>).total_hours_worked ?? "")
-      : "";
+  // Find previous report (excluding the currently active reportId so it never reads itself)
+  const previousReports = (recentReports ?? [])
+    .filter((r) => !body.data.reportId || r.id !== body.data.reportId)
+    .map((r) => {
+      const sd =
+        r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
+          ? (r.structured_data as Record<string, unknown>)
+          : {};
+      return {
+        id: r.id,
+        title: r.title,
+        date_from: String(sd.date_from ?? ""),
+        date_to: String(sd.date_to ?? ""),
+        hours_this_week: String(sd.hours_this_week ?? ""),
+        total_hours_worked: String(sd.total_hours_worked ?? ""),
+      };
+    });
+
+  const latestPrev = previousReports[0] ?? null;
+  const prevTotalRaw = latestPrev?.total_hours_worked ?? "";
+  const prevTotalNum = parseHoursNumber(prevTotalRaw) ?? 0;
+
+  const startIso = profile?.internship_start_date ?? null;
+  const calendarWeeks = buildInternshipWeeks(startIso, 12);
+  const currentWeekNumber = resolveWeekNumber(startIso, workingData.date_from);
 
   const systemPrompt = `You are **Accomplish AI**, a friendly, helpful assistant dedicated strictly to helping a student intern complete their official 1-page **"2026 Weekly Accomplishment Report"** (.docx).
 
@@ -291,26 +313,42 @@ User profile defaults: ${JSON.stringify({
     office: profile?.office || "DNX",
     default_verifier: profile?.default_verifier ?? "",
     default_daily_hours: profile?.default_daily_hours ?? 8,
-    previous_report_total_hours: prevTotal,
+    internship_start_date: startIso,
   })}
+Internship Mon–Fri Calendar (Week 1 begins ${startIso ?? "not set yet"}): ${JSON.stringify(
+    calendarWeeks.map((w) => ({
+      week: w.weekNumber,
+      date_from_monday: w.fromText,
+      date_to_friday: w.toText,
+    })),
+  )}
+Current report week number (from calendar): ${currentWeekNumber ?? "Unknown"}
+Previous report summary (for cumulative hours & date continuity): ${JSON.stringify(latestPrev)}
 Current report fields (exact live state): ${JSON.stringify(workingData)}
 
 CORE BEHAVIOR & STRICT RULES:
-1. **Always Execute Real CRUD Tools:**
+1. **Calendar-Aware Week Dates (Monday to Friday):**
+   - Every Weekly Accomplishment Report strictly covers **Monday (\`date_from\`) to Friday (\`date_to\`)**.
+   - Use \`Internship Mon–Fri Calendar\` above when resolving "1st week", "Week 2", "this week", etc. (e.g., if Week 1 started Monday November 9, 2026, Week 1 is **November 9, 2026** to **November 13, 2026**, Week 2 is **November 16, 2026** to **November 20, 2026**, etc.).
+   - If the user mentions when their internship began (e.g. *"we started November 9"*), call \`save_profile_defaults\` with \`internship_start_date: "YYYY-MM-DD"\` AND set \`date_from\`/\`date_to\` using that week's Monday–Friday.
+2. **Cumulative Total Hours Worked (\`total_hours_worked\`):**
+   - \`hours_this_week\` = hours worked in THIS week's report.
+   - \`total_hours_worked\` ("Total No. of Hours Worked (previous week/s plus this week)") = \`${prevTotalNum} + hours_this_week\`. Always compute and update \`total_hours_worked\` whenever \`hours_this_week\` is known or calculated!
+3. **Always Execute Real CRUD Tools:**
    - Whenever the user asks to **add, fill, translate, edit, update, replace, remove, delete, or clear** anything on the report, **ALWAYS call \`set_report_fields\` or \`clear_report_fields\`** BEFORE replying. NEVER reply saying a field was updated or cleared without actually calling the tool!
    - When adding a bullet to an existing day/section, keep existing lines and append the new line separated by \`\\n\`.
    - When deleting one bullet from a multi-line day/section, call \`set_report_fields\` with the remaining lines only (or \`clear_report_fields\` if removing the entire field).
-2. **Strictly Accomplished Tasks Only:** For \`mon_accomplishments\` through \`fri_accomplishments\`, record **ONLY actual work/tasks accomplished** (e.g., *"Attended internship orientation and role assignment meeting"*, *"Redesigned and published the DNX Solution landing page"*). **NEVER** put arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*, *"Dismissed at 4:30 PM"*), commute/boarding-house notes, or lunch breaks inside accomplishment entries.
-3. **Verify Before Clearing (No Fake Re-Clears):**
+4. **Strictly Accomplished Tasks Only:** For \`mon_accomplishments\` through \`fri_accomplishments\`, record **ONLY actual work/tasks accomplished**. **NEVER** put arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*, *"Dismissed at 4:30 PM"*), commute/boarding-house notes, or lunch breaks inside accomplishment entries.
+5. **Verify Before Clearing (No Fake Re-Clears):**
    - Check \`Current report fields\` (or \`get_report_fields\`) before clearing.
    - If the requested field(s) are **already \`""\`**, DO NOT pretend you cleared them and DO NOT show a table of cleared items—simply reply warmly that those fields are **already cleared / empty**.
-4. **Past-Tense, Concise & Table-Fit:** Keep tool values plain text (no \`**\`, \`*\`, or \`-\` bullets), formalized into crisp **past-tense** English:
+6. **Past-Tense, Concise & Table-Fit:** Keep tool values plain text (no \`**\`, \`*\`, or \`-\` bullets), formalized into crisp **past-tense** English:
    - Max **1–${aiSettings.maxBulletsPerDay} short lines** per worked day (\`<= 12 words\` per line, separated by \`\\n\`).
    - Max **1–2 short lines** for \`new_trainings\`, \`problems_encountered\`, and \`solutions_done\`.
-5. **Friendly & Strictly On-Topic:** Keep a warm, encouraging assistant tone, but **ONLY** assist with the Weekly Accomplishment Report, internship task summarization, and form editing. Politely decline unrelated topics and guide them back to their report.
-6. **Clean Markdown Formatting (NO HTML Tags):**
+7. **Friendly & Strictly On-Topic:** Keep a warm, encouraging assistant tone, but **ONLY** assist with the Weekly Accomplishment Report, internship calendar/hours, and form editing.
+8. **Clean Markdown Formatting (NO HTML Tags):**
    - Format replies in clean Markdown (**bold**, *italic*, and a compact Markdown table **only when fields were actually updated or cleared in this turn**).
-   - **NEVER output \`<br>\`, \`<br/>\` or any raw HTML tags.** Inside a Markdown table cell with multiple items, separate items cleanly with \`; \` (semicolon) or list items in bullet points outside the table.`;
+   - **NEVER output \`<br>\`, \`<br/>\` or any raw HTML tags.** Inside a Markdown table cell with multiple items, separate items cleanly with \`; \` (semicolon).`;
 
   const recentMessages = body.data.messages.slice(-10);
   const loopMessages: GroqMessage[] = [
@@ -345,8 +383,6 @@ CORE BEHAVIOR & STRICT RULES:
       if (toolCalls.length === 0) {
         const draftReply = (msg.content ?? "").trim();
 
-        // Anti-hallucination guard: if the LLM claimed it edited/updated/cleared fields
-        // without calling a mutation tool first, force a tool call immediately.
         if (!didMutateThisTurn && !forcedToolRetryUsed && looksLikeUnappliedMutation(draftReply)) {
           forcedToolRetryUsed = true;
           loopMessages.push({ role: "assistant", content: draftReply });
@@ -424,6 +460,19 @@ CORE BEHAVIOR & STRICT RULES:
             }
           }
 
+          // Keep total_hours_worked = previous_total + hours_this_week automatically when hours_this_week changes
+          if (changed.includes("hours_this_week") && !changed.includes("total_hours_worked")) {
+            const weekHoursNum = parseHoursNumber(workingData.hours_this_week);
+            if (weekHoursNum !== null) {
+              const autoTotal = String(prevTotalNum + weekHoursNum);
+              if (autoTotal !== workingData.total_hours_worked) {
+                workingData.total_hours_worked = autoTotal;
+                updatedKeys.add("total_hours_worked");
+                changed.push("total_hours_worked");
+              }
+            }
+          }
+
           if (profile?.default_verifier) {
             for (const d of DAYS) {
               if (workingData[`${d}_accomplishments`].trim() && !workingData[`${d}_verified_by`].trim()) {
@@ -474,6 +523,12 @@ CORE BEHAVIOR & STRICT RULES:
           }
           if (typeof args.default_verifier === "string" && args.default_verifier.trim()) {
             patch.default_verifier = args.default_verifier.trim().slice(0, 120);
+          }
+          if (
+            typeof args.internship_start_date === "string" &&
+            /^\d{4}-\d{2}-\d{2}$/.test(args.internship_start_date.trim())
+          ) {
+            patch.internship_start_date = args.internship_start_date.trim();
           }
           if (Object.keys(patch).length > 0) {
             await supabase.from("profiles").upsert({ id: user.id, ...patch }, { onConflict: "id" });

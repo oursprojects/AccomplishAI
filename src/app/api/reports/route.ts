@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
+import { inferNextWeekRange } from "@/lib/internship-calendar";
 import { emptyReport, MAX_CHAT_MESSAGES, reportDataStrictSchema } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -19,6 +20,8 @@ const createReportSchema = z.object({
   structuredData: reportDataStrictSchema.optional(),
   chatMessages: z.array(chatMessageSchema).max(MAX_CHAT_MESSAGES + 10).optional(),
   duplicateFromId: z.string().uuid().optional(),
+  weekStartDate: z.string().trim().max(40).optional(),
+  weekEndDate: z.string().trim().max(40).optional(),
 });
 
 export async function GET() {
@@ -61,13 +64,21 @@ export async function POST(request: Request) {
   }
 
   let initialData = parsed.data.structuredData;
+  let initialTitle = parsed.data.title;
+
   if (!initialData) {
-    const [{ data: profile }, { data: dupReport }] = await Promise.all([
+    const [{ data: profile }, { data: existingRows }, { data: dupReport }] = await Promise.all([
       supabase
         .from("profiles")
-        .select("name_last_first, name_first_last, office")
+        .select("name_last_first, name_first_last, office, internship_start_date")
         .eq("id", user.id)
         .maybeSingle(),
+      supabase
+        .from("reports")
+        .select("structured_data")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
       parsed.data.duplicateFromId
         ? supabase
             .from("reports")
@@ -99,6 +110,34 @@ export async function POST(request: Request) {
       profile?.office ||
       "DNX";
 
+    if (parsed.data.weekStartDate && parsed.data.weekEndDate) {
+      seeded.date_from = parsed.data.weekStartDate;
+      seeded.date_to = parsed.data.weekEndDate;
+    } else {
+      const existingPeriods = (existingRows ?? []).map((r) => {
+        const obj =
+          r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
+            ? (r.structured_data as Record<string, unknown>)
+            : {};
+        return {
+          date_from: typeof obj.date_from === "string" ? obj.date_from : "",
+          date_to: typeof obj.date_to === "string" ? obj.date_to : "",
+        };
+      });
+
+      const nextWeek = inferNextWeekRange({
+        startIso: profile?.internship_start_date,
+        existingReports: existingPeriods,
+      });
+      if (nextWeek) {
+        seeded.date_from = nextWeek.fromText;
+        seeded.date_to = nextWeek.toText;
+        if (!initialTitle) {
+          initialTitle = `Week ${nextWeek.weekNumber}`;
+        }
+      }
+    }
+
     initialData = seeded;
   }
 
@@ -107,7 +146,7 @@ export async function POST(request: Request) {
     .insert({
       user_id: user.id,
       template_id: parsed.data.templateId ?? null,
-      title: parsed.data.title,
+      title: initialTitle,
       raw_notes: parsed.data.rawNotes,
       structured_data: initialData as unknown as Json,
       chat_messages: (parsed.data.chatMessages ?? []) as unknown as Json,

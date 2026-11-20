@@ -27,7 +27,10 @@ import { DocxPreviewPanel } from "./DocxPreviewPanel";
 
 interface WorkspaceClientProps {
   userId: string;
-  profile: Pick<Profile, "name_last_first" | "name_first_last" | "office" | "default_verifier" | "default_daily_hours">;
+  profile: Pick<
+    Profile,
+    "name_last_first" | "name_first_last" | "office" | "default_verifier" | "default_daily_hours" | "internship_start_date"
+  >;
   previousTotalHours?: string;
   initialReview: TemplateReview | null;
   initialReport: {
@@ -477,6 +480,7 @@ export function WorkspaceClient({
               defaultVerifier={profile.default_verifier}
               defaultDailyHours={profile.default_daily_hours}
               previousTotalHours={previousTotalHours}
+              internshipStartDate={profile.internship_start_date ?? null}
             />
           </div>
         </div>

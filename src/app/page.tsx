@@ -22,13 +22,18 @@ async function ReportsHomeContent({
     redirect(`/reports/${encodeURIComponent(reportId)}`);
   }
 
-  const [{ data }, quota] = await Promise.all([
+  const [{ data }, { data: profile }, quota] = await Promise.all([
     supabase
       .from("reports")
       .select("id, title, raw_notes, structured_data, created_at, updated_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(100),
+    supabase
+      .from("profiles")
+      .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date")
+      .eq("id", user.id)
+      .maybeSingle(),
     getUserQuotaStatus(supabase, user.id, user.email),
   ]);
 
@@ -50,6 +55,14 @@ async function ReportsHomeContent({
         initialReports={reports}
         maxReports={quota.maxReports}
         canCreateReport={quota.canCreateReport}
+        initialStartDate={profile?.internship_start_date ?? null}
+        profileSnapshot={{
+          name_last_first: profile?.name_last_first ?? "",
+          name_first_last: profile?.name_first_last ?? "",
+          office: profile?.office ?? "DNX",
+          default_verifier: profile?.default_verifier ?? "",
+          default_daily_hours: profile?.default_daily_hours ?? 8,
+        }}
       />
     </AppShell>
   );

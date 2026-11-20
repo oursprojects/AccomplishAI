@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, PenLine, Save, UserRound } from "lucide-react";
+import { CalendarDays, CheckCircle2, PenLine, Save, UserRound } from "lucide-react";
 import type { Profile } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { InternshipCalendar } from "./InternshipCalendar";
 
 type EditableProfile = Pick<
   Profile,
-  "name_last_first" | "name_first_last" | "office" | "default_verifier" | "default_daily_hours"
+  "name_last_first" | "name_first_last" | "office" | "default_verifier" | "default_daily_hours" | "internship_start_date"
 >;
 
 function deriveSignatureName(lastFirst: string): string {
@@ -57,9 +58,9 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
             <UserRound className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="text-lg font-semibold text-[#1F1E1C]">Intern Profile Defaults</h1>
+            <h1 className="text-lg font-semibold text-[#1F1E1C]">Intern Profile &amp; Calendar Anchor</h1>
             <p className="mt-0.5 text-sm text-[#6B665E]">
-              Saved details automatically pre-fill every new report so you never retype them.
+              Saved details and your internship start date automatically fill Week 1, Week 2, etc. (Monday–Friday).
             </p>
           </div>
         </div>
@@ -70,7 +71,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
         {saved && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span>Profile defaults saved.</span>
+            <span>Profile &amp; internship calendar defaults saved.</span>
           </div>
         )}
 
@@ -153,6 +154,42 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
             onChange={(e) => setForm({ ...form, default_verifier: e.target.value })}
             placeholder="Optional — leave blank for wet-ink initials"
           />
+        </div>
+
+        {/* Internship Start Date Calendar */}
+        <div className="rounded-2xl border border-[#E6E2D8] bg-[#FAF9F5]/80 p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-[#57544E] flex items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5 text-[#D97757]" />
+              <span>Internship Start Date (Week 1)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={form.internship_start_date ?? ""}
+                onChange={(e) => setForm({ ...form, internship_start_date: e.target.value || null })}
+                className="h-8 w-40 bg-white text-xs"
+              />
+              {form.internship_start_date && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setForm({ ...form, internship_start_date: null })}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#E6E2D8] bg-white p-3">
+            <InternshipCalendar
+              mode="anchor"
+              startDateIso={form.internship_start_date}
+              onSelectAnchor={(iso) => setForm({ ...form, internship_start_date: iso })}
+            />
+          </div>
         </div>
 
         <div className="pt-2 flex justify-end">

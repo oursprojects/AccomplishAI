@@ -16,6 +16,7 @@ export type Database = {
           office: string;
           default_verifier: string;
           default_daily_hours: number;
+          internship_start_date: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -26,6 +27,7 @@ export type Database = {
           office?: string;
           default_verifier?: string;
           default_daily_hours?: number;
+          internship_start_date?: string | null;
           created_at?: string;
           updated_at?: string;
         };

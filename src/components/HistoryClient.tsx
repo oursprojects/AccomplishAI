@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
+  CalendarDays,
   Check,
+  ChevronDown,
+  ChevronUp,
   Clock,
   CopyPlus,
   ExternalLink,
@@ -17,11 +20,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { inferNextWeekRange, resolveWeekNumber } from "@/lib/internship-calendar";
 import type { ReportData } from "@/lib/report-schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { InternshipCalendar } from "./InternshipCalendar";
 
 export interface ReportSummary {
   id: string;
@@ -36,13 +41,27 @@ export function HistoryClient({
   initialReports,
   maxReports,
   canCreateReport,
+  initialStartDate = null,
+  profileSnapshot,
 }: {
   initialReports: ReportSummary[];
   maxReports: number | null;
   canCreateReport: boolean;
+  initialStartDate?: string | null;
+  profileSnapshot?: {
+    name_last_first: string;
+    name_first_last: string;
+    office: string;
+    default_verifier: string;
+    default_daily_hours: number;
+  };
 }) {
   const router = useRouter();
   const [reports, setReports] = useState<ReportSummary[]>(initialReports);
+  const [startDate, setStartDate] = useState<string | null>(initialStartDate);
+  const [calendarOpen, setCalendarOpen] = useState(!initialStartDate);
+  const [savingAnchor, setSavingAnchor] = useState(false);
+
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
@@ -51,6 +70,18 @@ export function HistoryClient({
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const coveredFromTexts = reports
+    .map((r) => r.structured_data.date_from)
+    .filter((v): v is string => Boolean(v && v.trim()));
+
+  const nextWeekPreview = inferNextWeekRange({
+    startIso: startDate,
+    existingReports: reports.map((r) => ({
+      date_from: r.structured_data.date_from,
+      date_to: r.structured_data.date_to,
+    })),
+  });
 
   const normalizedQuery = query.trim().toLowerCase();
   const filteredReports = normalizedQuery
@@ -71,17 +102,50 @@ export function HistoryClient({
       })
     : reports;
 
-  async function handleCreateReport(duplicateFromId?: string) {
+  async function saveAnchorDate(isoDate: string) {
+    setSavingAnchor(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name_last_first: profileSnapshot?.name_last_first ?? "",
+          name_first_last: profileSnapshot?.name_first_last ?? "",
+          office: profileSnapshot?.office || "DNX",
+          default_verifier: profileSnapshot?.default_verifier ?? "",
+          default_daily_hours: profileSnapshot?.default_daily_hours ?? 8,
+          internship_start_date: isoDate || null,
+        }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? "Could not save internship start date.");
+      }
+      setStartDate(isoDate || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save start date.");
+    } finally {
+      setSavingAnchor(false);
+    }
+  }
+
+  async function handleCreateReport(opts?: {
+    duplicateFromId?: string;
+    weekStartDate?: string;
+    weekEndDate?: string;
+    title?: string;
+  }) {
     if (!canCreateReport || creating || duplicatingId) return;
     setError(null);
-    if (duplicateFromId) setDuplicatingId(duplicateFromId);
+    if (opts?.duplicateFromId) setDuplicatingId(opts.duplicateFromId);
     else setCreating(true);
 
     try {
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(duplicateFromId ? { duplicateFromId } : {}),
+        body: JSON.stringify(opts ?? {}),
       });
       const json = (await res.json()) as { report?: { id: string }; error?: string };
       if (!res.ok || !json.report) {
@@ -154,7 +218,7 @@ export function HistoryClient({
             </Badge>
           </div>
           <p className="mt-0.5 text-sm text-[#6B665E]">
-            Open any report below to chat with Accomplish AI, edit fields, undo changes, and export to Word.
+            Open any report to chat with Accomplish AI, edit fields, undo changes, and export to Word.
           </p>
         </div>
 
@@ -163,12 +227,122 @@ export function HistoryClient({
           variant="accent"
           disabled={!canCreateReport || creating}
           onClick={() => void handleCreateReport()}
-          title={canCreateReport ? "Create a brand-new Weekly Report with its own AI chat" : "Saved report limit reached"}
+          title={
+            nextWeekPreview
+              ? `Create Week ${nextWeekPreview.weekNumber} (${nextWeekPreview.fromText} – ${nextWeekPreview.toText})`
+              : "Create a brand-new Weekly Report"
+          }
         >
           {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
-          <span>{creating ? "Creating..." : "New Report"}</span>
+          <span>
+            {creating
+              ? "Creating..."
+              : nextWeekPreview
+                ? `New Week ${nextWeekPreview.weekNumber} Report`
+                : "New Report"}
+          </span>
         </Button>
       </div>
+
+      {/* Internship Calendar Schedule Card */}
+      <Card className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#F7F6F0] px-4 py-3 border-b border-[#E6E2D8]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <CalendarDays className="h-4 w-4 text-[#D97757] shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm font-semibold text-[#1F1E1C]">
+                Internship Calendar (Mon–Fri Schedule)
+              </p>
+              <p className="text-[11px] text-[#6B665E] truncate">
+                {startDate
+                  ? nextWeekPreview
+                    ? `Week 1 started ${startDate} · Next up: Week ${nextWeekPreview.weekNumber} (${nextWeekPreview.fromText} – ${nextWeekPreview.toText})`
+                    : `Week 1 started ${startDate}`
+                  : "Pick the date your internship began so Week 1, Week 2, etc. and hours calculate automatically."}
+              </p>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setCalendarOpen((v) => !v)}
+          >
+            {calendarOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            <span>{calendarOpen ? "Hide Calendar" : "Show Calendar"}</span>
+          </Button>
+        </div>
+
+        {calendarOpen && (
+          <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+            <div className="md:col-span-5 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E] mb-1">
+                  Week 1 Start Date
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={startDate ?? ""}
+                    disabled={savingAnchor}
+                    onChange={(e) => void saveAnchorDate(e.target.value)}
+                    className="bg-white"
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-[#6B665E]">
+                  For example, if you began Monday <strong>November 9</strong>, Week 1 is{" "}
+                  <strong>Nov 9 – Nov 13</strong>, and Week 2 is automatically <strong>Nov 16 – Nov 20</strong>.
+                </p>
+              </div>
+
+              {nextWeekPreview && (
+                <div className="rounded-xl border border-[#F0D5C9] bg-[#FDF3EF] p-3 space-y-2">
+                  <p className="text-xs font-semibold text-[#9F4427]">
+                    Next Report: Week {nextWeekPreview.weekNumber}
+                  </p>
+                  <p className="text-xs text-[#4A463F]">
+                    {nextWeekPreview.fromText} – {nextWeekPreview.toText}
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="accent"
+                    disabled={!canCreateReport || creating}
+                    onClick={() =>
+                      void handleCreateReport({
+                        weekStartDate: nextWeekPreview.fromText,
+                        weekEndDate: nextWeekPreview.toText,
+                        title: `Week ${nextWeekPreview.weekNumber}`,
+                      })
+                    }
+                    className="w-full"
+                  >
+                    <FilePlus2 className="h-3.5 w-3.5" />
+                    <span>Create Week {nextWeekPreview.weekNumber} Report</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="md:col-span-7 rounded-xl border border-[#E6E2D8] bg-white p-3">
+              <InternshipCalendar
+                mode={startDate ? "week" : "anchor"}
+                startDateIso={startDate}
+                coveredFromTexts={coveredFromTexts}
+                onSelectAnchor={(iso) => void saveAnchorDate(iso)}
+                onSelectWeek={(wk) =>
+                  void handleCreateReport({
+                    weekStartDate: wk.fromText,
+                    weekEndDate: wk.toText,
+                    title: wk.weekNumber ? `Week ${wk.weekNumber}` : undefined,
+                  })
+                }
+              />
+            </div>
+          </div>
+        )}
+      </Card>
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>
@@ -220,6 +394,7 @@ export function HistoryClient({
             const d = report.structured_data;
             const dateFallback = [d.date_from, d.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
             const displayTitle = report.title.trim() || dateFallback;
+            const wkNum = resolveWeekNumber(startDate, d.date_from ?? "");
             const created = new Date(report.created_at).toLocaleDateString(undefined, {
               year: "numeric",
               month: "short",
@@ -279,6 +454,7 @@ export function HistoryClient({
                       >
                         {displayTitle}
                       </Link>
+                      {wkNum !== null && <Badge variant="accent">Week {wkNum}</Badge>}
                       <button
                         type="button"
                         onClick={() => startRename(report)}
@@ -292,7 +468,7 @@ export function HistoryClient({
                       {d.hours_this_week && (
                         <Badge variant="success">
                           <Clock className="h-3 w-3" />
-                          {d.hours_this_week} hrs
+                          {d.hours_this_week} hrs{d.total_hours_worked ? ` (Total: ${d.total_hours_worked})` : ""}
                         </Badge>
                       )}
                     </div>
@@ -302,7 +478,7 @@ export function HistoryClient({
                     <Calendar className="h-3 w-3" />
                     Created {created}
                     {d.intern_name_last_first ? ` · ${d.intern_name_last_first}` : ""}
-                    {report.title.trim() && [d.date_from, d.date_to].filter(Boolean).length > 0
+                    {[d.date_from, d.date_to].filter(Boolean).length > 0
                       ? ` · ${[d.date_from, d.date_to].filter(Boolean).join(" – ")}`
                       : ""}
                   </p>
@@ -324,7 +500,7 @@ export function HistoryClient({
                     size="sm"
                     variant="secondary"
                     disabled={!canCreateReport || duplicatingId === report.id}
-                    onClick={() => void handleCreateReport(report.id)}
+                    onClick={() => void handleCreateReport({ duplicateFromId: report.id })}
                     title="Create next week's report keeping your name and office defaults"
                   >
                     {duplicatingId === report.id ? (
