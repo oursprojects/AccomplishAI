@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   Activity,
   Bot,
+  ChevronDown,
+  ChevronUp,
   Cpu,
   Eye,
   EyeOff,
@@ -103,6 +105,14 @@ export function AdminClient({
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [newLimit, setNewLimit] = useState("");
   const [newMaxReports, setNewMaxReports] = useState("");
+  const [showOptionalDefaults, setShowOptionalDefaults] = useState(false);
+  const [newNameLastFirst, setNewNameLastFirst] = useState("");
+  const [newNameFirstLast, setNewNameFirstLast] = useState("");
+  const [newOffice, setNewOffice] = useState("");
+  const [newVerifier, setNewVerifier] = useState("");
+  const [newDailyHours, setNewDailyHours] = useState("");
+  const [newTargetOjtHours, setNewTargetOjtHours] = useState("");
+  const [newStartDate, setNewStartDate] = useState("");
 
   const aiControlsChanged =
     activeTextModel !== aiSettings.activeTextModel ||
@@ -160,6 +170,13 @@ export function AdminClient({
           password: newPassword,
           customDailyLimit: newLimit.trim() === "" ? null : Number(newLimit),
           customMaxReports: newMaxReports.trim() === "" ? null : Number(newMaxReports),
+          nameLastFirst: newNameLastFirst.trim() || undefined,
+          nameFirstLast: newNameFirstLast.trim() || undefined,
+          office: newOffice.trim() || undefined,
+          defaultVerifier: newVerifier.trim() || undefined,
+          defaultDailyHours: newDailyHours.trim() === "" ? undefined : Number(newDailyHours),
+          targetOjtHours: newTargetOjtHours.trim() === "" ? undefined : Number(newTargetOjtHours),
+          internshipStartDate: newStartDate || undefined,
         }),
       });
       const json = (await res.json()) as {
@@ -187,6 +204,14 @@ export function AdminClient({
       setShowNewPassword(false);
       setNewLimit("");
       setNewMaxReports("");
+      setNewNameLastFirst("");
+      setNewNameFirstLast("");
+      setNewOffice("");
+      setNewVerifier("");
+      setNewDailyHours("");
+      setNewTargetOjtHours("");
+      setNewStartDate("");
+      setShowOptionalDefaults(false);
       setCreateModalOpen(false);
     } catch (err) {
       setModalError(err instanceof Error ? err.message : "Could not create account.");
@@ -805,7 +830,7 @@ export function AdminClient({
 
       {/* Create Intern Account Modal */}
       <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[92dvh] overflow-y-auto">
           <form onSubmit={handleCreateAccount}>
             <DialogHeader>
               <div className="flex items-start justify-between gap-2">
@@ -910,6 +935,130 @@ export function AdminClient({
                     placeholder={defaultMaxReports === "" ? "Unlimited (∞)" : `Default (${defaultMaxReports})`}
                   />
                 </div>
+              </div>
+
+              {/* Optional Profile, Office & OJT Hour Defaults */}
+              <div className="rounded-xl border border-[#E6E2D8] bg-[#FAF9F5]/80 p-3 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setShowOptionalDefaults((v) => !v)}
+                  className="w-full flex items-center justify-between gap-2 text-xs font-semibold text-[#1F1E1C] cursor-pointer"
+                >
+                  <span>Optional Intern Defaults (Name, Office, Hours, Start Date)</span>
+                  {showOptionalDefaults ? (
+                    <ChevronUp className="h-4 w-4 text-[#6B665E]" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-[#6B665E]" />
+                  )}
+                </button>
+
+                {showOptionalDefaults && (
+                  <div className="space-y-2.5 pt-1 border-t border-[#E6E2D8]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label htmlFor="create-intern-name-lf" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                          Header Name (Optional)
+                        </label>
+                        <Input
+                          id="create-intern-name-lf"
+                          type="text"
+                          value={newNameLastFirst}
+                          onChange={(e) => setNewNameLastFirst(e.target.value.toUpperCase())}
+                          placeholder="DELA CRUZ, JUAN A."
+                          className="bg-white uppercase text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="create-intern-name-fl" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                          Signature Name (Optional)
+                        </label>
+                        <Input
+                          id="create-intern-name-fl"
+                          type="text"
+                          value={newNameFirstLast}
+                          onChange={(e) => setNewNameFirstLast(e.target.value.toUpperCase())}
+                          placeholder="JUAN A. DELA CRUZ"
+                          className="bg-white uppercase text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label htmlFor="create-intern-office" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                          Office / Company (Optional)
+                        </label>
+                        <Input
+                          id="create-intern-office"
+                          type="text"
+                          value={newOffice}
+                          onChange={(e) => setNewOffice(e.target.value)}
+                          placeholder="DNX"
+                          className="bg-white text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="create-intern-verifier" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                          Default Verified By (Optional)
+                        </label>
+                        <Input
+                          id="create-intern-verifier"
+                          type="text"
+                          value={newVerifier}
+                          onChange={(e) => setNewVerifier(e.target.value.toUpperCase())}
+                          placeholder="SUPERVISOR NAME"
+                          className="bg-white uppercase text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div>
+                        <label htmlFor="create-intern-daily-hrs" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                          Hours / Day (Opt.)
+                        </label>
+                        <Input
+                          id="create-intern-daily-hrs"
+                          type="number"
+                          step="0.5"
+                          min={0}
+                          max={24}
+                          value={newDailyHours}
+                          onChange={(e) => setNewDailyHours(e.target.value)}
+                          placeholder="8"
+                          className="bg-white text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="create-intern-ojt-hrs" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                          Target OJT Hrs (Opt.)
+                        </label>
+                        <Input
+                          id="create-intern-ojt-hrs"
+                          type="number"
+                          min={40}
+                          max={5000}
+                          value={newTargetOjtHours}
+                          onChange={(e) => setNewTargetOjtHours(e.target.value)}
+                          placeholder="486"
+                          className="bg-white text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="create-intern-start" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                          Week 1 Date (Opt.)
+                        </label>
+                        <Input
+                          id="create-intern-start"
+                          type="date"
+                          value={newStartDate}
+                          onChange={(e) => setNewStartDate(e.target.value)}
+                          className="bg-white text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

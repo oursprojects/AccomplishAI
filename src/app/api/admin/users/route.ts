@@ -17,11 +17,27 @@ import type { Database } from "@/lib/supabase/database.types";
 const textModelIds = ALLOWED_TEXT_MODELS.map((m) => m.id) as [string, ...string[]];
 const sttModelIds = ALLOWED_STT_MODELS.map((m) => m.id) as [string, ...string[]];
 
+const optionalIsoDate = z
+  .union([
+    z.literal(""),
+    z.null(),
+    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD date format."),
+  ])
+  .optional()
+  .transform((v) => (v ? v : null));
+
 const createMemberSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
   password: z.string().min(6, "Password must be at least 6 characters.").max(128),
   customDailyLimit: z.coerce.number().int().min(0).max(1000).nullable().optional(),
   customMaxReports: z.coerce.number().int().min(1).max(10000).nullable().optional(),
+  nameLastFirst: z.string().trim().max(120).optional(),
+  nameFirstLast: z.string().trim().max(120).optional(),
+  office: z.string().trim().max(80).optional(),
+  defaultVerifier: z.string().trim().max(120).optional(),
+  defaultDailyHours: z.coerce.number().min(0).max(24).nullable().optional(),
+  targetOjtHours: z.coerce.number().int().min(40).max(5000).nullable().optional(),
+  internshipStartDate: optionalIsoDate,
 });
 
 const patchSchema = z.discriminatedUnion("action", [
@@ -75,18 +91,33 @@ export async function POST(request: Request) {
   const body = await parseJsonBody(request, createMemberSchema, "Invalid account details.");
   if (body.response) return body.response;
 
-  const { email, password, customDailyLimit, customMaxReports } = body.data;
+  const {
+    email,
+    password,
+    customDailyLimit,
+    customMaxReports,
+    nameLastFirst,
+    nameFirstLast,
+    office,
+    defaultVerifier,
+    defaultDailyHours,
+    targetOjtHours,
+    internshipStartDate,
+  } = body.data;
 
   try {
     let createdUserId: string | null = null;
     let needsConfirmWarning = false;
 
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (serviceKey) {
-      const adminClient = createSupabaseClient<Database>(publicEnv.supabaseUrl, serviceKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-      const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
+    const adminServiceClient = serviceKey
+      ? createSupabaseClient<Database>(publicEnv.supabaseUrl, serviceKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : null;
+
+    if (adminServiceClient) {
+      const { data: created, error: createErr } = await adminServiceClient.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
@@ -105,9 +136,20 @@ export async function POST(request: Request) {
     }
 
     if (createdUserId) {
-      await supabase
-        .from("user_quotas")
-        .upsert(
+      const writer = adminServiceClient ?? supabase;
+      const profilePayload = {
+        id: createdUserId,
+        name_last_first: (nameLastFirst ?? "").toUpperCase(),
+        name_first_last: (nameFirstLast ?? "").toUpperCase(),
+        office: office?.trim() || "DNX",
+        default_verifier: (defaultVerifier ?? "").toUpperCase(),
+        default_daily_hours: defaultDailyHours ?? 8,
+        target_ojt_hours: targetOjtHours ?? 486,
+        internship_start_date: internshipStartDate ?? null,
+      };
+
+      const [{ error: quotaErr }, { error: profileErr }] = await Promise.all([
+        writer.from("user_quotas").upsert(
           {
             user_id: createdUserId,
             email,
@@ -115,7 +157,11 @@ export async function POST(request: Request) {
             custom_max_reports: customMaxReports ?? null,
           },
           { onConflict: "user_id" },
-        );
+        ),
+        writer.from("profiles").upsert(profilePayload, { onConflict: "id" }),
+      ]);
+      if (quotaErr) throw new Error(quotaErr.message);
+      if (profileErr) throw new Error(profileErr.message);
     }
 
     const data = await loadAdminDashboardData(supabase);
