@@ -259,13 +259,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const burst = await checkBurstRateLimit(supabase, user.id, quotaBefore.isAdmin);
+  const burst = await checkBurstRateLimit(supabase, user.id, quotaBefore.isAdmin, aiSettings.globalRpmLimit);
   if (!burst.allowed) {
     return NextResponse.json(
       {
-        error: `Too many requests in one minute (${burst.count}/${burst.limit} RPM). Please wait a few seconds before sending again.`,
+        error:
+          burst.reason === "global"
+            ? `High concurrent AI traffic (${burst.count}/${burst.limit} shared RPM). Retrying shortly...`
+            : `Too many requests in one minute (${burst.count}/${burst.limit} RPM). Please wait a few seconds before sending again.`,
+        retryAfterSeconds: burst.retryAfterSeconds,
       },
-      { status: 429 },
+      { status: 429, headers: { "Retry-After": String(burst.retryAfterSeconds) } },
     );
   }
 
@@ -598,6 +602,12 @@ CORE BEHAVIOR & STRICT RULES:
     });
   } catch (err) {
     const mapped = groqErrorResponse(err);
-    return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+    return NextResponse.json(
+      { error: mapped.message, ...(mapped.retryAfterSeconds ? { retryAfterSeconds: mapped.retryAfterSeconds } : {}) },
+      {
+        status: mapped.status,
+        ...(mapped.retryAfterSeconds ? { headers: { "Retry-After": String(mapped.retryAfterSeconds) } } : {}),
+      },
+    );
   }
 }

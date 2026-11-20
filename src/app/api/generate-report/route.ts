@@ -148,6 +148,12 @@ STRICT ACCOMPLISHED-TASK, PAST-TENSE & TABLE-FIT RULES (the entire report MUST f
     return NextResponse.json({ structuredData: parsed, usage, model, quota: quotaAfter });
   } catch (err) {
     const mapped = groqErrorResponse(err);
-    return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+    return NextResponse.json(
+      { error: mapped.message, ...(mapped.retryAfterSeconds ? { retryAfterSeconds: mapped.retryAfterSeconds } : {}) },
+      {
+        status: mapped.status,
+        ...(mapped.retryAfterSeconds ? { headers: { "Retry-After": String(mapped.retryAfterSeconds) } } : {}),
+      },
+    );
   }
 }

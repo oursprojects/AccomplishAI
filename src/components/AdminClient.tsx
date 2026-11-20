@@ -33,10 +33,21 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+export interface PoolSnapshot {
+  inFlight: number;
+  queued: number;
+  models: Array<{
+    model: string;
+    callsLastMinute: number;
+    cooldownRemainingSeconds: number;
+  }>;
+}
+
 interface AdminClientProps {
   initialAiSettings: AiRuntimeSettings;
   initialMembers: AdminMember[];
   initialUsageMonitor: ApiUsageMonitor;
+  initialPoolStatus: PoolSnapshot;
 }
 
 const ENDPOINT_LABELS: Record<string, string> = {
@@ -45,9 +56,15 @@ const ENDPOINT_LABELS: Record<string, string> = {
   transcribe: "Voice Transcription (STT)",
 };
 
-export function AdminClient({ initialAiSettings, initialMembers, initialUsageMonitor }: AdminClientProps) {
+export function AdminClient({
+  initialAiSettings,
+  initialMembers,
+  initialUsageMonitor,
+  initialPoolStatus,
+}: AdminClientProps) {
   const [aiSettings, setAiSettings] = useState<AiRuntimeSettings>(initialAiSettings);
   const [usageMonitor, setUsageMonitor] = useState<ApiUsageMonitor>(initialUsageMonitor);
+  const [poolStatus, setPoolStatus] = useState<PoolSnapshot>(initialPoolStatus);
   const [defaultLimit, setDefaultLimit] = useState(initialAiSettings.defaultDailyLimit);
   const [defaultMaxReports, setDefaultMaxReports] = useState(
     initialAiSettings.defaultMaxReports === null ? "" : String(initialAiSettings.defaultMaxReports),
@@ -56,6 +73,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
   const [activeSttModel, setActiveSttModel] = useState<AllowedSttModel>(initialAiSettings.activeSttModel);
   const [maxBulletsPerDay, setMaxBulletsPerDay] = useState(initialAiSettings.maxBulletsPerDay);
   const [maxChatMessages, setMaxChatMessages] = useState(initialAiSettings.maxChatMessages);
+  const [globalRpmLimit, setGlobalRpmLimit] = useState(initialAiSettings.globalRpmLimit);
 
   const [members, setMembers] = useState<AdminMember[]>(initialMembers);
   const [draftLimits, setDraftLimits] = useState<Record<string, string>>(() =>
@@ -81,9 +99,11 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
     aiSettings: AiRuntimeSettings;
     members: AdminMember[];
     usageMonitor?: ApiUsageMonitor;
+    poolStatus?: PoolSnapshot;
   }) {
     setAiSettings(json.aiSettings);
     if (json.usageMonitor) setUsageMonitor(json.usageMonitor);
+    if (json.poolStatus) setPoolStatus(json.poolStatus);
     setDefaultLimit(json.aiSettings.defaultDailyLimit);
     setDefaultMaxReports(
       json.aiSettings.defaultMaxReports === null ? "" : String(json.aiSettings.defaultMaxReports),
@@ -92,6 +112,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
     setActiveSttModel(json.aiSettings.activeSttModel);
     setMaxBulletsPerDay(json.aiSettings.maxBulletsPerDay);
     setMaxChatMessages(json.aiSettings.maxChatMessages);
+    setGlobalRpmLimit(json.aiSettings.globalRpmLimit);
     setMembers(json.members);
     setDraftLimits(
       Object.fromEntries(json.members.map((m) => [m.userId, m.customDailyLimit === null ? "" : String(m.customDailyLimit)])),
@@ -207,12 +228,14 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
           activeSttModel,
           maxBulletsPerDay,
           maxChatMessages,
+          globalRpmLimit,
         }),
       });
       const json = (await res.json()) as {
         aiSettings?: AiRuntimeSettings;
         members?: AdminMember[];
         usageMonitor?: ApiUsageMonitor;
+        poolStatus?: PoolSnapshot;
         error?: string;
       };
       if (!res.ok || !json.members || !json.aiSettings) {
@@ -222,6 +245,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
         aiSettings: json.aiSettings,
         members: json.members,
         usageMonitor: json.usageMonitor,
+        poolStatus: json.poolStatus,
       });
       setNotice(`AI settings updated: ${json.aiSettings.activeTextModel} & ${json.aiSettings.activeSttModel}.`);
     } catch (err) {
@@ -396,10 +420,32 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
               <span>API Usage &amp; Security Monitor</span>
             </h2>
             <p className="text-xs text-[#6B665E]">
-              Protected by per-user 8 RPM burst guard + daily prompt caps across chat, generation, and voice STT.
+              Protected by per-user 8 RPM burst guard, {aiSettings.globalRpmLimit} shared RPM cap, and multi-model load balancing (~90 RPM pooled).
             </p>
           </div>
-          <Badge variant="success">Burst Guard: 8 RPM / user</Badge>
+          <Badge variant="success">
+            Pool: {poolStatus.inFlight} active · {poolStatus.queued} queued
+          </Badge>
+        </div>
+
+        {/* Live multi-model RPM pool status */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {poolStatus.models.map((pm) => (
+            <div
+              key={pm.model}
+              className="rounded-xl border border-[#EFECE3] bg-[#FAF9F5] px-3 py-2 flex items-center justify-between gap-2"
+            >
+              <div className="min-w-0">
+                <p className="text-[11px] font-mono font-semibold text-[#1F1E1C] truncate">{pm.model}</p>
+                <p className="text-[11px] text-[#6B665E]">{pm.callsLastMinute} / 24 soft RPM</p>
+              </div>
+              {pm.cooldownRemainingSeconds > 0 ? (
+                <Badge variant="warning">Cooldown {pm.cooldownRemainingSeconds}s</Badge>
+              ) : (
+                <Badge variant="success">Ready</Badge>
+              )}
+            </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -484,7 +530,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
             <Badge>GPT-OSS 120B + Whisper v3 Turbo</Badge>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
               <label className="block text-xs font-medium text-[#4A463F] mb-1">Primary Chat / Report Model</label>
               <select
@@ -535,7 +581,7 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
                 className="text-xs font-semibold"
               />
               <p className="mt-1 text-[11px] text-[#7A746B]">
-                Keeps daily task tables compact inside the 1-page .docx layout (recommended: 3).
+                Keeps daily tasks inside 1 page (recommended: 3).
               </p>
             </div>
 
@@ -550,7 +596,22 @@ export function AdminClient({ initialAiSettings, initialMembers, initialUsageMon
                 className="text-xs font-semibold"
               />
               <p className="mt-1 text-[11px] text-[#7A746B]">
-                Messages kept per report chat before prompting Clear Chat (default: 16).
+                Messages kept per report chat before Clear Chat (default: 16).
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[#4A463F] mb-1">Shared Team RPM Limit</label>
+              <Input
+                type="number"
+                min={10}
+                max={300}
+                value={globalRpmLimit}
+                onChange={(e) => setGlobalRpmLimit(Math.max(10, Math.min(300, Number(e.target.value) || 60)))}
+                className="text-xs font-semibold"
+              />
+              <p className="mt-1 text-[11px] text-[#7A746B]">
+                Pooled across 3 models (default: 60 RPM safely below 90 RPM ceiling).
               </p>
             </div>
           </div>

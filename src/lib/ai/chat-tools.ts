@@ -1,19 +1,14 @@
 import "server-only";
 import type Groq from "groq-sdk";
 import { getGroq } from "./groq";
+import { runWithGroqLoadBalancer } from "./rate-limiter";
 
 export type GroqMessage = Groq.Chat.Completions.ChatCompletionMessageParam;
 export type GroqTool = Groq.Chat.Completions.ChatCompletionTool;
 
 const CHAT_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"] as const;
 
-function shouldFallback(err: unknown): boolean {
-  if (!err || typeof err !== "object" || !("status" in err)) return false;
-  const status = (err as { status?: number }).status;
-  return status === 400 || status === 429 || status === 404 || status === 503;
-}
-
-/** Run a chat completion with tool calling and automatic model fallback across active Groq models. */
+/** Run a chat completion with tool calling, multi-model load balancing, and automatic fallback. */
 export async function groqChatWithTools(opts: {
   messages: GroqMessage[];
   tools?: GroqTool[];
@@ -25,13 +20,14 @@ export async function groqChatWithTools(opts: {
   const models = opts.preferredModel
     ? [opts.preferredModel, ...CHAT_MODELS.filter((m) => m !== opts.preferredModel)]
     : [...CHAT_MODELS];
-  let lastError: unknown;
 
-  for (const model of models) {
-    try {
-      const supportsReasoningEffort = model.startsWith("openai/gpt-oss");
-      const completion = await getGroq().chat.completions.create({
-        model,
+  const { result, model } = await runWithGroqLoadBalancer({
+    models,
+    preferredModel: opts.preferredModel,
+    execute: (m) => {
+      const supportsReasoningEffort = m.startsWith("openai/gpt-oss");
+      return getGroq().chat.completions.create({
+        model: m,
         temperature: opts.temperature ?? 0.2,
         max_completion_tokens: opts.maxTokens ?? 1500,
         ...(supportsReasoningEffort ? { reasoning_effort: "low" as const } : {}),
@@ -40,12 +36,8 @@ export async function groqChatWithTools(opts: {
           ? { tools: opts.tools, tool_choice: opts.toolChoice ?? ("auto" as const) }
           : {}),
       });
-      return { completion, model };
-    } catch (err) {
-      lastError = err;
-      if (!shouldFallback(err)) throw err;
-    }
-  }
+    },
+  });
 
-  throw lastError;
+  return { completion: result, model };
 }

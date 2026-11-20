@@ -105,6 +105,7 @@ export type Database = {
           active_stt_model: string;
           max_bullets_per_day: number;
           max_chat_messages: number;
+          global_rpm_limit: number;
           updated_at: string;
         };
         Insert: {
@@ -115,6 +116,7 @@ export type Database = {
           active_stt_model?: string;
           max_bullets_per_day?: number;
           max_chat_messages?: number;
+          global_rpm_limit?: number;
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["admin_settings"]["Insert"]>;

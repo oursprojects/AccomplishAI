@@ -9,6 +9,7 @@ import {
   isAdminEmail,
   loadAdminDashboardData,
 } from "@/lib/admin";
+import { getGroqPoolSnapshot } from "@/lib/ai/rate-limiter";
 import { publicEnv } from "@/lib/env";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -34,6 +35,7 @@ const patchSchema = z.discriminatedUnion("action", [
     activeSttModel: z.enum(sttModelIds),
     maxBulletsPerDay: z.coerce.number().int().min(1).max(5),
     maxChatMessages: z.coerce.number().int().min(4).max(60),
+    globalRpmLimit: z.coerce.number().int().min(10).max(300),
   }),
   z.object({
     action: z.literal("update_member"),
@@ -55,7 +57,10 @@ export async function GET() {
 
   try {
     const data = await loadAdminDashboardData(supabase);
-    return NextResponse.json(data);
+    return NextResponse.json({
+      ...data,
+      poolStatus: getGroqPoolSnapshot(ALLOWED_TEXT_MODELS.map((m) => m.id)),
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load admin data." },
@@ -161,6 +166,7 @@ export async function PATCH(request: Request) {
             active_stt_model: body.activeSttModel,
             max_bullets_per_day: body.maxBulletsPerDay,
             max_chat_messages: body.maxChatMessages,
+            global_rpm_limit: body.globalRpmLimit,
           },
           { onConflict: "id" },
         );
@@ -185,7 +191,10 @@ export async function PATCH(request: Request) {
     }
 
     const data = await loadAdminDashboardData(supabase);
-    return NextResponse.json(data);
+    return NextResponse.json({
+      ...data,
+      poolStatus: getGroqPoolSnapshot(ALLOWED_TEXT_MODELS.map((m) => m.id)),
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Update failed." },

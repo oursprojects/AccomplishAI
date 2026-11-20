@@ -67,8 +67,10 @@ export function ReportChat({
 }: ReportChatProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [failedRetryPayload, setFailedRetryPayload] = useState<ChatTurn[] | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -92,17 +94,7 @@ export function ReportChat({
   const contextNearLimit = !contextAtLimit && contextCount >= Math.max(2, maxChatMessages - 4);
   const composerDisabled = sending || quotaBlocked || contextAtLimit;
 
-  async function sendMessage() {
-    const text = input.trim();
-    if (!text || composerDisabled) return;
-
-    setError(null);
-    const userTurn: ChatTurn = { id: `u-${crypto.randomUUID()}`, role: "user", content: text };
-    const nextHistory = [...messages, userTurn];
-    onMessagesChange(nextHistory);
-    setInput("");
-    setSending(true);
-
+  async function submitHistory(nextHistory: ChatTurn[], attempt = 0): Promise<void> {
     try {
       const res = await fetch("/api/chat-report", {
         method: "POST",
@@ -119,15 +111,28 @@ export function ReportChat({
         updatedKeys?: ReportKey[];
         toolActions?: string[];
         quota?: QuotaStatus;
+        retryAfterSeconds?: number;
         error?: string;
       };
       if (json.quota) onQuotaChange(json.quota);
-      if (!res.ok || !json.reply) throw new Error(json.error ?? "Could not reach AI assistant.");
+
+      if (res.status === 429 && attempt < 1) {
+        const waitSecs = Math.max(2, Math.min(8, Number(json.retryAfterSeconds ?? 4)));
+        setQueueNotice(`High concurrent traffic — retrying automatically in ${waitSecs}s...`);
+        await new Promise((r) => setTimeout(r, waitSecs * 1000));
+        setQueueNotice(null);
+        return submitHistory(nextHistory, attempt + 1);
+      }
+
+      if (!res.ok || !json.reply) {
+        throw new Error(json.error ?? "Could not reach AI assistant.");
+      }
 
       if (json.structuredData && JSON.stringify(json.structuredData) !== JSON.stringify(data)) {
         onAiDataUpdate(json.structuredData);
       }
 
+      setFailedRetryPayload(null);
       const assistantTurn: ChatTurn = {
         id: `a-${crypto.randomUUID()}`,
         role: "assistant",
@@ -137,7 +142,38 @@ export function ReportChat({
       };
       onMessagesChange([...nextHistory, assistantTurn]);
     } catch (err) {
+      setQueueNotice(null);
+      setFailedRetryPayload(nextHistory);
       setError(err instanceof Error ? err.message : "Failed to send message.");
+    }
+  }
+
+  async function sendMessage() {
+    const text = input.trim();
+    if (!text || composerDisabled) return;
+
+    setError(null);
+    setQueueNotice(null);
+    setFailedRetryPayload(null);
+    const userTurn: ChatTurn = { id: `u-${crypto.randomUUID()}`, role: "user", content: text };
+    const nextHistory = [...messages, userTurn];
+    onMessagesChange(nextHistory);
+    setInput("");
+    setSending(true);
+    try {
+      await submitHistory(nextHistory, 0);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function retryLastFailed() {
+    if (!failedRetryPayload || sending) return;
+    setError(null);
+    setQueueNotice(null);
+    setSending(true);
+    try {
+      await submitHistory(failedRetryPayload, 0);
     } finally {
       setSending(false);
     }
@@ -253,7 +289,7 @@ export function ReportChat({
           <div className="flex items-start">
             <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-[#E6E2D8] bg-white px-3.5 py-2 text-xs text-[#6B665E] animate-pulse">
               <ReportPenIcon className="h-3.5 w-3.5 text-[#D97757]" />
-              <span>Updating this report...</span>
+              <span>{queueNotice ?? "Updating this report..."}</span>
             </div>
           </div>
         )}
@@ -276,8 +312,13 @@ export function ReportChat({
       )}
 
       {error && (
-        <div className="mx-3.5 mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          {error}
+        <div className="mx-3.5 mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-center justify-between gap-2">
+          <span>{error}</span>
+          {failedRetryPayload && (
+            <Button type="button" size="sm" variant="destructive" onClick={() => void retryLastFailed()}>
+              Retry
+            </Button>
+          )}
         </div>
       )}
 

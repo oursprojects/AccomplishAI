@@ -1,5 +1,6 @@
 import "server-only";
 import Groq from "groq-sdk";
+import { PoolBusyError, runWithGroqLoadBalancer } from "./rate-limiter";
 
 // Active Groq models per current rate-limit catalog
 export const GROQ_TEXT_MODEL = "openai/gpt-oss-120b";
@@ -22,12 +23,7 @@ export class MissingGroqKeyError extends Error {
   }
 }
 
-function shouldFallback(err: unknown): boolean {
-  if (!(err instanceof Groq.APIError)) return false;
-  return err.status === 400 || err.status === 429 || err.status === 404 || err.status === 503;
-}
-
-/** Run a JSON-mode chat completion with automatic fallback across active Groq models. */
+/** Run a JSON-mode chat completion with load balancing and automatic fallback across active Groq models. */
 export async function groqJson<T = unknown>(opts: {
   system: string;
   user: string;
@@ -35,33 +31,32 @@ export async function groqJson<T = unknown>(opts: {
   maxTokens?: number;
   preferredModel?: string;
 }): Promise<{ data: T; usage?: Groq.CompletionUsage; model: string }> {
+  const all = [GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS];
   const models = opts.preferredModel
-    ? [opts.preferredModel, ...[GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS].filter((m) => m !== opts.preferredModel)]
-    : [GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS];
-  let lastError: unknown;
+    ? [opts.preferredModel, ...all.filter((m) => m !== opts.preferredModel)]
+    : all;
 
-  for (const model of models) {
-    try {
-      const res = await getGroq().chat.completions.create({
-        model,
+  const { result: res, model } = await runWithGroqLoadBalancer({
+    models,
+    preferredModel: opts.preferredModel,
+    execute: (m) => {
+      const supportsReasoningEffort = m.startsWith("openai/gpt-oss");
+      return getGroq().chat.completions.create({
+        model: m,
         temperature: opts.temperature ?? 0.2,
         max_completion_tokens: opts.maxTokens ?? 2048,
-        reasoning_effort: "low",
+        ...(supportsReasoningEffort ? { reasoning_effort: "low" as const } : {}),
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: opts.system },
           { role: "user", content: opts.user },
         ],
       });
-      const content = res.choices[0]?.message?.content ?? "{}";
-      return { data: JSON.parse(content) as T, usage: res.usage, model };
-    } catch (err) {
-      lastError = err;
-      if (!shouldFallback(err)) throw err;
-    }
-  }
+    },
+  });
 
-  throw lastError;
+  const content = res.choices[0]?.message?.content ?? "{}";
+  return { data: JSON.parse(content) as T, usage: res.usage, model };
 }
 
 export type GroqMessage = Groq.Chat.Completions.ChatCompletionMessageParam;
@@ -76,16 +71,18 @@ export async function groqChatWithTools(opts: {
   maxTokens?: number;
   preferredModel?: string;
 }): Promise<{ completion: Groq.Chat.Completions.ChatCompletion; model: string }> {
+  const all = [GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS];
   const models = opts.preferredModel
-    ? [opts.preferredModel, ...[GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS].filter((m) => m !== opts.preferredModel)]
-    : [GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS];
-  let lastError: unknown;
+    ? [opts.preferredModel, ...all.filter((m) => m !== opts.preferredModel)]
+    : all;
 
-  for (const model of models) {
-    try {
-      const supportsReasoningEffort = model.startsWith("openai/gpt-oss");
-      const completion = await getGroq().chat.completions.create({
-        model,
+  const { result, model } = await runWithGroqLoadBalancer({
+    models,
+    preferredModel: opts.preferredModel,
+    execute: (m) => {
+      const supportsReasoningEffort = m.startsWith("openai/gpt-oss");
+      return getGroq().chat.completions.create({
+        model: m,
         temperature: opts.temperature ?? 0.2,
         max_completion_tokens: opts.maxTokens ?? 1500,
         ...(supportsReasoningEffort ? { reasoning_effort: "low" as const } : {}),
@@ -94,26 +91,29 @@ export async function groqChatWithTools(opts: {
           ? { tools: opts.tools, tool_choice: opts.toolChoice ?? ("auto" as const) }
           : {}),
       });
-      return { completion, model };
-    } catch (err) {
-      lastError = err;
-      if (!shouldFallback(err)) throw err;
-    }
-  }
+    },
+  });
 
-  throw lastError;
+  return { completion: result, model };
 }
 
 function redactSecrets(text: string): string {
   return text.replace(/gsk_[A-Za-z0-9_-]+/gi, "[redacted]").replace(/sb_[a-z]+_[A-Za-z0-9_-]+/gi, "[redacted]");
 }
 
-/** Maps Groq SDK errors to an HTTP status + user-safe message. */
-export function groqErrorResponse(err: unknown): { status: number; message: string } {
+/** Maps Groq SDK / pool errors to an HTTP status + user-safe message. */
+export function groqErrorResponse(err: unknown): { status: number; message: string; retryAfterSeconds?: number } {
   if (err instanceof MissingGroqKeyError) return { status: 500, message: err.message };
+  if (err instanceof PoolBusyError) {
+    return { status: 429, message: err.message, retryAfterSeconds: err.retryAfterSeconds };
+  }
   if (err instanceof Groq.APIError) {
     if (err.status === 429) {
-      return { status: 429, message: "Groq rate limit reached across active models. Please wait a minute and retry." };
+      return {
+        status: 429,
+        message: "AI models are temporarily busy with concurrent users. Retrying shortly...",
+        retryAfterSeconds: 6,
+      };
     }
     if (err.status === 401) return { status: 500, message: "AI service authentication error." };
     return { status: 502, message: `Groq error: ${redactSecrets(err.message)}` };

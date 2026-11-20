@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
-import { getUserQuotaStatus, isAdminEmail, loadAdminDashboardData } from "@/lib/admin";
+import { ALLOWED_TEXT_MODELS, getUserQuotaStatus, isAdminEmail, loadAdminDashboardData } from "@/lib/admin";
+import { getGroqPoolSnapshot } from "@/lib/ai/rate-limiter";
 import { AppShell } from "@/components/AppShell";
 import { AdminClient } from "@/components/AdminClient";
 import AdminLoading from "./loading";
@@ -18,12 +19,15 @@ async function AdminContent() {
     getUserQuotaStatus(supabase, user.id, user.email),
   ]);
 
+  const poolStatus = getGroqPoolSnapshot(ALLOWED_TEXT_MODELS.map((m) => m.id));
+
   return (
     <AppShell userEmail={user.email ?? ""} quota={quota}>
       <AdminClient
         initialAiSettings={dashboard.aiSettings}
         initialMembers={dashboard.members}
         initialUsageMonitor={dashboard.usageMonitor}
+        initialPoolStatus={poolStatus}
       />
     </AppShell>
   );

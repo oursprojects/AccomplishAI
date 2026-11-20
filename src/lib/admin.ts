@@ -44,6 +44,7 @@ export interface AiRuntimeSettings {
   activeSttModel: AllowedSttModel;
   maxBulletsPerDay: number;
   maxChatMessages: number;
+  globalRpmLimit: number;
 }
 
 export function isAdminEmail(email?: string | null): boolean {
@@ -72,7 +73,9 @@ export interface QuotaStatus {
 export async function getAiSettings(supabase: SupabaseClient<Database>): Promise<AiRuntimeSettings> {
   const { data } = await supabase
     .from("admin_settings")
-    .select("default_daily_prompt_limit, default_max_reports, active_text_model, active_stt_model, max_bullets_per_day, max_chat_messages")
+    .select(
+      "default_daily_prompt_limit, default_max_reports, active_text_model, active_stt_model, max_bullets_per_day, max_chat_messages, global_rpm_limit",
+    )
     .eq("id", 1)
     .maybeSingle();
 
@@ -86,6 +89,7 @@ export async function getAiSettings(supabase: SupabaseClient<Database>): Promise
     activeSttModel: (sttValid ? data!.active_stt_model : "whisper-large-v3-turbo") as AllowedSttModel,
     maxBulletsPerDay: data?.max_bullets_per_day ?? 3,
     maxChatMessages: data?.max_chat_messages ?? 16,
+    globalRpmLimit: data?.global_rpm_limit ?? 60,
   };
 }
 
@@ -178,16 +182,36 @@ export async function checkBurstRateLimit(
   supabase: SupabaseClient<Database>,
   userId: string,
   isAdmin: boolean,
-): Promise<{ allowed: boolean; count: number; limit: number }> {
+  globalRpmLimit = 60,
+): Promise<{
+  allowed: boolean;
+  reason?: "user" | "global";
+  count: number;
+  limit: number;
+  retryAfterSeconds: number;
+}> {
   const oneMinAgo = new Date(Date.now() - 60_000).toISOString();
   const limit = isAdmin ? 20 : 8;
-  const { count } = await supabase
-    .from("prompt_usage_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .gte("created_at", oneMinAgo);
-  const used = count ?? 0;
-  return { allowed: used < limit, count: used, limit };
+  const [{ count: userCount }, { count: visibleGlobalCount }] = await Promise.all([
+    supabase
+      .from("prompt_usage_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("created_at", oneMinAgo),
+    supabase
+      .from("prompt_usage_logs")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", oneMinAgo),
+  ]);
+  const used = userCount ?? 0;
+  if (used >= limit) {
+    return { allowed: false, reason: "user", count: used, limit, retryAfterSeconds: 6 };
+  }
+  const globalUsed = visibleGlobalCount ?? 0;
+  if (globalUsed >= globalRpmLimit) {
+    return { allowed: false, reason: "global", count: globalUsed, limit: globalRpmLimit, retryAfterSeconds: 5 };
+  }
+  return { allowed: true, count: used, limit, retryAfterSeconds: 0 };
 }
 
 function manilaDateKey(isoOrDate: string | Date): string {
