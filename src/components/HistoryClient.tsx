@@ -27,11 +27,18 @@ import {
 import { DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
 import type { DetectedField } from "@/lib/docx/types";
 import {
+  addDays,
+  formatWeekRangeFromMondayIso,
+  getReportWeekMondayIso,
   inferNextWeekRange,
   normalizeDateToLongFormat,
   parseDisplayDate,
   parseHoursNumber,
+  parseIsoDate,
+  resolveWeekCategory,
   resolveWeekNumber,
+  toIsoDate,
+  type ReportWeekCategory,
 } from "@/lib/internship-calendar";
 import { DAYS, type ReportData } from "@/lib/report-schema";
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +113,7 @@ export function HistoryClient({
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [weekFilter, setWeekFilter] = useState<string>("all");
   const [exportingAll, setExportingAll] = useState(false);
 
   const [creating, setCreating] = useState(false);
@@ -116,6 +124,40 @@ export function HistoryClient({
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflictReport, setConflictReport] = useState<{ id: string; title: string } | null>(null);
+
+  const reportByMondayIso = useMemo(() => {
+    const map = new Map<string, ReportSummary>();
+    for (const r of reports) {
+      const monIso = getReportWeekMondayIso(r.structured_data.date_from, r.structured_data.date_to);
+      if (monIso && !map.has(monIso)) {
+        map.set(monIso, r);
+      }
+    }
+    return map;
+  }, [reports]);
+
+  const weekCategories = useMemo(() => {
+    const map = new Map<string, { meta: ReportWeekCategory; count: number }>();
+    for (const r of reports) {
+      const meta = resolveWeekCategory({
+        dateFrom: r.structured_data.date_from,
+        dateTo: r.structured_data.date_to,
+        startDateIso: startDate,
+      });
+      const existing = map.get(meta.key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(meta.key, { meta, count: 1 });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.meta.key === "unscheduled") return 1;
+      if (b.meta.key === "unscheduled") return -1;
+      return a.meta.key.localeCompare(b.meta.key);
+    });
+  }, [reports, startDate]);
 
   const coveredFromTexts = reports
     .map((r) => r.structured_data.date_from)
@@ -152,6 +194,14 @@ export function HistoryClient({
     const list = reports.filter((r) => {
       if (statusFilter === "ready" && !isReportReady(r.structured_data)) return false;
       if (statusFilter === "draft" && isReportReady(r.structured_data)) return false;
+      if (weekFilter !== "all") {
+        const cat = resolveWeekCategory({
+          dateFrom: r.structured_data.date_from,
+          dateTo: r.structured_data.date_to,
+          startDateIso: startDate,
+        });
+        if (cat.key !== weekFilter) return false;
+      }
       if (!normalizedQuery) return true;
       const d = r.structured_data;
       const haystack = [
@@ -179,7 +229,25 @@ export function HistoryClient({
       });
     }
     return list;
-  }, [reports, query, sortMode, statusFilter]);
+  }, [reports, query, sortMode, statusFilter, weekFilter, startDate]);
+
+  const groupedVisibleReports = useMemo(() => {
+    const groups = new Map<string, { meta: ReportWeekCategory; items: ReportSummary[] }>();
+    for (const r of visibleReports) {
+      const meta = resolveWeekCategory({
+        dateFrom: r.structured_data.date_from,
+        dateTo: r.structured_data.date_to,
+        startDateIso: startDate,
+      });
+      const bucket = groups.get(meta.key);
+      if (bucket) {
+        bucket.items.push(r);
+      } else {
+        groups.set(meta.key, { meta, items: [r] });
+      }
+    }
+    return Array.from(groups.values());
+  }, [visibleReports, startDate]);
 
   async function saveAnchorDate(isoDate: string) {
     setSavingAnchor(true);
@@ -257,6 +325,20 @@ export function HistoryClient({
   }) {
     if (!canCreateReport || creating || duplicatingId) return;
     setError(null);
+    setConflictReport(null);
+
+    // Client-side guard: only 1 report allowed per accomplishment report week
+    if (opts?.weekStartDate || opts?.weekEndDate) {
+      const targetMonIso = getReportWeekMondayIso(opts.weekStartDate, opts.weekEndDate);
+      const existing = targetMonIso ? reportByMondayIso.get(targetMonIso) : undefined;
+      if (existing) {
+        startNavTransition(() => {
+          router.push(`/reports/${existing.id}`);
+        });
+        return;
+      }
+    }
+
     if (opts?.duplicateFromId) setDuplicatingId(opts.duplicateFromId);
     else setCreating(true);
 
@@ -266,8 +348,19 @@ export function HistoryClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(opts ?? {}),
       });
-      const json = (await res.json()) as { report?: { id: string }; error?: string };
+      const json = (await res.json()) as {
+        report?: { id: string };
+        error?: string;
+        existingReportId?: string;
+        existingReportTitle?: string;
+      };
       if (!res.ok || !json.report) {
+        if (res.status === 409 && json.existingReportId) {
+          setConflictReport({
+            id: json.existingReportId,
+            title: json.existingReportTitle || "Open existing report",
+          });
+        }
         throw new Error(json.error ?? "Could not create report.");
       }
       startNavTransition(() => {
@@ -494,13 +587,20 @@ export function HistoryClient({
                 startDateIso={startDate}
                 coveredFromTexts={coveredFromTexts}
                 onSelectAnchor={(iso) => void saveAnchorDate(iso)}
-                onSelectWeek={(wk) =>
+                onSelectWeek={(wk) => {
+                  const existing = reportByMondayIso.get(wk.mondayIso);
+                  if (existing) {
+                    startNavTransition(() => {
+                      router.push(`/reports/${existing.id}`);
+                    });
+                    return;
+                  }
                   void handleCreateReport({
                     weekStartDate: wk.fromText,
                     weekEndDate: wk.toText,
                     title: wk.weekNumber ? `Week ${wk.weekNumber}` : undefined,
-                  })
-                }
+                  });
+                }}
               />
             </div>
           </div>
@@ -508,11 +608,66 @@ export function HistoryClient({
       </Card>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 flex flex-wrap items-center justify-between gap-2">
+          <span>{error}</span>
+          {conflictReport && (
+            <Link
+              href={`/reports/${conflictReport.id}`}
+              className="inline-flex items-center gap-1 rounded-lg bg-red-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-800 transition"
+            >
+              <ExternalLink className="h-3 w-3" />
+              <span>Open {conflictReport.title}</span>
+            </Link>
+          )}
+        </div>
       )}
 
       {reports.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="space-y-2.5">
+          {/* Week Category filter pills */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#6B665E] mr-1">
+              Week Category:
+            </span>
+            <button
+              type="button"
+              onClick={() => setWeekFilter("all")}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer transition ${
+                weekFilter === "all"
+                  ? "border-[#D97757] bg-[#FDF3EF] text-[#9F4427]"
+                  : "border-[#DDD7CB] bg-white text-[#57544E] hover:bg-[#F4F2EA]"
+              }`}
+            >
+              <span>All Weeks</span>
+              <span className="rounded-md bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold">{reports.length}</span>
+            </button>
+            {weekCategories.map(({ meta, count }) => {
+              const active = weekFilter === meta.key;
+              return (
+                <button
+                  key={meta.key}
+                  type="button"
+                  onClick={() => setWeekFilter(active ? "all" : meta.key)}
+                  title={`${meta.rangeText} (${count} report${count === 1 ? "" : "s"})`}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer transition ${
+                    active
+                      ? "border-[#D97757] bg-[#FDF3EF] text-[#9F4427]"
+                      : "border-[#DDD7CB] bg-white text-[#57544E] hover:bg-[#F4F2EA]"
+                  }`}
+                >
+                  <Calendar className="h-3 w-3 text-[#D97757]" />
+                  <span>{meta.label}</span>
+                  {meta.mondayIso !== null && (
+                    <span className="rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 px-1 text-[10px] font-semibold">
+                      1/1
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div className="relative flex-1 min-w-[220px] max-w-md">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A847A]" />
             <Input
@@ -551,6 +706,7 @@ export function HistoryClient({
               <option value="week_asc">By Week Date</option>
             </select>
           </div>
+          </div>
         </div>
       )}
 
@@ -582,142 +738,195 @@ export function HistoryClient({
           <p className="text-sm font-medium text-[#1F1E1C]">No matching reports found</p>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {visibleReports.map((report) => {
-            const d = report.structured_data;
-            const dateFallback = [d.date_from, d.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
-            const displayTitle = report.title.trim() || dateFallback;
-            const wkNum = resolveWeekNumber(startDate, d.date_from ?? "");
-            const ready = isReportReady(d);
-            const created = new Date(report.created_at).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            });
-            const isRenaming = renamingId === report.id;
+        <div className="space-y-5">
+          {groupedVisibleReports.map((group) => (
+            <section key={group.meta.key} className="space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] pb-1.5">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-[#D97757]" />
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-[#4A463F]">
+                    {group.meta.label}
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-[#6B665E] hidden sm:inline">{group.meta.rangeText}</span>
+                  <Badge variant={group.meta.mondayIso ? "success" : "warning"} className="text-[10px]">
+                    {group.meta.mondayIso
+                      ? `${group.items.length}/1 Report this week`
+                      : `${group.items.length} Unscheduled`}
+                  </Badge>
+                </div>
+              </div>
 
-            return (
-              <Card
-                key={report.id}
-                className="p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 hover:border-[#D9CFC0] transition-colors"
-              >
-                <div className="min-w-0 space-y-1 flex-1">
-                  {isRenaming ? (
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        void saveRename(report.id);
-                      }}
-                      className="flex flex-wrap items-center gap-1.5"
+              <div className="space-y-2.5">
+                {group.items.map((report) => {
+                  const d = report.structured_data;
+                  const dateFallback = [d.date_from, d.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
+                  const displayTitle = report.title.trim() || dateFallback;
+                  const wkNum = resolveWeekNumber(startDate, d.date_from ?? "");
+                  const ready = isReportReady(d);
+                  const created = new Date(report.created_at).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  });
+                  const isRenaming = renamingId === report.id;
+
+                  // Resolve immediate next week (+7 days) to avoid duplicate creation per week
+                  const currentMonIso = getReportWeekMondayIso(d.date_from, d.date_to);
+                  const nextMonDate = currentMonIso ? parseIsoDate(currentMonIso) : null;
+                  const nextMonIso = nextMonDate ? toIsoDate(addDays(nextMonDate, 7)) : null;
+                  const nextRange = nextMonIso ? formatWeekRangeFromMondayIso(nextMonIso) : null;
+                  const nextExisting = nextMonIso ? reportByMondayIso.get(nextMonIso) : undefined;
+                  const nextWkNum = nextRange ? resolveWeekNumber(startDate, nextRange.fromText) : null;
+
+                  return (
+                    <Card
+                      key={report.id}
+                      className="p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 hover:border-[#D9CFC0] transition-colors"
                     >
-                      <Input
-                        type="text"
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        maxLength={120}
-                        autoFocus
-                        placeholder="Enter report title..."
-                        className="h-8 max-w-sm border-[#D97757]"
-                      />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={savingRename || !renameValue.trim()}
-                        title="Save title"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        <span>Save</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setRenamingId(null)}
-                        title="Cancel"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        <span>Cancel</span>
-                      </Button>
-                    </form>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <FileText className="h-4 w-4 text-[#D97757] shrink-0" />
-                      <Link
-                        href={`/reports/${report.id}`}
-                        className="text-sm font-semibold text-[#1F1E1C] hover:text-[#C86343] transition-colors"
-                      >
-                        {displayTitle}
-                      </Link>
-                      {wkNum !== null && <Badge variant="accent">Week {wkNum}</Badge>}
-                      <Badge variant={ready ? "success" : "warning"}>{ready ? "Ready" : "Draft"}</Badge>
-                      <button
-                        type="button"
-                        onClick={() => startRename(report)}
-                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[#6B665E] hover:bg-[#F4F2EA] hover:text-[#1F1E1C] transition cursor-pointer"
-                        title="Rename report"
-                      >
-                        <Pencil className="h-3 w-3" />
-                        <span>Rename</span>
-                      </button>
-                      {d.office && <Badge>{d.office}</Badge>}
-                      {d.hours_this_week && (
-                        <Badge variant="outline">
-                          <Clock className="h-3 w-3" />
-                          {d.hours_this_week} hrs{d.total_hours_worked ? ` (Total: ${d.total_hours_worked})` : ""}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
+                      <div className="min-w-0 space-y-1 flex-1">
+                        {isRenaming ? (
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              void saveRename(report.id);
+                            }}
+                            className="flex flex-wrap items-center gap-1.5"
+                          >
+                            <Input
+                              type="text"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              maxLength={120}
+                              autoFocus
+                              placeholder="Enter report title..."
+                              className="h-8 max-w-sm border-[#D97757]"
+                            />
+                            <Button
+                              type="submit"
+                              size="sm"
+                              disabled={savingRename || !renameValue.trim()}
+                              title="Save title"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              <span>Save</span>
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setRenamingId(null)}
+                              title="Cancel"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              <span>Cancel</span>
+                            </Button>
+                          </form>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <FileText className="h-4 w-4 text-[#D97757] shrink-0" />
+                            <Link
+                              href={`/reports/${report.id}`}
+                              className="text-sm font-semibold text-[#1F1E1C] hover:text-[#C86343] transition-colors"
+                            >
+                              {displayTitle}
+                            </Link>
+                            {wkNum !== null && <Badge variant="accent">Week {wkNum}</Badge>}
+                            <Badge variant={ready ? "success" : "warning"}>{ready ? "Ready" : "Draft"}</Badge>
+                            <button
+                              type="button"
+                              onClick={() => startRename(report)}
+                              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[#6B665E] hover:bg-[#F4F2EA] hover:text-[#1F1E1C] transition cursor-pointer"
+                              title="Rename report"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              <span>Rename</span>
+                            </button>
+                            {d.office && <Badge>{d.office}</Badge>}
+                            {d.hours_this_week && (
+                              <Badge variant="outline">
+                                <Clock className="h-3 w-3" />
+                                {d.hours_this_week} hrs{d.total_hours_worked ? ` (Total: ${d.total_hours_worked})` : ""}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
 
-                  <p className="inline-flex items-center gap-1 text-xs text-[#6B665E]">
-                    <Calendar className="h-3 w-3" />
-                    Created {created}
-                    {d.intern_name_last_first ? ` · ${d.intern_name_last_first}` : ""}
-                    {[d.date_from, d.date_to].filter(Boolean).length > 0
-                      ? ` · ${[d.date_from, d.date_to].filter(Boolean).join(" – ")}`
-                      : ""}
-                  </p>
-                  {report.raw_notes && (
-                    <p className="text-xs text-[#57544E] line-clamp-2 pt-0.5">{report.raw_notes}</p>
-                  )}
-                </div>
+                        <p className="inline-flex items-center gap-1 text-xs text-[#6B665E]">
+                          <Calendar className="h-3 w-3" />
+                          Created {created}
+                          {d.intern_name_last_first ? ` · ${d.intern_name_last_first}` : ""}
+                          {[d.date_from, d.date_to].filter(Boolean).length > 0
+                            ? ` · ${[d.date_from, d.date_to].filter(Boolean).join(" – ")}`
+                            : ""}
+                        </p>
+                        {report.raw_notes && (
+                          <p className="text-xs text-[#57544E] line-clamp-2 pt-0.5">{report.raw_notes}</p>
+                        )}
+                      </div>
 
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  <Link
-                    href={`/reports/${report.id}`}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#1F1E1C] px-3 text-xs font-medium text-white hover:bg-[#33312E] transition"
-                  >
-                    <OpenLinkContent />
-                  </Link>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={!canCreateReport || duplicatingId === report.id}
-                    onClick={() => void handleCreateReport({ duplicateFromId: report.id })}
-                    title="Create next week's report keeping your name and office defaults"
-                  >
-                    {duplicatingId === report.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <CopyPlus className="h-3.5 w-3.5 text-[#D97757]" />
-                    )}
-                    <span>Next Week</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => void handleDelete(report.id)}
-                    disabled={deletingId === report.id}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>{deletingId === report.id ? "..." : "Delete"}</span>
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <Link
+                          href={`/reports/${report.id}`}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#1F1E1C] px-3 text-xs font-medium text-white hover:bg-[#33312E] transition"
+                        >
+                          <OpenLinkContent />
+                        </Link>
+                        {nextExisting ? (
+                          <Link
+                            href={`/reports/${nextExisting.id}`}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#DDD7CB] bg-white px-3 text-xs font-medium text-[#4A463F] hover:bg-[#F4F2EA] transition"
+                            title="Only 1 report per week — open the existing next week's report"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 text-[#6B665E]" />
+                            <span>{nextWkNum ? `Open Week ${nextWkNum}` : "Next Week Exists"}</span>
+                          </Link>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={!canCreateReport || duplicatingId === report.id}
+                            onClick={() =>
+                              void handleCreateReport({
+                                duplicateFromId: report.id,
+                                ...(nextRange
+                                  ? {
+                                      weekStartDate: nextRange.fromText,
+                                      weekEndDate: nextRange.toText,
+                                      title: nextWkNum ? `Week ${nextWkNum}` : undefined,
+                                    }
+                                  : {}),
+                              })
+                            }
+                            title="Create next week's report keeping your name and office defaults"
+                          >
+                            {duplicatingId === report.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <CopyPlus className="h-3.5 w-3.5 text-[#D97757]" />
+                            )}
+                            <span>{nextWkNum ? `Create Week ${nextWkNum}` : "Next Week"}</span>
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => void handleDelete(report.id)}
+                          disabled={deletingId === report.id}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>{deletingId === report.id ? "..." : "Delete"}</span>
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
     </div>

@@ -4,8 +4,10 @@ import { getUser } from "@/lib/supabase/server";
 import { checkBurstRateLimit, getAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import {
   buildInternshipWeeks,
+  getReportWeekMondayIso,
   normalizeDateToLongFormat,
   parseHoursNumber,
+  resolveWeekCategory,
   resolveWeekNumber,
 } from "@/lib/internship-calendar";
 import { sanitizeAccomplishmentLines } from "@/lib/report-task-format";
@@ -310,6 +312,12 @@ export async function POST(request: Request) {
       };
     });
 
+  const occupiedWeekMondays = new Map<string, string>();
+  for (const prev of previousReports) {
+    const monIso = getReportWeekMondayIso(prev.date_from, prev.date_to);
+    if (monIso) occupiedWeekMondays.set(monIso, prev.title || prev.date_from);
+  }
+
   const latestPrev = previousReports[0] ?? null;
   const prevTotalRaw = latestPrev?.total_hours_worked ?? "";
   const prevTotalNum = parseHoursNumber(prevTotalRaw) ?? 0;
@@ -463,7 +471,21 @@ CORE BEHAVIOR & STRICT RULES:
 
         if (name === "set_report_fields" || name === "update_report_fields") {
           const changed: string[] = [];
+          let blockedDateConflict: string | null = null;
+
+          // Enforce 1 report per Mon–Fri week before applying date changes
+          const proposedFrom = "date_from" in args ? cleanFieldValue("date_from", args.date_from, aiSettings.maxBulletsPerDay) : workingData.date_from;
+          const proposedTo = "date_to" in args ? cleanFieldValue("date_to", args.date_to, aiSettings.maxBulletsPerDay) : workingData.date_to;
+          const proposedMonIso =
+            "date_from" in args || "date_to" in args ? getReportWeekMondayIso(proposedFrom, proposedTo) : null;
+          const allowDateUpdate = !proposedMonIso || !occupiedWeekMondays.has(proposedMonIso);
+          if (!allowDateUpdate && proposedMonIso) {
+            const cat = resolveWeekCategory({ dateFrom: proposedFrom, dateTo: proposedTo, startDateIso: startIso });
+            blockedDateConflict = `Only 1 report per week is allowed, and another report already covers ${cat.label}.`;
+          }
+
           for (const key of REPORT_KEYS) {
+            if ((key === "date_from" || key === "date_to") && !allowDateUpdate) continue;
             if (key in args && args[key] !== undefined && args[key] !== null) {
               const cleaned = cleanFieldValue(key, args[key], aiSettings.maxBulletsPerDay);
               if (cleaned !== "" && cleaned !== workingData[key]) {
@@ -500,7 +522,11 @@ CORE BEHAVIOR & STRICT RULES:
           if (changed.length > 0) {
             toolActions.push(`Updated ${changed.length} field${changed.length === 1 ? "" : "s"}`);
           }
-          toolResult = { updated: changed, status: computeStatus(workingData) };
+          toolResult = {
+            updated: changed,
+            ...(blockedDateConflict ? { blocked_date_conflict: blockedDateConflict } : {}),
+            status: computeStatus(workingData),
+          };
         } else if (name === "clear_report_fields") {
           const cleared: string[] = [];
           const alreadyEmpty: string[] = [];

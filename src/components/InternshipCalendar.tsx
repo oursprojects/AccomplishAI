@@ -270,7 +270,7 @@ export function InternshipCalendar({
               })}
             </div>
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
-              <Badge variant="success" className="text-[10px]">Green = report created</Badge>
+              <Badge variant="success" className="text-[10px]">Green = created (1/week · click to open)</Badge>
               <Badge variant="accent" className="text-[10px]">Terracotta = selected Mon–Fri</Badge>
             </div>
           </div>

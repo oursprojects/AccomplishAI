@@ -139,9 +139,79 @@ export function resolveWeekNumber(startIso: string | null | undefined, dateFromT
   return Math.floor(diffDays / 7) + 1;
 }
 
+export interface ReportWeekCategory {
+  key: string;
+  mondayIso: string | null;
+  weekNumber: number | null;
+  label: string;
+  shortLabel: string;
+  rangeText: string;
+}
+
+/** Resolves the canonical Monday ISO ("YYYY-MM-DD") for a report's date_from / date_to pair. */
+export function getReportWeekMondayIso(dateFrom?: string | null, dateTo?: string | null): string | null {
+  const fromD = parseDisplayDate(dateFrom);
+  const toD = parseDisplayDate(dateTo);
+  const ref = fromD ?? (toD ? addDays(toD, -4) : null);
+  return ref ? toIsoDate(getMondayOfWeek(ref)) : null;
+}
+
+/** Builds clean display strings for a Monday ISO week key. */
+export function formatWeekRangeFromMondayIso(mondayIso: string): {
+  mondayIso: string;
+  fridayIso: string;
+  fromText: string;
+  toText: string;
+  shortRange: string;
+  longRange: string;
+} | null {
+  const monday = parseIsoDate(mondayIso);
+  if (!monday) return null;
+  const friday = addDays(monday, 4);
+  return {
+    mondayIso,
+    fridayIso: toIsoDate(friday),
+    fromText: formatLongDate(monday),
+    toText: formatLongDate(friday),
+    shortRange: `${formatShortDate(monday)} – ${formatShortDate(friday)}, ${friday.getFullYear()}`,
+    longRange: `${formatLongDate(monday)} – ${formatLongDate(friday)}`,
+  };
+}
+
+/** Resolves a displayable Week Category descriptor for a report. */
+export function resolveWeekCategory(opts: {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  startDateIso?: string | null;
+}): ReportWeekCategory {
+  const mondayIso = getReportWeekMondayIso(opts.dateFrom, opts.dateTo);
+  if (!mondayIso) {
+    return {
+      key: "unscheduled",
+      mondayIso: null,
+      weekNumber: null,
+      label: "Unscheduled / No Dates Set",
+      shortLabel: "Unscheduled",
+      rangeText: "Assign Monday–Friday dates inside the report",
+    };
+  }
+
+  const range = formatWeekRangeFromMondayIso(mondayIso)!;
+  const weekNumber = resolveWeekNumber(opts.startDateIso, range.fromText);
+  return {
+    key: mondayIso,
+    mondayIso,
+    weekNumber,
+    label: weekNumber !== null ? `Week ${weekNumber} · ${range.shortRange}` : range.shortRange,
+    shortLabel: weekNumber !== null ? `Week ${weekNumber}` : range.shortRange,
+    rangeText: range.longRange,
+  };
+}
+
 /**
- * Infers the next report's Week number, Monday `fromText`, and Friday `toText`
+ * Infers the next open report's Week number, Monday `fromText`, and Friday `toText`
  * from existing saved reports and/or the user's internship start date.
+ * Ensures at most 1 report per accomplishment week by skipping already-covered weeks.
  */
 export function inferNextWeekRange(opts: {
   startIso?: string | null;
@@ -149,50 +219,43 @@ export function inferNextWeekRange(opts: {
 }): { weekNumber: number; fromText: string; toText: string; mondayIso: string; fridayIso: string } | null {
   const { startIso, existingReports } = opts;
 
+  const coveredMondays = new Set<string>();
   let latestMonday: Date | null = null;
   for (const r of existingReports) {
-    const fromD = parseDisplayDate(r.date_from);
-    const toD = parseDisplayDate(r.date_to);
-    const ref = fromD ?? (toD ? addDays(toD, -4) : null);
-    if (!ref) continue;
-    const mon = getMondayOfWeek(ref);
-    if (!latestMonday || mon.getTime() > latestMonday.getTime()) {
+    const monIso = getReportWeekMondayIso(r.date_from, r.date_to);
+    if (!monIso) continue;
+    coveredMondays.add(monIso);
+    const mon = parseIsoDate(monIso);
+    if (mon && (!latestMonday || mon.getTime() > latestMonday.getTime())) {
       latestMonday = mon;
+    }
+  }
+
+  if (startIso) {
+    for (let w = 1; w <= 104; w++) {
+      const wk = getWeekRange(startIso, w);
+      if (wk && !coveredMondays.has(wk.mondayIso)) {
+        return {
+          weekNumber: wk.weekNumber,
+          fromText: wk.fromText,
+          toText: wk.toText,
+          mondayIso: wk.mondayIso,
+          fridayIso: wk.fridayIso,
+        };
+      }
     }
   }
 
   if (latestMonday) {
     const nextMon = addDays(latestMonday, 7);
     const nextFri = addDays(nextMon, 4);
-    const startAnchor = parseIsoDate(startIso);
-    const weekNumber = startAnchor
-      ? Math.max(
-          1,
-          Math.floor(
-            (nextMon.getTime() - getMondayOfWeek(startAnchor).getTime()) / (7 * 24 * 60 * 60 * 1000),
-          ) + 1,
-        )
-      : existingReports.length + 1;
     return {
-      weekNumber,
+      weekNumber: existingReports.length + 1,
       fromText: formatLongDate(nextMon),
       toText: formatLongDate(nextFri),
       mondayIso: toIsoDate(nextMon),
       fridayIso: toIsoDate(nextFri),
     };
-  }
-
-  if (startIso) {
-    const wk = getWeekRange(startIso, existingReports.length + 1);
-    if (wk) {
-      return {
-        weekNumber: wk.weekNumber,
-        fromText: wk.fromText,
-        toText: wk.toText,
-        mondayIso: wk.mondayIso,
-        fridayIso: wk.fridayIso,
-      };
-    }
   }
 
   return null;

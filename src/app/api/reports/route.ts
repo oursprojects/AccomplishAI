@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
-import { inferNextWeekRange, normalizeDateToLongFormat } from "@/lib/internship-calendar";
+import {
+  getReportWeekMondayIso,
+  inferNextWeekRange,
+  normalizeDateToLongFormat,
+  resolveWeekCategory,
+} from "@/lib/internship-calendar";
 import { emptyReport, reportDataStrictSchema } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -66,29 +71,45 @@ export async function POST(request: Request) {
   let initialData = parsed.data.structuredData;
   let initialTitle = parsed.data.title;
 
-  if (!initialData) {
-    const [{ data: profile }, { data: existingRows }, { data: dupReport }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("name_last_first, name_first_last, office, internship_start_date")
-        .eq("id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("reports")
-        .select("structured_data")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50),
-      parsed.data.duplicateFromId
-        ? supabase
-            .from("reports")
-            .select("structured_data")
-            .eq("id", parsed.data.duplicateFromId)
-            .eq("user_id", user.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
+  const [{ data: profile }, { data: existingRows }, { data: dupReport }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("name_last_first, name_first_last, office, internship_start_date")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("reports")
+      .select("id, title, structured_data")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    parsed.data.duplicateFromId
+      ? supabase
+          .from("reports")
+          .select("structured_data")
+          .eq("id", parsed.data.duplicateFromId)
+          .eq("user_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
+  const existingWithWeek = (existingRows ?? []).map((r) => {
+    const obj =
+      r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
+        ? (r.structured_data as Record<string, unknown>)
+        : {};
+    const date_from = typeof obj.date_from === "string" ? obj.date_from : "";
+    const date_to = typeof obj.date_to === "string" ? obj.date_to : "";
+    return {
+      id: r.id,
+      title: r.title,
+      date_from,
+      date_to,
+      mondayIso: getReportWeekMondayIso(date_from, date_to),
+    };
+  });
+
+  if (!initialData) {
     const seeded = emptyReport();
     const dupSrc =
       dupReport?.structured_data &&
@@ -116,20 +137,9 @@ export async function POST(request: Request) {
       seeded.date_from = normalizeDateToLongFormat(parsed.data.weekStartDate);
       seeded.date_to = normalizeDateToLongFormat(parsed.data.weekEndDate);
     } else {
-      const existingPeriods = (existingRows ?? []).map((r) => {
-        const obj =
-          r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
-            ? (r.structured_data as Record<string, unknown>)
-            : {};
-        return {
-          date_from: typeof obj.date_from === "string" ? obj.date_from : "",
-          date_to: typeof obj.date_to === "string" ? obj.date_to : "",
-        };
-      });
-
       const nextWeek = inferNextWeekRange({
         startIso: profile?.internship_start_date,
-        existingReports: existingPeriods,
+        existingReports: existingWithWeek,
       });
       if (nextWeek) {
         seeded.date_from = nextWeek.fromText;
@@ -141,6 +151,27 @@ export async function POST(request: Request) {
     }
 
     initialData = seeded;
+  }
+
+  // Enforce 1 accomplishment report per Mon–Fri week
+  const targetMondayIso = getReportWeekMondayIso(initialData.date_from, initialData.date_to);
+  if (targetMondayIso) {
+    const conflict = existingWithWeek.find((r) => r.mondayIso === targetMondayIso);
+    if (conflict) {
+      const weekCat = resolveWeekCategory({
+        dateFrom: initialData.date_from,
+        dateTo: initialData.date_to,
+        startDateIso: profile?.internship_start_date,
+      });
+      return NextResponse.json(
+        {
+          error: `A report for ${weekCat.label} already exists. Only 1 accomplishment report is allowed per week.`,
+          existingReportId: conflict.id,
+          existingReportTitle: conflict.title,
+        },
+        { status: 409 },
+      );
+    }
   }
 
   const { data, error } = await supabase

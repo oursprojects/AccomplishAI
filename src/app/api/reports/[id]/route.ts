@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
+import { getReportWeekMondayIso, resolveWeekCategory } from "@/lib/internship-calendar";
 import { reportDataStrictSchema } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -67,6 +68,57 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+
+  // Enforce 1 report per Mon–Fri week when changing report dates
+  if (parsed.data.structuredData) {
+    const targetMondayIso = getReportWeekMondayIso(
+      parsed.data.structuredData.date_from,
+      parsed.data.structuredData.date_to,
+    );
+    if (targetMondayIso) {
+      const [{ data: otherReports }, { data: profile }] = await Promise.all([
+        supabase
+          .from("reports")
+          .select("id, title, structured_data")
+          .eq("user_id", user.id)
+          .neq("id", id)
+          .limit(100),
+        supabase
+          .from("profiles")
+          .select("internship_start_date")
+          .eq("id", user.id)
+          .maybeSingle(),
+      ]);
+
+      const conflict = (otherReports ?? []).find((r) => {
+        const obj =
+          r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
+            ? (r.structured_data as Record<string, unknown>)
+            : {};
+        return (
+          getReportWeekMondayIso(
+            typeof obj.date_from === "string" ? obj.date_from : "",
+            typeof obj.date_to === "string" ? obj.date_to : "",
+          ) === targetMondayIso
+        );
+      });
+
+      if (conflict) {
+        const weekCat = resolveWeekCategory({
+          dateFrom: parsed.data.structuredData.date_from,
+          dateTo: parsed.data.structuredData.date_to,
+          startDateIso: profile?.internship_start_date,
+        });
+        return NextResponse.json(
+          {
+            error: `Another report already covers ${weekCat.label}. Only 1 accomplishment report is allowed per week.`,
+            conflictReportId: conflict.id,
+          },
+          { status: 409 },
+        );
+      }
+    }
   }
 
   const { data, error } = await supabase
