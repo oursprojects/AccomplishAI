@@ -9,6 +9,7 @@ import {
   FileCheck2,
   FilePlus2,
   FolderKanban,
+  LayoutDashboard,
   Loader2,
   LogOut,
   Menu,
@@ -32,6 +33,7 @@ interface NavItem {
 }
 
 const BASE_NAV: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/", label: "My Reports", icon: FolderKanban, matchPrefix: "/reports" },
   { href: "/template", label: "Template", icon: FileCheck2 },
   { href: "/profile", label: "Profile", icon: UserRound },
