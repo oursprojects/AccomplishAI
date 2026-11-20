@@ -44,6 +44,14 @@ import { DAYS, type ReportData } from "@/lib/report-schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { InternshipCalendar } from "./InternshipCalendar";
 
@@ -120,6 +128,7 @@ export function HistoryClient({
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [, startNavTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
@@ -403,19 +412,22 @@ export function HistoryClient({
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm("Delete this saved report and its conversation?")) return;
+  async function handleConfirmDelete() {
+    if (!confirmDelete || deletingId) return;
+    const targetId = confirmDelete.id;
     setError(null);
-    setDeletingId(id);
+    setDeletingId(targetId);
     try {
-      const res = await fetch(`/api/reports/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/reports/${targetId}`, { method: "DELETE" });
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(j.error ?? "Could not delete report.");
       }
-      setReports((prev) => prev.filter((r) => r.id !== id));
+      setReports((prev) => prev.filter((r) => r.id !== targetId));
+      setConfirmDelete(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed.");
+      setConfirmDelete(null);
     } finally {
       setDeletingId(null);
     }
@@ -914,11 +926,11 @@ export function HistoryClient({
                           type="button"
                           size="sm"
                           variant="destructive"
-                          onClick={() => void handleDelete(report.id)}
+                          onClick={() => setConfirmDelete({ id: report.id, title: displayTitle })}
                           disabled={deletingId === report.id}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                          <span>{deletingId === report.id ? "..." : "Delete"}</span>
+                          <span>{deletingId === report.id ? "Deleting..." : "Delete"}</span>
                         </Button>
                       </div>
                     </Card>
@@ -929,6 +941,64 @@ export function HistoryClient({
           ))}
         </div>
       )}
+
+      {/* System Delete Confirmation Modal (replaces native browser confirm) */}
+      <Dialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingId) setConfirmDelete(null);
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 border border-red-200">
+                  <Trash2 className="h-4 w-4" />
+                </span>
+                <div>
+                  <DialogTitle>Delete Weekly Report?</DialogTitle>
+                  <DialogDescription>
+                    This permanently deletes{" "}
+                    <strong className="text-[#1F1E1C]">{confirmDelete?.title}</strong> and its AI conversation.
+                  </DialogDescription>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                disabled={Boolean(deletingId)}
+                onClick={() => setConfirmDelete(null)}
+                aria-label="Close confirmation"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={Boolean(deletingId)}
+              onClick={() => setConfirmDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={Boolean(deletingId)}
+              onClick={() => void handleConfirmDelete()}
+              className="bg-red-600 text-white border-red-600 hover:bg-red-700"
+            >
+              {deletingId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              <span>{deletingId ? "Deleting..." : "Delete Report"}</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

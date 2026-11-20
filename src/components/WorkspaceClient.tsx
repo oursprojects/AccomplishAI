@@ -442,7 +442,7 @@ export function WorkspaceClient({
       )}
 
       {/* Mobile tab bar */}
-      <div className="lg:hidden sticky top-[57px] z-20 grid grid-cols-3 rounded-2xl border border-[#E6E2D8] bg-white/95 backdrop-blur p-1 shadow-xs">
+      <div className="lg:hidden sticky top-[53px] z-20 grid grid-cols-3 rounded-2xl border border-[#E6E2D8] bg-white/95 backdrop-blur p-1 shadow-xs">
         <button
           type="button"
           onClick={() => setTab("chat")}

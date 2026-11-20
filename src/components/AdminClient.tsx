@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 import {
   ALLOWED_STT_MODELS,
@@ -31,6 +32,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 export interface PoolSnapshot {
@@ -87,6 +96,8 @@ export function AdminClient({
   const [savingDefault, setSavingDefault] = useState(false);
   const [savingAi, setSavingAi] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -122,9 +133,15 @@ export function AdminClient({
     );
   }
 
+  function openCreateModal() {
+    setModalError(null);
+    setCreateModalOpen(true);
+  }
+
   async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setModalError(null);
     setNotice(null);
     setCreating(true);
     try {
@@ -163,8 +180,9 @@ export function AdminClient({
       setShowNewPassword(false);
       setNewLimit("");
       setNewMaxReports("");
+      setCreateModalOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create account.");
+      setModalError(err instanceof Error ? err.message : "Could not create account.");
     } finally {
       setCreating(false);
     }
@@ -351,6 +369,11 @@ export function AdminClient({
             Monitor live Groq API utilization, enforce per-user prompt &amp; report limits, and manage intern logins.
           </p>
         </div>
+
+        <Button type="button" variant="accent" onClick={openCreateModal} className="self-start sm:self-center">
+          <UserPlus className="w-4 h-4" />
+          <span>Create Intern Account</span>
+        </Button>
       </div>
 
       {/* Summary metrics */}
@@ -530,7 +553,7 @@ export function AdminClient({
             <Badge>GPT-OSS 120B + Whisper v3 Turbo</Badge>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
             <div>
               <label className="block text-xs font-medium text-[#4A463F] mb-1">Primary Chat / Report Model</label>
               <select
@@ -620,72 +643,6 @@ export function AdminClient({
             <Button type="submit" size="sm" disabled={savingAi}>
               <Save className="w-3.5 h-3.5" />
               <span>{savingAi ? "Saving..." : "Save AI Controls"}</span>
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {/* Create Intern Account (Admin Only) */}
-      <Card className="p-4 sm:p-5">
-        <form onSubmit={handleCreateAccount} className="space-y-3">
-          <div>
-            <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
-              <UserPlus className="w-4 h-4 text-[#D97757]" />
-              <span>Create Intern Account</span>
-            </h2>
-            <p className="text-xs text-[#6B665E]">
-              Public sign-up is disabled. Only the admin account can provision new intern logins.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
-            <Input
-              type="email"
-              required
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="intern@email.com"
-              className="md:col-span-4 h-9"
-            />
-            <div className="relative md:col-span-3">
-              <Input
-                type={showNewPassword ? "text" : "password"}
-                required
-                minLength={6}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Temp password (min 6)"
-                className="pr-9 h-9"
-              />
-              <button
-                type="button"
-                onClick={() => setShowNewPassword((v) => !v)}
-                aria-label={showNewPassword ? "Hide password" : "Show password"}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8A847A] hover:text-[#1F1E1C] cursor-pointer"
-              >
-                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <Input
-              type="number"
-              min={0}
-              max={1000}
-              value={newLimit}
-              onChange={(e) => setNewLimit(e.target.value)}
-              placeholder={`Prompts (${defaultLimit}/d)`}
-              className="md:col-span-2 h-9 text-xs"
-            />
-            <Input
-              type="number"
-              min={1}
-              max={10000}
-              value={newMaxReports}
-              onChange={(e) => setNewMaxReports(e.target.value)}
-              placeholder="Reports (∞)"
-              className="md:col-span-1 h-9 text-xs"
-            />
-            <Button type="submit" variant="accent" disabled={creating} className="md:col-span-2 h-9">
-              {creating ? "Creating..." : "Create Account"}
             </Button>
           </div>
         </form>
@@ -850,6 +807,129 @@ export function AdminClient({
           })}
         </div>
       </Card>
+
+      {/* Create Intern Account Modal */}
+      <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+        <DialogContent className="max-w-md">
+          <form onSubmit={handleCreateAccount}>
+            <DialogHeader>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FDF3EF] text-[#D97757]">
+                    <UserPlus className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <DialogTitle>Create Intern Account</DialogTitle>
+                    <DialogDescription>
+                      Public sign-up is disabled. Provision a login and optional custom limits.
+                    </DialogDescription>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  disabled={creating}
+                  onClick={() => setCreateModalOpen(false)}
+                  aria-label="Close modal"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </DialogHeader>
+
+            <div className="px-5 py-2 space-y-3">
+              {modalError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {modalError}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="create-intern-email" className="block text-xs font-medium text-[#4A463F] mb-1">
+                  Email Address
+                </label>
+                <Input
+                  id="create-intern-email"
+                  type="email"
+                  required
+                  autoFocus
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="intern@email.com"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="create-intern-password" className="block text-xs font-medium text-[#4A463F] mb-1">
+                  Temporary Password
+                </label>
+                <div className="relative">
+                  <Input
+                    id="create-intern-password"
+                    type={showNewPassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="At least 6 characters"
+                    className="pr-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((v) => !v)}
+                    aria-label={showNewPassword ? "Hide password" : "Show password"}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8A847A] hover:text-[#1F1E1C] cursor-pointer"
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="create-intern-prompts" className="block text-xs font-medium text-[#4A463F] mb-1">
+                    Daily Prompt Limit
+                  </label>
+                  <Input
+                    id="create-intern-prompts"
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={newLimit}
+                    onChange={(e) => setNewLimit(e.target.value)}
+                    placeholder={`Default (${defaultLimit}/d)`}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-intern-reports" className="block text-xs font-medium text-[#4A463F] mb-1">
+                    Max Saved Reports
+                  </label>
+                  <Input
+                    id="create-intern-reports"
+                    type="number"
+                    min={1}
+                    max={10000}
+                    value={newMaxReports}
+                    onChange={(e) => setNewMaxReports(e.target.value)}
+                    placeholder={defaultMaxReports === "" ? "Unlimited (∞)" : `Default (${defaultMaxReports})`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={creating} onClick={() => setCreateModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="accent" disabled={creating}>
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>{creating ? "Creating..." : "Create Account"}</span>
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

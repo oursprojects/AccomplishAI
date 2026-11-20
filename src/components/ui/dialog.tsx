@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+
+const emptySubscribe = () => () => {};
 
 export function Dialog({
   open,
@@ -12,6 +15,12 @@ export function Dialog({
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
 }) {
+  const isClient = React.useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+
   React.useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
@@ -26,17 +35,18 @@ export function Dialog({
     };
   }, [open, onOpenChange]);
 
-  if (!open) return null;
+  if (!open || !isClient) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F1E1C]/50 backdrop-blur-[2px] p-3 sm:p-5"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F1E1C]/50 backdrop-blur-[2px] p-2 sm:p-5 overflow-y-auto"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
       {children}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -52,7 +62,7 @@ export function DialogContent({
       role="dialog"
       aria-modal="true"
       className={cn(
-        "w-full max-w-md rounded-2xl border border-[#E6E2D8] bg-white shadow-2xl overflow-hidden",
+        "w-full max-w-md max-h-[94dvh] rounded-2xl border border-[#E6E2D8] bg-white shadow-2xl overflow-hidden",
         className,
       )}
     >

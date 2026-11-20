@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import Image from "next/image";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Clock,
   FileCheck2,
   FilePlus2,
   FolderKanban,
@@ -35,6 +36,80 @@ const BASE_NAV: NavItem[] = [
   { href: "/template", label: "Template", icon: FileCheck2 },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
+
+function formatClockSnapshot(compact: boolean): string {
+  const now = new Date();
+  const datePart = now.toLocaleDateString("en-US", {
+    ...(compact ? {} : { weekday: "short", year: "numeric" }),
+    month: "short",
+    day: "numeric",
+  });
+  const timePart = now.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${datePart} · ${timePart}`;
+}
+
+let cachedFullClock = "";
+let cachedCompactClock = "";
+const clockListeners = new Set<() => void>();
+let clockTimer: number | null = null;
+
+function refreshClockCache() {
+  cachedFullClock = formatClockSnapshot(false);
+  cachedCompactClock = formatClockSnapshot(true);
+}
+
+function subscribeClock(listener: () => void) {
+  if (typeof window === "undefined") return () => {};
+  refreshClockCache();
+  clockListeners.add(listener);
+  if (clockTimer === null) {
+    clockTimer = window.setInterval(() => {
+      const prevFull = cachedFullClock;
+      refreshClockCache();
+      if (cachedFullClock !== prevFull) {
+        clockListeners.forEach((fn) => fn());
+      }
+    }, 1000);
+  }
+  return () => {
+    clockListeners.delete(listener);
+    if (clockListeners.size === 0 && clockTimer !== null) {
+      window.clearInterval(clockTimer);
+      clockTimer = null;
+    }
+  };
+}
+
+function getFullClockSnapshot() {
+  if (!cachedFullClock && typeof window !== "undefined") refreshClockCache();
+  return cachedFullClock;
+}
+
+function getCompactClockSnapshot() {
+  if (!cachedCompactClock && typeof window !== "undefined") refreshClockCache();
+  return cachedCompactClock;
+}
+
+function HeaderClock({ compact = false }: { compact?: boolean }) {
+  const text = useSyncExternalStore(
+    subscribeClock,
+    compact ? getCompactClockSnapshot : getFullClockSnapshot,
+    () => "",
+  );
+  if (!text) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E2D9] bg-white px-2.5 py-1 text-xs font-medium text-[#57544E] shadow-2xs tabular-nums"
+      title="Current local date and time"
+    >
+      <Clock className="h-3.5 w-3.5 text-[#D97757] shrink-0" />
+      <span>{text}</span>
+    </span>
+  );
+}
 
 function NavPendingSpinner() {
   const { pending } = useLinkStatus();
@@ -195,6 +270,9 @@ export function AppShell({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          <div className="hidden sm:inline-flex">
+            <HeaderClock compact />
+          </div>
           <AllowancePill quota={quota} />
           <Button
             type="button"
@@ -439,6 +517,7 @@ export function AppShell({
             )}
           </div>
           <div className="flex items-center gap-2.5">
+            <HeaderClock />
             <AllowancePill quota={quota} />
           </div>
         </header>

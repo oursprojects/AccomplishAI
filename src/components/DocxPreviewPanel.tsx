@@ -182,7 +182,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     };
   }, [manualZoom, computeFitZoom, paperSize]);
 
-  // Fit modal preview cleanly when opened
+  // Fit modal preview cleanly when opened or resized on mobile/tablet/desktop
   useEffect(() => {
     if (!previewModalOpen) return;
     const syncModal = () => {
@@ -192,9 +192,15 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     };
     const id = window.requestAnimationFrame(syncModal);
     window.addEventListener("resize", syncModal);
+    let observer: ResizeObserver | undefined;
+    if (modalStageRef.current && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(syncModal);
+      observer.observe(modalStageRef.current);
+    }
     return () => {
       window.cancelAnimationFrame(id);
       window.removeEventListener("resize", syncModal);
+      observer?.disconnect();
     };
   }, [previewModalOpen, modalManualZoom, computeFitZoom]);
 
@@ -285,7 +291,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
               aria-label="Paper size"
               value={paperSize}
               onChange={(e) => setPaperSize(e.target.value as PaperSize)}
-              className="h-8 rounded-lg border border-[#DDD7CB] bg-white px-2.5 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
+              className="h-8 max-w-[140px] sm:max-w-none rounded-lg border border-[#DDD7CB] bg-white px-2 sm:px-2.5 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
             >
               <option value="letter">{PAPER_DIMENSIONS.letter.label}</option>
               <option value="folio">{PAPER_DIMENSIONS.folio.label}</option>
@@ -387,19 +393,19 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
       {/* Large Preview Modal */}
       <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
-        <DialogContent className="flex h-[92vh] w-full max-w-5xl flex-col bg-[#FAF9F5]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] bg-white px-4 py-3">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-[#D97757]" />
-              <h2 className="text-sm font-semibold text-[#1F1E1C]">Document Preview</h2>
+        <DialogContent className="flex h-[94dvh] max-h-[94dvh] w-full max-w-5xl flex-col bg-[#FAF9F5]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] bg-white px-3 sm:px-4 py-2.5 sm:py-3 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText className="h-4 w-4 text-[#D97757] shrink-0" />
+              <h2 className="text-xs sm:text-sm font-semibold text-[#1F1E1C] truncate">Document Preview</h2>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <select
                 aria-label="Modal paper size"
                 value={paperSize}
                 onChange={(e) => setPaperSize(e.target.value as PaperSize)}
-                className="h-8 rounded-lg border border-[#DDD7CB] bg-white px-2.5 text-xs font-medium text-[#1F1E1C]"
+                className="h-8 max-w-[140px] sm:max-w-none rounded-lg border border-[#DDD7CB] bg-white px-2 sm:px-2.5 text-xs font-medium text-[#1F1E1C]"
               >
                 <option value="letter">{PAPER_DIMENSIONS.letter.label}</option>
                 <option value="folio">{PAPER_DIMENSIONS.folio.label}</option>
@@ -417,7 +423,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
                 >
                   <ZoomOut className="h-3.5 w-3.5" />
                 </button>
-                <span className="px-2 text-[11px] font-mono text-[#1F1E1C]">
+                <span className="px-1.5 sm:px-2 text-[11px] font-mono text-[#1F1E1C]">
                   {Math.round(modalZoom * 100)}%
                 </span>
                 <button
@@ -445,7 +451,8 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
               <Button type="button" size="sm" onClick={openDownloadPrompt}>
                 <Download className="h-3.5 w-3.5" />
-                <span>Download .docx</span>
+                <span className="hidden sm:inline">Download .docx</span>
+                <span className="sm:hidden">.docx</span>
               </Button>
 
               <Button
@@ -462,7 +469,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
           <div
             ref={modalStageRef}
-            className="docx-preview-stage flex-1 overflow-auto bg-[#ECEAE2] p-4 flex justify-center"
+            className="docx-preview-stage flex-1 min-h-0 overflow-auto bg-[#ECEAE2] p-2.5 sm:p-4 flex justify-center"
           >
             <div
               style={{
