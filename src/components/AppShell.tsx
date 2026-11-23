@@ -24,6 +24,14 @@ import type { QuotaStatus } from "@/lib/admin";
 import { QuotaGaugeIcon } from "@/components/icons/AccomplishIcons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
 
 interface NavItem {
@@ -169,6 +177,7 @@ export function AppShell({
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [signOutModalOpen, setSignOutModalOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [creatingReport, setCreatingReport] = useState(false);
   const [isNavTransition, startNavTransition] = useTransition();
@@ -240,7 +249,14 @@ export function AppShell({
     navItems.find((i) => isNavActive(i))?.label ?? "Accomplish AI";
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#FAF9F5] text-[#1F1E1C]">
+    <div className="relative min-h-screen flex flex-col md:flex-row bg-[#FAF9F5] text-[#1F1E1C]">
+      {/* Subtle editorial workspace background */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-[0.16]"
+        style={{ backgroundImage: "url('/bg-accomplish.webp')" }}
+      />
+
       {/* Subtle top progress bar during imperative route transitions */}
       {(creatingReport || isNavTransition) && (
         <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-[#F0D5C9] overflow-hidden">
@@ -249,7 +265,7 @@ export function AppShell({
       )}
 
       {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-[#E5E2D9] bg-[#FAF9F5]/95 backdrop-blur-md px-3.5 py-2">
+      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-[#E5E2D9] bg-[#FAF9F5]/90 backdrop-blur-md px-3.5 py-2">
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
@@ -281,7 +297,7 @@ export function AppShell({
             variant="outline"
             size="icon"
             disabled={signingOut}
-            onClick={() => void handleSignOut()}
+            onClick={() => setSignOutModalOpen(true)}
             title="Sign out"
             className="rounded-xl"
           >
@@ -384,7 +400,7 @@ export function AppShell({
                 disabled={signingOut}
                 onClick={() => {
                   setMobileOpen(false);
-                  void handleSignOut();
+                  setSignOutModalOpen(true);
                 }}
                 className="w-full"
               >
@@ -401,7 +417,7 @@ export function AppShell({
 
       {/* Desktop sticky sidebar */}
       <aside
-        className={`hidden md:flex sticky top-0 h-screen shrink-0 flex-col justify-between border-r border-[#E5E2D9] bg-[#F4F2EA] transition-all duration-200 ${
+        className={`relative z-20 hidden md:flex sticky top-0 h-screen shrink-0 flex-col justify-between border-r border-[#E5E2D9] bg-[#F4F2EA]/92 backdrop-blur-md transition-all duration-200 ${
           collapsed ? "w-[76px] px-2.5 py-4" : "w-60 px-3.5 py-4"
         }`}
       >
@@ -498,7 +514,7 @@ export function AppShell({
             type="button"
             variant="outline"
             disabled={isShellBusy}
-            onClick={() => void handleSignOut()}
+            onClick={() => setSignOutModalOpen(true)}
             title="Sign out"
             className="w-full"
           >
@@ -515,8 +531,8 @@ export function AppShell({
       </aside>
 
       {/* Main workspace canvas with desktop header allowance bar */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex sticky top-0 z-20 items-center justify-between border-b border-[#E5E2D9] bg-[#FAF9F5]/95 backdrop-blur-md px-6 py-3">
+      <div className="relative z-10 flex-1 min-w-0 flex flex-col">
+        <header className="hidden md:flex sticky top-0 z-20 items-center justify-between border-b border-[#E5E2D9] bg-[#FAF9F5]/90 backdrop-blur-md px-6 py-3">
           <div className="flex items-center gap-2.5">
             <span className="text-sm font-semibold text-[#1F1E1C]">{currentLabel}</span>
             {quota && !quota.isAdmin && (
@@ -533,9 +549,65 @@ export function AppShell({
         </header>
 
         <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-5">
-          <div className="mx-auto w-full max-w-7xl">{children}</div>
+          <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
+
+      {/* Sign Out Confirmation Modal */}
+      <Dialog
+        open={signOutModalOpen}
+        onOpenChange={(open) => {
+          if (!open && !signingOut) setSignOutModalOpen(false);
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FDF3EF] text-[#D97757] border border-[#F0D5C9]">
+                  <LogOut className="h-4 w-4" />
+                </span>
+                <div>
+                  <DialogTitle>Sign out of Accomplish AI?</DialogTitle>
+                  <DialogDescription>
+                    Signed in as <strong className="text-[#1F1E1C]">{userEmail}</strong>. Your saved reports stay safe.
+                  </DialogDescription>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                disabled={signingOut}
+                onClick={() => setSignOutModalOpen(false)}
+                aria-label="Close sign out dialog"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={signingOut}
+              onClick={() => setSignOutModalOpen(false)}
+            >
+              Stay Signed In
+            </Button>
+            <Button
+              type="button"
+              variant="accent"
+              disabled={signingOut}
+              onClick={() => void handleSignOut()}
+            >
+              {signingOut ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+              <span>{signingOut ? "Signing out..." : "Confirm Sign Out"}</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

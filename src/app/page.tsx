@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
+import { normalizeHolidayMondays } from "@/lib/internship-calendar";
 import { ensureFastActiveTemplateReview } from "@/lib/templates/pipeline";
 import type { ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
@@ -60,12 +61,18 @@ async function ReportsHomeContent({
         maxReports={quota.maxReports}
         canCreateReport={quota.canCreateReport}
         initialStartDate={profile?.internship_start_date ?? null}
+        initialHolidayMondays={normalizeHolidayMondays(user.user_metadata?.holiday_mondays)}
         targetOjtHours={profile?.target_ojt_hours ?? 486}
         exportTemplate={
           review
             ? {
                 templateId: review.template.id,
-                fields: review.fields.map((f) => ({ key: f.key, kind: f.kind })),
+                templateVersion: review.template.updated_at,
+                fields: review.fields.map((f) => ({
+                  key: f.key,
+                  kind: f.kind,
+                  ...(f.customTexts ? { customTexts: f.customTexts } : {}),
+                })),
               }
             : null
         }

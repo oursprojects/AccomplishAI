@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
 import { getQuotaAndAiSettings } from "@/lib/admin";
+import { normalizeHolidayMondays } from "@/lib/internship-calendar";
 import { ensureFastActiveTemplateReview } from "@/lib/templates/pipeline";
 import { reportDataSchema, type ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
@@ -111,6 +112,7 @@ async function ReportDetailContent({
         key={initialReport.id}
         userId={user.id}
         profile={initialProfile}
+        holidayMondays={normalizeHolidayMondays(user.user_metadata?.holiday_mondays)}
         previousTotalHours={previousTotalHours}
         initialReview={review}
         initialReport={initialReport}

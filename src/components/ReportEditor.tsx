@@ -72,6 +72,7 @@ interface ReportEditorProps {
   defaultDailyHours?: number;
   previousTotalHours?: string;
   internshipStartDate?: string | null;
+  holidayMondays?: string[];
 }
 
 export function ReportEditor({
@@ -89,6 +90,7 @@ export function ReportEditor({
   defaultDailyHours = 8,
   previousTotalHours = "",
   internshipStartDate = null,
+  holidayMondays = [],
 }: ReportEditorProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -247,7 +249,7 @@ export function ReportEditor({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">From (Monday)</label>
+            <label className="block text-xs font-medium text-[#4A463F] mb-1">Period From</label>
             <Input
               type="text"
               value={data.date_from}
@@ -260,7 +262,7 @@ export function ReportEditor({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">To (Friday)</label>
+            <label className="block text-xs font-medium text-[#4A463F] mb-1">Period To</label>
             <Input
               type="text"
               value={data.date_to}
@@ -442,15 +444,15 @@ export function ReportEditor({
         </div>
       </Card>
 
-      {/* Mon-Fri Week Calendar Picker Modal */}
+      {/* Week / Custom Range Calendar Picker Modal */}
       <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <div className="flex items-start justify-between gap-2">
               <div>
-                <DialogTitle>Select Report Week (Monday – Friday)</DialogTitle>
+                <DialogTitle>Edit Report Dates &amp; Schedule</DialogTitle>
                 <DialogDescription>
-                  Click any date or week button to fill From (Monday) and To (Friday).
+                  Pick a Monday–Friday week or switch to Custom Dates for partial or holiday weeks.
                 </DialogDescription>
               </div>
               <Button type="button" size="icon" variant="ghost" onClick={() => setCalendarOpen(false)}>
@@ -463,6 +465,8 @@ export function ReportEditor({
               mode="week"
               startDateIso={internshipStartDate}
               selectedFromText={data.date_from}
+              selectedToText={data.date_to}
+              holidayMondays={holidayMondays}
               onSelectWeek={(wk) => {
                 onChange({ ...data, date_from: wk.fromText, date_to: wk.toText });
                 if (wk.weekNumber && (!title.trim() || /^Week \d+$/i.test(title.trim()))) {

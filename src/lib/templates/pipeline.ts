@@ -6,7 +6,7 @@ import type { Database, Json, TemplateRow } from "@/lib/supabase/database.types"
 import { scanDocx } from "@/lib/docx/scanner";
 import { tagDocx } from "@/lib/docx/tagger";
 import { resolveFields, type FieldAssignment } from "@/lib/docx/mapping";
-import type { Candidate, DetectedField } from "@/lib/docx/types";
+import type { Candidate, DetectedField, TemplateTextOverrides } from "@/lib/docx/types";
 import { DOCX_MIME } from "@/lib/docx/fill";
 import { mapCandidatesWithAI } from "@/lib/ai/field-mapper";
 import { TEMPLATE_BUCKET, templatePaths } from "@/lib/env";
@@ -96,6 +96,7 @@ export async function confirmTemplate(
   userId: string,
   templateId: string,
   assignments: FieldAssignment[],
+  customTexts?: Partial<TemplateTextOverrides>,
 ): Promise<TemplateReview> {
   const { data: tpl, error } = await supabase
     .from("templates")
@@ -105,13 +106,21 @@ export async function confirmTemplate(
     .single();
   if (error || !tpl) throw new Error("Template not found.");
 
-  const { data: blob, error: dlError } = await supabase.storage.from(TEMPLATE_BUCKET).download(tpl.original_path);
-  if (dlError || !blob) throw new Error(`Could not load original template: ${dlError?.message}`);
-  const original = Buffer.from(await blob.arrayBuffer());
+  let original: Buffer;
+  try {
+    original = await readFile(DEFAULT_TEMPLATE_PATH);
+  } catch {
+    const { data: blob, error: dlError } = await supabase.storage.from(TEMPLATE_BUCKET).download(tpl.original_path);
+    if (dlError || !blob) throw new Error(`Could not load original template: ${dlError?.message}`);
+    original = Buffer.from(await blob.arrayBuffer());
+  }
 
   const scan = scanDocx(original);
   const fields = resolveFields(scan.candidates, assignments, "user");
   if (!fields.length) throw new Error("Assign at least one field before confirming.");
+  if (customTexts && Object.keys(customTexts).length > 0) {
+    fields[0] = { ...fields[0], customTexts };
+  }
   const tagged = tagDocx(original, fields);
   await upload(supabase, tpl.storage_path, tagged);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link, { useLinkStatus } from "next/link";
 import { useRouter } from "next/navigation";
 import PizZip from "pizzip";
@@ -26,8 +26,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { fetchCachedTemplateBytes, prefetchTemplatePreview } from "@/lib/docx/client-cache";
 import { defaultReportFileName, DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
-import type { DetectedField } from "@/lib/docx/types";
+import { resolveTemplateTexts, type DetectedField } from "@/lib/docx/types";
 import {
   addDays,
   formatWeekRangeFromMondayIso,
@@ -97,6 +98,7 @@ export function HistoryClient({
   maxReports,
   canCreateReport,
   initialStartDate = null,
+  initialHolidayMondays = [],
   targetOjtHours = 486,
   exportTemplate = null,
   profileSnapshot,
@@ -105,8 +107,13 @@ export function HistoryClient({
   maxReports: number | null;
   canCreateReport: boolean;
   initialStartDate?: string | null;
+  initialHolidayMondays?: string[];
   targetOjtHours?: number;
-  exportTemplate?: { templateId: string; fields: Pick<DetectedField, "key" | "kind">[] } | null;
+  exportTemplate?: {
+    templateId: string;
+    templateVersion?: string;
+    fields: Pick<DetectedField, "key" | "kind" | "customTexts">[];
+  } | null;
   profileSnapshot?: {
     name_last_first: string;
     name_first_last: string;
@@ -119,6 +126,7 @@ export function HistoryClient({
   const router = useRouter();
   const [reports, setReports] = useState<ReportSummary[]>(initialReports);
   const [startDate, setStartDate] = useState<string | null>(initialStartDate);
+  const [holidayMondays, setHolidayMondays] = useState<string[]>(initialHolidayMondays);
   const [calendarOpen, setCalendarOpen] = useState(!initialStartDate);
   const [savingAnchor, setSavingAnchor] = useState(false);
 
@@ -167,6 +175,7 @@ export function HistoryClient({
         dateFrom: r.structured_data.date_from,
         dateTo: r.structured_data.date_to,
         startDateIso: startDate,
+        holidayMondays,
       });
       const existing = map.get(meta.key);
       if (existing) {
@@ -180,7 +189,7 @@ export function HistoryClient({
       if (b.meta.key === "unscheduled") return -1;
       return a.meta.key.localeCompare(b.meta.key);
     });
-  }, [reports, startDate]);
+  }, [reports, startDate, holidayMondays]);
 
   const coveredFromTexts = reports
     .map((r) => r.structured_data.date_from)
@@ -188,11 +197,18 @@ export function HistoryClient({
 
   const nextWeekPreview = inferNextWeekRange({
     startIso: startDate,
+    holidayMondays,
     existingReports: reports.map((r) => ({
       date_from: r.structured_data.date_from,
       date_to: r.structured_data.date_to,
     })),
   });
+
+  useEffect(() => {
+    if (exportTemplate) {
+      prefetchTemplatePreview(exportTemplate.templateId, exportTemplate.templateVersion);
+    }
+  }, [exportTemplate]);
 
   // Compute OJT cumulative hours progress cleanly across reports
   const ojtStats = useMemo(() => {
@@ -222,6 +238,7 @@ export function HistoryClient({
           dateFrom: r.structured_data.date_from,
           dateTo: r.structured_data.date_to,
           startDateIso: startDate,
+          holidayMondays,
         });
         if (cat.key !== weekFilter) return false;
       }
@@ -252,7 +269,7 @@ export function HistoryClient({
       });
     }
     return list;
-  }, [reports, query, sortMode, statusFilter, weekFilter, startDate]);
+  }, [reports, query, sortMode, statusFilter, weekFilter, startDate, holidayMondays]);
 
   const groupedVisibleReports = useMemo(() => {
     const groups = new Map<string, { meta: ReportWeekCategory; items: ReportSummary[] }>();
@@ -261,6 +278,7 @@ export function HistoryClient({
         dateFrom: r.structured_data.date_from,
         dateTo: r.structured_data.date_to,
         startDateIso: startDate,
+        holidayMondays,
       });
       const bucket = groups.get(meta.key);
       if (bucket) {
@@ -270,9 +288,9 @@ export function HistoryClient({
       }
     }
     return Array.from(groups.values());
-  }, [visibleReports, startDate]);
+  }, [visibleReports, startDate, holidayMondays]);
 
-  async function saveAnchorDate(isoDate: string) {
+  async function persistCalendarDefaults(nextStartIso: string | null, nextHolidays: string[]) {
     setSavingAnchor(true);
     try {
       const res = await fetch("/api/profile", {
@@ -285,30 +303,41 @@ export function HistoryClient({
           default_verifier: profileSnapshot?.default_verifier ?? "",
           default_daily_hours: profileSnapshot?.default_daily_hours ?? 8,
           target_ojt_hours: profileSnapshot?.target_ojt_hours ?? targetOjtHours,
-          internship_start_date: isoDate || null,
+          internship_start_date: nextStartIso || null,
+          holiday_mondays: nextHolidays,
         }),
       });
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error ?? "Could not save internship start date.");
+        throw new Error(j.error ?? "Could not update internship calendar.");
       }
-      setStartDate(isoDate || null);
-      toast.success("Internship Week 1 start date updated.");
+      setStartDate(nextStartIso || null);
+      setHolidayMondays(nextHolidays);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save start date.");
+      toast.error(err instanceof Error ? err.message : "Could not save calendar.");
     } finally {
       setSavingAnchor(false);
     }
   }
 
+  async function saveAnchorDate(isoDate: string) {
+    await persistCalendarDefaults(isoDate || null, holidayMondays);
+    toast.success("Internship Week 1 start date updated.");
+  }
+
+  async function toggleHolidayWeek(mondayIso: string) {
+    const exists = holidayMondays.includes(mondayIso);
+    const nextHolidays = exists
+      ? holidayMondays.filter((m) => m !== mondayIso)
+      : [...holidayMondays, mondayIso].sort();
+    await persistCalendarDefaults(startDate, nextHolidays);
+    toast.success(exists ? "Removed holiday/break week." : "Marked week as Holiday / Break.");
+  }
+
   async function loadTemplateBytes(): Promise<ArrayBuffer> {
     if (cachedTemplateBytes) return cachedTemplateBytes;
     if (!exportTemplate) throw new Error("No active Word template configured.");
-    const res = await fetch(`/api/template-file?templateId=${encodeURIComponent(exportTemplate.templateId)}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("Could not load active Word template.");
-    const bytes = await res.arrayBuffer();
+    const bytes = await fetchCachedTemplateBytes(exportTemplate.templateId, exportTemplate.templateVersion);
     setCachedTemplateBytes(bytes);
     return bytes;
   }
@@ -318,7 +347,8 @@ export function HistoryClient({
     setDownloadingId(report.id);
     try {
       const bytes = await loadTemplateBytes();
-      const filled = fillTemplate(bytes, report.structured_data, exportTemplate.fields);
+      const customTexts = resolveTemplateTexts(exportTemplate.fields);
+      const filled = fillTemplate(bytes, report.structured_data, exportTemplate.fields, customTexts);
       const fileName = `${defaultReportFileName(report.structured_data, displayTitle)}.docx`;
       const copy = new Uint8Array(filled);
       saveAs(new Blob([copy], { type: DOCX_MIME }), fileName);
@@ -335,6 +365,7 @@ export function HistoryClient({
     setExportingAll(true);
     try {
       const templateBytes = await loadTemplateBytes();
+      const customTexts = resolveTemplateTexts(exportTemplate.fields);
 
       const zip = new PizZip();
       const usedNames = new Map<string, number>();
@@ -347,7 +378,7 @@ export function HistoryClient({
         const count = (usedNames.get(rawLabel) ?? 0) + 1;
         usedNames.set(rawLabel, count);
         const fileName = `${count > 1 ? `${rawLabel}-${count}` : rawLabel}.docx`;
-        const filled = fillTemplate(templateBytes, d, exportTemplate.fields);
+        const filled = fillTemplate(templateBytes, d, exportTemplate.fields, customTexts);
         zip.file(fileName, filled);
       }
 
@@ -639,9 +670,11 @@ export function HistoryClient({
                 mode={startDate ? "week" : "anchor"}
                 startDateIso={startDate}
                 coveredFromTexts={coveredFromTexts}
+                holidayMondays={holidayMondays}
+                onToggleHolidayWeek={(monIso) => void toggleHolidayWeek(monIso)}
                 onSelectAnchor={(iso) => void saveAnchorDate(iso)}
                 onSelectWeek={(wk) => {
-                  const existing = reportByMondayIso.get(wk.mondayIso);
+                  const existing = !wk.isCustom ? reportByMondayIso.get(wk.mondayIso) : undefined;
                   if (existing) {
                     startNavTransition(() => {
                       router.push(`/reports/${existing.id}`);
@@ -804,7 +837,7 @@ export function HistoryClient({
                   const d = report.structured_data;
                   const dateFallback = [d.date_from, d.date_to].filter(Boolean).join(" – ") || "Untitled Weekly Report";
                   const displayTitle = report.title.trim() || dateFallback;
-                  const wkNum = resolveWeekNumber(startDate, d.date_from ?? "");
+                  const wkNum = resolveWeekNumber(startDate, d.date_from ?? "", holidayMondays);
                   const ready = isReportReady(d);
                   const created = new Date(report.created_at).toLocaleDateString(undefined, {
                     year: "numeric",
@@ -813,13 +846,23 @@ export function HistoryClient({
                   });
                   const isRenaming = renamingId === report.id;
 
-                  // Resolve immediate next week (+7 days) to avoid duplicate creation per week
+                  // Resolve immediate next non-holiday week to avoid duplicate creation per week
                   const currentMonIso = getReportWeekMondayIso(d.date_from, d.date_to);
-                  const nextMonDate = currentMonIso ? parseIsoDate(currentMonIso) : null;
-                  const nextMonIso = nextMonDate ? toIsoDate(addDays(nextMonDate, 7)) : null;
+                  let nextMonDate = currentMonIso ? parseIsoDate(currentMonIso) : null;
+                  if (nextMonDate) {
+                    const holSet = new Set(holidayMondays);
+                    for (let step = 1; step <= 26; step++) {
+                      const candidate = addDays(nextMonDate, step * 7);
+                      if (!holSet.has(toIsoDate(candidate))) {
+                        nextMonDate = candidate;
+                        break;
+                      }
+                    }
+                  }
+                  const nextMonIso = nextMonDate ? toIsoDate(nextMonDate) : null;
                   const nextRange = nextMonIso ? formatWeekRangeFromMondayIso(nextMonIso) : null;
                   const nextExisting = nextMonIso ? reportByMondayIso.get(nextMonIso) : undefined;
-                  const nextWkNum = nextRange ? resolveWeekNumber(startDate, nextRange.fromText) : null;
+                  const nextWkNum = nextRange ? resolveWeekNumber(startDate, nextRange.fromText, holidayMondays) : null;
 
                   return (
                     <Card
@@ -1015,6 +1058,7 @@ export function HistoryClient({
             if (!open) setPreviewReport(null);
           }}
           templateId={exportTemplate.templateId}
+          templateVersion={exportTemplate.templateVersion}
           fields={exportTemplate.fields}
           data={previewReport.structured_data}
           reportTitle={previewReport.title.trim() || undefined}

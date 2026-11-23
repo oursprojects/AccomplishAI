@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { Download, FileText, Loader2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { fetchCachedTemplateBytes, warmDocxPreview } from "@/lib/docx/client-cache";
 import { defaultReportFileName, DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
 import { enhanceCsuPreviewChrome, PAPER_DIMENSIONS, type PaperSize } from "@/lib/docx/csu-template-chrome";
-import type { DetectedField } from "@/lib/docx/types";
+import { resolveTemplateTexts, type DetectedField } from "@/lib/docx/types";
 import type { ReportData } from "@/lib/report-schema";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -15,7 +16,8 @@ interface QuickDocxPreviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   templateId: string;
-  fields: Pick<DetectedField, "key" | "kind">[];
+  templateVersion?: string;
+  fields: Pick<DetectedField, "key" | "kind" | "customTexts">[];
   data: Partial<ReportData>;
   reportTitle?: string;
   cachedTemplateBytes?: ArrayBuffer | null;
@@ -28,6 +30,7 @@ export function QuickDocxPreviewModal({
   open,
   onOpenChange,
   templateId,
+  templateVersion,
   fields,
   data,
   reportTitle,
@@ -38,11 +41,12 @@ export function QuickDocxPreviewModal({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [filledBytes, setFilledBytes] = useState<Uint8Array | null>(null);
 
-  const [paperSize, setPaperSize] = useState<PaperSize>("letter");
+  const paperSize: PaperSize = "letter";
   const [zoom, setZoom] = useState(0.75);
   const [manualZoom, setManualZoom] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const customTexts = useMemo(() => resolveTemplateTexts(fields), [fields]);
   const dims = PAPER_DIMENSIONS[paperSize];
   const pagePxW = Math.round(dims.widthPt * PT_TO_PX);
   const pagePxH = Math.round(dims.heightPt * PT_TO_PX);
@@ -84,19 +88,15 @@ export function QuickDocxPreviewModal({
       try {
         let bytes = cachedTemplateBytes ?? null;
         if (!bytes) {
-          const res = await fetch(`/api/template-file?templateId=${encodeURIComponent(templateId)}`, {
-            cache: "no-store",
-          });
-          if (!res.ok) throw new Error("Could not load Word template.");
-          bytes = await res.arrayBuffer();
+          bytes = await fetchCachedTemplateBytes(templateId, templateVersion);
           onTemplateBytesLoaded?.(bytes);
         }
         if (cancelled || !containerRef.current) return;
 
-        const filled = fillTemplate(bytes, data, fields);
+        const filled = fillTemplate(bytes, data, fields, customTexts);
         if (!cancelled) setFilledBytes(filled);
 
-        const { renderAsync } = await import("docx-preview");
+        const { renderAsync } = await warmDocxPreview();
         if (cancelled || !containerRef.current) return;
         containerRef.current.innerHTML = "";
         await renderAsync(filled.buffer as ArrayBuffer, containerRef.current, undefined, {
@@ -108,7 +108,7 @@ export function QuickDocxPreviewModal({
           useBase64URL: true,
         });
         if (!cancelled && containerRef.current) {
-          enhanceCsuPreviewChrome(containerRef.current, filled, paperSize);
+          enhanceCsuPreviewChrome(containerRef.current, filled, paperSize, customTexts);
         }
       } catch (err) {
         if (!cancelled) {
@@ -123,7 +123,7 @@ export function QuickDocxPreviewModal({
     return () => {
       cancelled = true;
     };
-  }, [open, templateId, fields, data, paperSize, cachedTemplateBytes, onTemplateBytesLoaded]);
+  }, [open, templateId, templateVersion, fields, data, customTexts, paperSize, cachedTemplateBytes, onTemplateBytesLoaded]);
 
   function handleDownload() {
     if (!filledBytes) return;
@@ -146,15 +146,9 @@ export function QuickDocxPreviewModal({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <select
-              aria-label="Modal paper size"
-              value={paperSize}
-              onChange={(e) => setPaperSize(e.target.value as PaperSize)}
-              className="h-8 max-w-[140px] sm:max-w-none rounded-lg border border-[#DDD7CB] bg-white px-2 sm:px-2.5 text-xs font-medium text-[#1F1E1C]"
-            >
-              <option value="letter">{PAPER_DIMENSIONS.letter.label}</option>
-              <option value="folio">{PAPER_DIMENSIONS.folio.label}</option>
-            </select>
+            <span className="hidden sm:inline-flex items-center rounded-lg border border-[#DDD7CB] bg-white px-2.5 h-8 text-xs font-medium text-[#4A463F]">
+              {dims.label}
+            </span>
 
             <div className="flex items-center rounded-lg border border-[#DDD7CB] bg-white text-xs overflow-hidden h-8">
               <button

@@ -1,13 +1,13 @@
 import PizZip from "pizzip";
+import { DEFAULT_TEMPLATE_TEXTS, type TemplateTextOverrides } from "./types";
 
-export type PaperSize = "letter" | "folio";
+export type PaperSize = "letter";
 
 export const PAPER_DIMENSIONS: Record<
   PaperSize,
   { label: string; widthPt: number; heightPt: number; widthIn: string; heightIn: string }
 > = {
-  letter: { label: 'Original (8.5" × 11")', widthPt: 612, heightPt: 792, widthIn: "8.5in", heightIn: "11in" },
-  folio: { label: 'Long (8.5" × 13")', widthPt: 612, heightPt: 936, widthIn: "8.5in", heightIn: "13in" },
+  letter: { label: '8.5" × 11" (Standard Letter)', widthPt: 612, heightPt: 792, widthIn: "8.5in", heightIn: "11in" },
 };
 
 interface TemplateMedia {
@@ -63,10 +63,18 @@ function extractCsuMedia(docxBytes: ArrayBuffer | Uint8Array): TemplateMedia | n
   }
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /**
  * Enhances the docx-preview DOM for the official 2026 CSU CICS template:
  * 1. Restores the exact header/footer PNG assets, waves, fonts, and double borders.
- * 2. Enforces a strict single-page canvas (8.5"x11" original or 8.5"x13" long).
+ * 2. Enforces a strict single-page 8.5" x 11" canvas.
  * 3. Proportionally auto-fits <article> if inputs get long so text NEVER overlaps
  *    the footer or spills onto a second printed page.
  */
@@ -74,9 +82,11 @@ export function enhanceCsuPreviewChrome(
   container: HTMLElement,
   docxBytes: ArrayBuffer | Uint8Array,
   paperSize: PaperSize = "letter",
+  customTexts?: Partial<TemplateTextOverrides> | null,
 ): void {
   const media = extractCsuMedia(docxBytes);
   if (!media) return;
+  const texts: TemplateTextOverrides = { ...DEFAULT_TEMPLATE_TEXTS, ...(customTexts ?? {}) };
 
   const dims = PAPER_DIMENSIONS[paperSize];
   const sidePadPt = 58; // (612 - 495.9 table width) / 2 -> keeps the table centered cleanly
@@ -123,14 +133,14 @@ export function enhanceCsuPreviewChrome(
     const header = section.querySelector("header");
     if (header) {
       header.style.cssText = "position:relative;z-index:1;flex-shrink:0;margin:0 0 8pt 0;padding:0;";
-      header.innerHTML = buildHeaderHtml(media, dims.widthPt, sidePadPt);
+      header.innerHTML = buildHeaderHtml(media, dims.widthPt, sidePadPt, texts);
     }
 
     const article = section.querySelector("article");
     const footer = section.querySelector("footer");
     if (footer) {
       footer.style.cssText = "position:relative;z-index:1;flex-shrink:0;margin:auto 0 0 0;padding:4pt 0 0 0;";
-      footer.innerHTML = buildFooterHtml(media, dims.widthPt, sidePadPt);
+      footer.innerHTML = buildFooterHtml(media, dims.widthPt, sidePadPt, texts);
     }
 
     if (article) {
@@ -209,32 +219,47 @@ export function enhanceCsuPreviewChrome(
   });
 }
 
-function buildHeaderHtml(media: TemplateMedia, widthPt: number, sidePadPt: number): string {
-  return `
-    <div style="display:flex;align-items:center;justify-content:center;gap:10pt;padding-top:4pt;margin-bottom:4pt;">
-      <img src="${media.csuLogo}" alt="CSU Logo" style="width:56pt;height:58pt;object-fit:contain;flex-shrink:0;" />
-      <div style="text-align:center;line-height:1.15;color:#000;">
-        <div style="font-family:'Century Gothic','Trebuchet MS',sans-serif;font-size:10pt;">Republic of the Philippines</div>
-        <div style="font-family:'Old English Text MT',var(--font-old-english),'Times New Roman',serif;font-size:13pt;font-weight:600;margin:1pt 0;">Cagayan State University</div>
-        <div style="font-family:'Century Gothic','Trebuchet MS',sans-serif;font-size:10pt;">GONZAGA CAMPUS</div>
-        <div style="font-family:'Century Gothic','Trebuchet MS',sans-serif;font-size:10pt;">Gonzaga, Cagayan</div>
-      </div>
-    </div>
-    <div style="width:${widthPt}pt;margin-left:-${sidePadPt}pt;border-top:4pt double #000;border-bottom:4pt double #000;padding:2pt 12pt;text-align:center;font-family:'Century Gothic','Trebuchet MS',sans-serif;color:#000;background:transparent;box-sizing:border-box;">
-      <span style="font-size:14pt;font-weight:700;">C</span><span style="font-size:11pt;">OLLEGE</span>
+function buildHeaderHtml(
+  media: TemplateMedia,
+  widthPt: number,
+  sidePadPt: number,
+  texts: TemplateTextOverrides,
+): string {
+  const isDefaultCollege = texts.college_banner === DEFAULT_TEMPLATE_TEXTS.college_banner;
+  const collegeHtml = isDefaultCollege
+    ? `<span style="font-size:14pt;font-weight:700;">C</span><span style="font-size:11pt;">OLLEGE</span>
       <span style="font-family:'Brush Script MT','Segoe Script',cursive;font-size:12pt;margin:0 2pt;">of</span>
       <span style="font-size:14pt;font-weight:700;">I</span><span style="font-size:11pt;">NFORMATION</span>
       <span style="font-family:'Brush Script MT','Segoe Script',cursive;font-size:12pt;margin:0 2pt;">and</span>
       <span style="font-size:14pt;font-weight:700;">C</span><span style="font-size:11pt;">OMPUTING</span>
-      <span style="font-size:14pt;font-weight:700;margin-left:3pt;">S</span><span style="font-size:11pt;">CIENCES</span>
+      <span style="font-size:14pt;font-weight:700;margin-left:3pt;">S</span><span style="font-size:11pt;">CIENCES</span>`
+    : `<span style="font-size:11.5pt;font-weight:700;">${escapeHtml(texts.college_banner)}</span>`;
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:center;gap:10pt;padding-top:4pt;margin-bottom:4pt;">
+      <img src="${media.csuLogo}" alt="CSU Logo" style="width:56pt;height:58pt;object-fit:contain;flex-shrink:0;" />
+      <div style="text-align:center;line-height:1.15;color:#000;">
+        <div style="font-family:'Century Gothic','Trebuchet MS',sans-serif;font-size:10pt;">${escapeHtml(texts.country_header)}</div>
+        <div style="font-family:'Old English Text MT',var(--font-old-english),'Times New Roman',serif;font-size:13pt;font-weight:600;margin:1pt 0;">${escapeHtml(texts.university_header)}</div>
+        <div style="font-family:'Century Gothic','Trebuchet MS',sans-serif;font-size:10pt;">${escapeHtml(texts.campus_header)}</div>
+        <div style="font-family:'Century Gothic','Trebuchet MS',sans-serif;font-size:10pt;">${escapeHtml(texts.campus_address)}</div>
+      </div>
+    </div>
+    <div style="width:${widthPt}pt;margin-left:-${sidePadPt}pt;border-top:4pt double #000;border-bottom:4pt double #000;padding:2pt 12pt;text-align:center;font-family:'Century Gothic','Trebuchet MS',sans-serif;color:#000;background:transparent;box-sizing:border-box;">
+      ${collegeHtml}
     </div>
     <div style="text-align:center;font-family:'Century Gothic','Trebuchet MS',sans-serif;font-size:10pt;font-weight:700;color:#000;margin-top:8pt;">
-      WEEKLY ACCOMPLISHMENT REPORT
+      ${escapeHtml(texts.report_title)}
     </div>
   `;
 }
 
-function buildFooterHtml(media: TemplateMedia, widthPt: number, sidePadPt: number): string {
+function buildFooterHtml(
+  media: TemplateMedia,
+  widthPt: number,
+  sidePadPt: number,
+  texts: TemplateTextOverrides,
+): string {
   return `
     <div style="width:${widthPt}pt;margin-left:-${sidePadPt}pt;border-top:4pt double #000;padding:4pt 14pt 8pt 14pt;box-sizing:border-box;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6pt;color:#000;">
@@ -245,20 +270,19 @@ function buildFooterHtml(media: TemplateMedia, widthPt: number, sidePadPt: numbe
 
         <div style="flex:1;display:grid;grid-template-columns:1fr 1.12fr 1.48fr;gap:7pt;font-family:'Candara','Calibri','Segoe UI',sans-serif;font-size:6.4pt;line-height:1.15;text-align:left;">
           <div>
-            <div style="font-family:'Berlin Sans FB Demi','Trebuchet MS',sans-serif;font-weight:700;font-size:6.7pt;margin-bottom:1.5pt;">CSU VISION</div>
-            <div>CSU is a university with global stature in the arts, culture, agriculture and fisheries, the sciences as well as technological and professional fields.</div>
+            <div style="font-family:'Berlin Sans FB Demi','Trebuchet MS',sans-serif;font-weight:700;font-size:6.7pt;margin-bottom:1.5pt;">${escapeHtml(texts.vision_title)}</div>
+            <div>${escapeHtml(texts.vision_body)}</div>
           </div>
 
           <div>
-            <div style="font-family:'Berlin Sans FB Demi','Trebuchet MS',sans-serif;font-weight:700;font-size:6.7pt;margin-bottom:1.5pt;">CSU MISSION</div>
-            <div>CSU is committed to transform the lives of people and communities through high quality instruction and innovative research, development, production and extension.</div>
+            <div style="font-family:'Berlin Sans FB Demi','Trebuchet MS',sans-serif;font-weight:700;font-size:6.7pt;margin-bottom:1.5pt;">${escapeHtml(texts.mission_title)}</div>
+            <div>${escapeHtml(texts.mission_body)}</div>
           </div>
 
           <div>
-            <div style="font-family:'Berlin Sans FB Demi','Trebuchet MS',sans-serif;font-weight:700;font-size:6.7pt;margin-bottom:1.5pt;">GOALS AND OBJECTIVES</div>
-            <div>1. To produce proficient, competent and committed graduates equipped with the knowledge, skills and positive values demanded by the IT profession; and</div>
-            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:4pt;margin-top:1pt;">
-              <div>2. To produce research and extension-service-oriented graduates.</div>
+            <div style="font-family:'Berlin Sans FB Demi','Trebuchet MS',sans-serif;font-weight:700;font-size:6.7pt;margin-bottom:1.5pt;">${escapeHtml(texts.pledge_title)}</div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:4pt;">
+              <div>${escapeHtml(texts.pledge_body)}</div>
               <img src="${media.ambisyon}" alt="Ambisyon Natin 2040" style="width:50pt;height:23pt;object-fit:contain;flex-shrink:0;" />
             </div>
           </div>

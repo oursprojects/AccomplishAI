@@ -7,6 +7,7 @@ import {
   getReportWeekMondayIso,
   inferNextWeekRange,
   normalizeDateToLongFormat,
+  normalizeHolidayMondays,
   resolveWeekCategory,
 } from "@/lib/internship-calendar";
 import { emptyReport, reportDataStrictSchema } from "@/lib/report-schema";
@@ -136,9 +137,11 @@ export async function POST(request: Request) {
       seeded.date_from = normalizeDateToLongFormat(parsed.data.weekStartDate);
       seeded.date_to = normalizeDateToLongFormat(parsed.data.weekEndDate);
     } else {
+      const holidayMondays = normalizeHolidayMondays(user.user_metadata?.holiday_mondays);
       const nextWeek = inferNextWeekRange({
         startIso: profile?.internship_start_date,
         existingReports: existingWithWeek,
+        holidayMondays,
       });
       if (nextWeek) {
         seeded.date_from = nextWeek.fromText;
@@ -157,10 +160,12 @@ export async function POST(request: Request) {
   if (targetMondayIso) {
     const conflict = existingWithWeek.find((r) => r.mondayIso === targetMondayIso);
     if (conflict) {
+      const holidayMondays = normalizeHolidayMondays(user.user_metadata?.holiday_mondays);
       const weekCat = resolveWeekCategory({
         dateFrom: initialData.date_from,
         dateTo: initialData.date_to,
         startDateIso: profile?.internship_start_date,
+        holidayMondays,
       });
       return NextResponse.json(
         {

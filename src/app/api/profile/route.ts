@@ -3,12 +3,10 @@ import { z } from "zod";
 import { jsonError, parseJsonBody, safeServerError } from "@/lib/api-utils";
 import { getUser } from "@/lib/supabase/server";
 
+const isoDateStrict = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD date format.");
+
 const isoDateOptional = z
-  .union([
-    z.literal(""),
-    z.null(),
-    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD date format."),
-  ])
+  .union([z.literal(""), z.null(), isoDateStrict])
   .optional()
   .transform((v) => (v ? v : null));
 
@@ -20,6 +18,7 @@ const profileSchema = z.object({
   default_daily_hours: z.coerce.number().min(0).max(24).default(8),
   internship_start_date: isoDateOptional,
   target_ojt_hours: z.coerce.number().int().min(40).max(5000).default(486),
+  holiday_mondays: z.array(isoDateStrict).max(52).optional(),
 });
 
 export async function GET() {
@@ -35,16 +34,22 @@ export async function GET() {
     .maybeSingle();
 
   if (error) return safeServerError("api/profile GET", error, "Could not load profile.");
+  const holidayMondays = Array.isArray(user.user_metadata?.holiday_mondays)
+    ? user.user_metadata.holiday_mondays.filter((v): v is string => typeof v === "string")
+    : [];
   return NextResponse.json({
-    profile: data ?? {
-      id: user.id,
-      name_last_first: "",
-      name_first_last: "",
-      office: "DNX",
-      default_verifier: "",
-      default_daily_hours: 8,
-      internship_start_date: null,
-      target_ojt_hours: 486,
+    profile: {
+      ...(data ?? {
+        id: user.id,
+        name_last_first: "",
+        name_first_last: "",
+        office: "DNX",
+        default_verifier: "",
+        default_daily_hours: 8,
+        internship_start_date: null,
+        target_ojt_hours: 486,
+      }),
+      holiday_mondays: holidayMondays,
     },
   });
 }
@@ -77,5 +82,15 @@ export async function PUT(request: Request) {
     .single();
 
   if (error) return safeServerError("api/profile PUT", error, "Could not save profile.");
-  return NextResponse.json({ profile: data });
+
+  let savedHolidays = Array.isArray(user.user_metadata?.holiday_mondays)
+    ? user.user_metadata.holiday_mondays.filter((v): v is string => typeof v === "string")
+    : [];
+  if (body.data.holiday_mondays !== undefined) {
+    const cleaned = Array.from(new Set(body.data.holiday_mondays)).sort();
+    await supabase.auth.updateUser({ data: { holiday_mondays: cleaned } }).catch(() => null);
+    savedHolidays = cleaned;
+  }
+
+  return NextResponse.json({ profile: { ...data, holiday_mondays: savedHolidays } });
 }

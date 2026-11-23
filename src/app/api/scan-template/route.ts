@@ -6,11 +6,26 @@ import { jsonError, parseJsonBody, safeServerError } from "@/lib/api-utils";
 import { getUser } from "@/lib/supabase/server";
 import { isReportKey } from "@/lib/report-schema";
 import type { FieldAssignment } from "@/lib/docx/mapping";
+import { DEFAULT_TEMPLATE_TEXTS, type TemplateTextOverrides } from "@/lib/docx/types";
 import { confirmTemplate, loadActiveTemplateReview, scanAndStoreTemplate } from "@/lib/templates/pipeline";
 
 const DEFAULT_TEMPLATE_NAME = "2026-Weekly-Accomplishment-Report.docx";
 const DEFAULT_TEMPLATE_PATH = join(process.cwd(), "templates", DEFAULT_TEMPLATE_NAME);
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const customTextKeys = Object.keys(DEFAULT_TEMPLATE_TEXTS) as Array<keyof TemplateTextOverrides>;
+const customTextsSchema = z
+  .record(z.string(), z.string().max(600))
+  .optional()
+  .transform((rec) => {
+    if (!rec) return undefined;
+    const cleaned: Partial<TemplateTextOverrides> = {};
+    for (const key of customTextKeys) {
+      if (typeof rec[key] === "string") {
+        cleaned[key] = rec[key];
+      }
+    }
+    return cleaned;
+  });
 
 const confirmBodySchema = z.object({
   templateId: z.string().uuid("Invalid template ID."),
@@ -21,11 +36,8 @@ const confirmBodySchema = z.object({
       label: z.string().max(80).optional(),
     }),
   ),
+  customTexts: customTextsSchema,
 });
-
-function hasZipSignature(buf: Buffer): boolean {
-  return buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b;
-}
 
 export async function GET() {
   const { supabase, user } = await getUser();
@@ -39,37 +51,13 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST() {
   const { supabase, user } = await getUser();
   if (!user) return jsonError(401, "Unauthorized");
 
   try {
-    const contentType = request.headers.get("content-type") ?? "";
-    let buffer: Buffer;
-    let fileName = DEFAULT_TEMPLATE_NAME;
-
-    if (contentType.includes("multipart/form-data")) {
-      const form = await request.formData();
-      const file = form.get("file");
-      if (!(file instanceof File)) {
-        return jsonError(400, "No .docx file provided.");
-      }
-      if (!file.name.toLowerCase().endsWith(".docx")) {
-        return jsonError(400, "Please upload a valid .docx Word document.");
-      }
-      if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) {
-        return jsonError(file.size === 0 ? 400 : 413, file.size === 0 ? "Uploaded file is empty." : "Template exceeds the 10 MB limit.");
-      }
-      fileName = file.name.slice(0, 140);
-      buffer = Buffer.from(await file.arrayBuffer());
-      if (!hasZipSignature(buffer)) {
-        return jsonError(400, "Invalid .docx file format. Please upload a standard Word (.docx) document.");
-      }
-    } else {
-      buffer = await readFile(DEFAULT_TEMPLATE_PATH);
-    }
-
-    const review = await scanAndStoreTemplate(supabase, user.id, buffer, fileName);
+    const buffer = await readFile(DEFAULT_TEMPLATE_PATH);
+    const review = await scanAndStoreTemplate(supabase, user.id, buffer, DEFAULT_TEMPLATE_NAME);
     return NextResponse.json({ review }, { status: 201 });
   } catch (err) {
     return safeServerError("api/scan-template POST", err, "Failed to scan template.");
@@ -90,7 +78,13 @@ export async function PATCH(request: Request) {
       label: a.label,
     }));
 
-    const review = await confirmTemplate(supabase, user.id, body.data.templateId, assignments);
+    const review = await confirmTemplate(
+      supabase,
+      user.id,
+      body.data.templateId,
+      assignments,
+      body.data.customTexts,
+    );
     return NextResponse.json({ review });
   } catch (err) {
     return safeServerError("api/scan-template PATCH", err, "Failed to confirm template.");

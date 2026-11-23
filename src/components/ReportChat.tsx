@@ -41,6 +41,13 @@ interface ReportChatProps {
   onOpenPreview: () => void;
 }
 
+const THINKING_PHRASES = [
+  "Reading your notes & organizing daily tasks...",
+  "Converting entries into past-tense report bullets...",
+  "Calculating weekly hours & checking dates...",
+  "Syncing updates to your live document preview...",
+] as const;
+
 function getMissingSummary(data: ReportData): string[] {
   const missing: string[] = [];
   if (!data.intern_name_last_first.trim() || !data.intern_name_first_last.trim()) missing.push("Intern name");
@@ -67,6 +74,7 @@ export function ReportChat({
 }: ReportChatProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [thinkingIdx, setThinkingIdx] = useState(0);
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +84,14 @@ export function ReportChat({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, sending]);
+
+  useEffect(() => {
+    if (!sending) return;
+    const id = window.setInterval(() => {
+      setThinkingIdx((prev) => (prev + 1) % THINKING_PHRASES.length);
+    }, 1800);
+    return () => window.clearInterval(id);
+  }, [sending]);
 
   async function handleCopyReply(id: string, text: string) {
     try {
@@ -191,8 +207,8 @@ export function ReportChat({
             <h2 className="text-sm font-semibold text-[#1F1E1C] leading-tight">Report Assistant</h2>
             <p className="text-[11px] text-[#6B665E] truncate">
               {missing.length === 0
-                ? "Auto-updates this report — main sections filled"
-                : "Auto-updates this report from your English or Tagalog notes"}
+                ? "Main sections complete — ask anytime for tweaks or polish"
+                : "Share rough notes in English or Tagalog to build your preview"}
             </p>
           </div>
         </div>
@@ -292,7 +308,7 @@ export function ReportChat({
           <div className="flex items-start">
             <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-[#E6E2D8] bg-white px-3.5 py-2 text-xs text-[#6B665E] animate-pulse">
               <ReportPenIcon className="h-3.5 w-3.5 text-[#D97757]" />
-              <span>{queueNotice ?? "Updating this report..."}</span>
+              <span>{queueNotice ?? THINKING_PHRASES[thinkingIdx]}</span>
             </div>
           </div>
         )}

@@ -109,6 +109,16 @@ export async function POST(request: Request) {
     let createdUserId: string | null = null;
     let needsConfirmWarning = false;
 
+    const profileMetadata = {
+      name_last_first: (nameLastFirst ?? "").toUpperCase(),
+      name_first_last: (nameFirstLast ?? "").toUpperCase(),
+      office: office?.trim() || "DNX",
+      default_verifier: (defaultVerifier ?? "").toUpperCase(),
+      default_daily_hours: defaultDailyHours ?? 8,
+      target_ojt_hours: targetOjtHours ?? 486,
+      internship_start_date: internshipStartDate ?? null,
+    };
+
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const adminServiceClient = serviceKey
       ? createSupabaseClient<Database>(publicEnv.supabaseUrl, serviceKey, {
@@ -116,52 +126,109 @@ export async function POST(request: Request) {
         })
       : null;
 
+    const anonClient = createSupabaseClient<Database>(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
     if (adminServiceClient) {
       const { data: created, error: createErr } = await adminServiceClient.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
+        user_metadata: profileMetadata,
       });
-      if (createErr) return NextResponse.json({ error: createErr.message }, { status: 400 });
-      createdUserId = created.user?.id ?? null;
+      if (createErr) {
+        if (/already\s*registered|already\s*been\s*registered|exists/i.test(createErr.message)) {
+          const { data: listData } = await adminServiceClient.auth.admin.listUsers();
+          const existingUser = listData?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+          if (existingUser) {
+            createdUserId = existingUser.id;
+            await adminServiceClient.auth.admin.updateUserById(existingUser.id, {
+              password,
+              email_confirm: true,
+              user_metadata: { ...(existingUser.user_metadata ?? {}), ...profileMetadata },
+            });
+          } else {
+            return NextResponse.json({ error: createErr.message }, { status: 400 });
+          }
+        } else {
+          return NextResponse.json({ error: createErr.message }, { status: 400 });
+        }
+      } else {
+        createdUserId = created.user?.id ?? null;
+      }
     } else {
       // Stateless anon client so admin's own session cookies are untouched
-      const anonClient = createSupabaseClient<Database>(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
+      const { data: signed, error: signErr } = await anonClient.auth.signUp({
+        email,
+        password,
+        options: { data: profileMetadata },
       });
-      const { data: signed, error: signErr } = await anonClient.auth.signUp({ email, password });
-      if (signErr) return NextResponse.json({ error: signErr.message }, { status: 400 });
-      createdUserId = signed.user?.id ?? null;
-      needsConfirmWarning = !signed.session;
+      if (signErr) {
+        // Recover if a previous attempt created the auth user before quota/profile sync completed
+        if (/already\s*registered|already\s*been\s*registered/i.test(signErr.message)) {
+          const { data: recovered, error: recoverErr } = await anonClient.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (!recoverErr && recovered.user) {
+            createdUserId = recovered.user.id;
+            await anonClient.auth.updateUser({ data: profileMetadata }).catch(() => null);
+          } else {
+            const { data: existingQuota } = await supabase
+              .from("user_quotas")
+              .select("user_id")
+              .ilike("email", email)
+              .maybeSingle();
+            if (existingQuota?.user_id) {
+              createdUserId = existingQuota.user_id;
+            } else {
+              return NextResponse.json(
+                {
+                  error:
+                    "This email is already registered in Supabase Auth. Enter the same password used initially to finish linking their quota & profile, or use a different email.",
+                },
+                { status: 400 },
+              );
+            }
+          }
+        } else {
+          return NextResponse.json({ error: signErr.message }, { status: 400 });
+        }
+      } else {
+        createdUserId = signed.user?.id ?? null;
+        needsConfirmWarning = !signed.session;
+      }
     }
 
     if (createdUserId) {
-      const writer = adminServiceClient ?? supabase;
+      const quotaWriter = adminServiceClient ?? supabase;
       const profilePayload = {
         id: createdUserId,
-        name_last_first: (nameLastFirst ?? "").toUpperCase(),
-        name_first_last: (nameFirstLast ?? "").toUpperCase(),
-        office: office?.trim() || "DNX",
-        default_verifier: (defaultVerifier ?? "").toUpperCase(),
-        default_daily_hours: defaultDailyHours ?? 8,
-        target_ojt_hours: targetOjtHours ?? 486,
-        internship_start_date: internshipStartDate ?? null,
+        ...profileMetadata,
       };
 
-      const [{ error: quotaErr }, { error: profileErr }] = await Promise.all([
-        writer.from("user_quotas").upsert(
-          {
-            user_id: createdUserId,
-            email,
-            custom_daily_limit: customDailyLimit ?? null,
-            custom_max_reports: customMaxReports ?? null,
-          },
-          { onConflict: "user_id" },
-        ),
-        writer.from("profiles").upsert(profilePayload, { onConflict: "id" }),
-      ]);
+      const { error: quotaErr } = await quotaWriter.from("user_quotas").upsert(
+        {
+          user_id: createdUserId,
+          email,
+          custom_daily_limit: customDailyLimit ?? null,
+          custom_max_reports: customMaxReports ?? null,
+        },
+        { onConflict: "user_id" },
+      );
       if (quotaErr) throw new Error(quotaErr.message);
-      if (profileErr) throw new Error(profileErr.message);
+
+      // Try writing profile with service client, new user's own session client (passes profiles_update_own RLS), or admin client
+      const profileClient = adminServiceClient ?? anonClient;
+      const { error: pErr1 } = await profileClient.from("profiles").upsert(profilePayload, { onConflict: "id" });
+      if (pErr1) {
+        const { error: pErr2 } = await supabase.from("profiles").upsert(profilePayload, { onConflict: "id" });
+        if (pErr2) {
+          // Non-fatal: defaults are also stored in user_metadata and auto-synced when the intern signs in
+          console.warn("[api/admin/users POST] Profile RLS deferred to user_metadata sync:", pErr2.message);
+        }
+      }
     }
 
     const data = await loadAdminDashboardData(supabase);

@@ -18,7 +18,9 @@ type EditableProfile = Pick<
   | "default_daily_hours"
   | "internship_start_date"
   | "target_ojt_hours"
->;
+> & {
+  holiday_mondays: string[];
+};
 
 function deriveSignatureName(lastFirst: string): string {
   const parts = lastFirst
@@ -221,6 +223,18 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
             <InternshipCalendar
               mode="anchor"
               startDateIso={form.internship_start_date}
+              holidayMondays={form.holiday_mondays}
+              onToggleHolidayWeek={(mondayIso) => {
+                setForm((prev) => {
+                  const exists = prev.holiday_mondays.includes(mondayIso);
+                  return {
+                    ...prev,
+                    holiday_mondays: exists
+                      ? prev.holiday_mondays.filter((m) => m !== mondayIso)
+                      : [...prev.holiday_mondays, mondayIso].sort(),
+                  };
+                });
+              }}
               onSelectAnchor={(iso) => setForm({ ...form, internship_start_date: iso })}
             />
           </div>

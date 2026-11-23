@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/api/(.*)",
+        source: "/api/((?!template-file).*)",
         headers: [
           { key: "Cache-Control", value: "no-store, private, max-age=0" },
           { key: "Pragma", value: "no-cache" },

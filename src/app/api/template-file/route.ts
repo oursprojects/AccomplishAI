@@ -13,6 +13,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const templateId = searchParams.get("templateId");
+  const version = searchParams.get("v");
   if (templateId && !uuidSchema.safeParse(templateId).success) {
     return jsonError(400, "Invalid template ID.");
   }
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
     headers: {
       "Content-Type": DOCX_MIME,
       "Content-Disposition": `inline; filename="${safeName}"`,
-      "Cache-Control": "no-store, private",
+      "Cache-Control": version ? "private, max-age=86400, immutable" : "no-store, private",
       "X-Content-Type-Options": "nosniff",
     },
   });

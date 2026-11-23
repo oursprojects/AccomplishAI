@@ -44,6 +44,7 @@ interface WorkspaceClientProps {
     Profile,
     "name_last_first" | "name_first_last" | "office" | "default_verifier" | "default_daily_hours" | "internship_start_date"
   >;
+  holidayMondays?: string[];
   previousTotalHours?: string;
   initialReview: TemplateReview | null;
   initialReport: {
@@ -90,6 +91,7 @@ function formSnapshotOf(title: string, data: ReportData): string {
 
 export function WorkspaceClient({
   profile,
+  holidayMondays = [],
   previousTotalHours = "",
   initialReview,
   initialReport,
@@ -119,7 +121,7 @@ export function WorkspaceClient({
   const currentSnapshot = useMemo(() => formSnapshotOf(title, data), [title, data]);
   const hasChanges = currentSnapshot !== savedSnapshot;
 
-  const [tab, setTab] = useState<WorkspaceTab>("chat");
+  const [tab, setTab] = useState<WorkspaceTab>("preview");
   const [desktopLeftMode, setDesktopLeftMode] = useState<"chat" | "edit">("chat");
 
   const [saving, setSaving] = useState(false);
@@ -442,43 +444,58 @@ export function WorkspaceClient({
         </div>
       )}
 
-      {/* Mobile tab bar */}
-      <div className="lg:hidden sticky top-[53px] z-20 grid grid-cols-3 rounded-2xl border border-[#E6E2D8] bg-white/95 backdrop-blur p-1 shadow-xs">
-        <button
-          type="button"
-          onClick={() => setTab("chat")}
-          className={`inline-flex items-center justify-center gap-1.5 min-h-[38px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-            tab === "chat" ? "bg-[#1F1E1C] text-white shadow-2xs" : "text-[#57544E] hover:bg-[#F4F2EA]"
-          }`}
-        >
-          <MessageSquareText className="h-3.5 w-3.5" />
-          <span>1. Chat</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("edit")}
-          className={`inline-flex items-center justify-center gap-1.5 min-h-[38px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-            tab === "edit" ? "bg-[#1F1E1C] text-white shadow-2xs" : "text-[#57544E] hover:bg-[#F4F2EA]"
-          }`}
-        >
-          <Edit3 className="h-3.5 w-3.5" />
-          <span>2. Edit</span>
-        </button>
+      {/* Mobile & tablet tab bar — Live Preview is front and center alongside Chat & Edit */}
+      <div className="lg:hidden sticky top-[53px] z-20 grid grid-cols-3 gap-1 rounded-2xl border border-[#E6E2D8] bg-white/95 backdrop-blur p-1 shadow-xs">
         <button
           type="button"
           onClick={() => setTab("preview")}
-          className={`inline-flex items-center justify-center gap-1.5 min-h-[38px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
+          className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
             tab === "preview" ? "bg-[#1F1E1C] text-white shadow-2xs" : "text-[#57544E] hover:bg-[#F4F2EA]"
           }`}
         >
           <Eye className="h-3.5 w-3.5" />
-          <span>3. Preview</span>
+          <span>Document</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("chat")}
+          className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
+            tab === "chat" ? "bg-[#1F1E1C] text-white shadow-2xs" : "text-[#57544E] hover:bg-[#F4F2EA]"
+          }`}
+        >
+          <MessageSquareText className="h-3.5 w-3.5" />
+          <span>AI Chat</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("edit")}
+          className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
+            tab === "edit" ? "bg-[#1F1E1C] text-white shadow-2xs" : "text-[#57544E] hover:bg-[#F4F2EA]"
+          }`}
+        >
+          <Edit3 className="h-3.5 w-3.5" />
+          <span>Edit Fields</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left column: Chatbot + Manual Editor */}
-        <div className="lg:col-span-6 space-y-4">
+        {/* Main Focus Column: Live 1-Page DOCX Preview (first on desktop left/center or right? Let's place prominent lg:col-span-7 on the left/main area OR responsive order-1 / lg:order-2!) */}
+        <div
+          className={`${
+            tab === "preview" ? "block" : "hidden lg:block"
+          } lg:col-span-7 lg:order-2 lg:sticky lg:top-[4.25rem]`}
+        >
+          <DocxPreviewPanel
+            templateId={review.template.id}
+            templateVersion={review.template.updated_at}
+            fields={review.fields}
+            data={data}
+            reportTitle={title}
+          />
+        </div>
+
+        {/* Interactive Chat + Manual Edit Column */}
+        <div className="lg:col-span-5 lg:order-1 space-y-3.5">
           <div className="hidden lg:grid grid-cols-2 rounded-2xl border border-[#E6E2D8] bg-white p-1 shadow-2xs">
             <button
               type="button"
@@ -488,7 +505,7 @@ export function WorkspaceClient({
               }`}
             >
               <MessageSquareText className="h-3.5 w-3.5" />
-              <span>AI Report Assistant</span>
+              <span>AI Assistant</span>
             </button>
             <button
               type="button"
@@ -498,7 +515,7 @@ export function WorkspaceClient({
               }`}
             >
               <Edit3 className="h-3.5 w-3.5" />
-              <span>Manual Field Editor</span>
+              <span>Manual Edit</span>
             </button>
           </div>
 
@@ -543,19 +560,9 @@ export function WorkspaceClient({
               defaultDailyHours={profile.default_daily_hours}
               previousTotalHours={previousTotalHours}
               internshipStartDate={profile.internship_start_date ?? null}
+              holidayMondays={holidayMondays}
             />
           </div>
-        </div>
-
-        {/* Right column: Live 1-Page DOCX Preview */}
-        <div className={`${tab === "preview" ? "block" : "hidden lg:block"} lg:col-span-6 lg:sticky lg:top-[4.25rem]`}>
-          <DocxPreviewPanel
-            templateId={review.template.id}
-            templateVersion={review.template.updated_at}
-            fields={review.fields}
-            data={data}
-            reportTitle={title}
-          />
         </div>
       </div>
 

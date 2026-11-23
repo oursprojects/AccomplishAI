@@ -6,6 +6,7 @@ import {
   buildInternshipWeeks,
   getReportWeekMondayIso,
   normalizeDateToLongFormat,
+  normalizeHolidayMondays,
   parseHoursNumber,
   resolveWeekCategory,
   resolveWeekNumber,
@@ -320,8 +321,9 @@ export async function POST(request: Request) {
   const prevTotalNum = parseHoursNumber(prevTotalRaw) ?? 0;
 
   const startIso = profile?.internship_start_date ?? null;
-  const calendarWeeks = buildInternshipWeeks(startIso, 12);
-  const currentWeekNumber = resolveWeekNumber(startIso, workingData.date_from);
+  const holidayMondays = normalizeHolidayMondays(user.user_metadata?.holiday_mondays);
+  const calendarWeeks = buildInternshipWeeks(startIso, 16, holidayMondays);
+  const currentWeekNumber = resolveWeekNumber(startIso, workingData.date_from, holidayMondays);
 
   const systemPrompt = `You are **Accomplish AI**, a friendly, helpful assistant dedicated strictly to helping a student intern complete their official 1-page **"2026 Weekly Accomplishment Report"** (.docx).
 
@@ -415,7 +417,11 @@ CORE BEHAVIOR & STRICT RULES:
           continue;
         }
 
-        const reply = (draftReply || "Updated your report.").replace(/<br\s*\/?>/gi, "; ");
+        const defaultReply =
+          toolActions.length > 0
+            ? `All set — ${toolActions.join(", ").toLowerCase()} in your live report preview.`
+            : "Everything on your report looks good as-is.";
+        const reply = (draftReply || defaultReply).replace(/<br\s*\/?>/gi, "; ");
         const status = computeStatus(workingData);
 
         const nextHistory = [
@@ -586,10 +592,13 @@ CORE BEHAVIOR & STRICT RULES:
     }
 
     const status = computeStatus(workingData);
+    const missingHints = status.missingEssential.slice(0, 2).map((m) => m.label);
     const fallbackReply =
       toolActions.length > 0
-        ? "Your report has been updated in the preview."
-        : "No changes were needed.";
+        ? `Done — updated ${toolActions.join(", ").toLowerCase()} on your live document preview.${
+            missingHints.length > 0 ? ` Whenever you're ready, share ${missingHints.join(" & ")} next.` : ""
+          }`
+        : "Got it — no report fields needed changes yet. Let me know what you'd like to add or adjust!";
 
     const nextHistory = [
       ...body.data.messages.map((m, idx) => ({ id: `h-${idx}`, role: m.role, content: m.content })),

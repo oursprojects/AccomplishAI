@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
+import { normalizeHolidayMondays } from "@/lib/internship-calendar";
 import { AppShell } from "@/components/AppShell";
 import { ProfileForm } from "@/components/ProfileForm";
 import SubpageLoading from "./loading";
@@ -23,14 +24,17 @@ async function ProfileContent() {
     getUserQuotaStatus(supabase, user.id, user.email),
   ]);
 
-  const initial = data ?? {
-    name_last_first: "",
-    name_first_last: "",
-    office: "DNX",
-    default_verifier: "",
-    default_daily_hours: 8,
-    internship_start_date: null,
-    target_ojt_hours: 486,
+  const initial = {
+    ...(data ?? {
+      name_last_first: "",
+      name_first_last: "",
+      office: "DNX",
+      default_verifier: "",
+      default_daily_hours: 8,
+      internship_start_date: null,
+      target_ojt_hours: 486,
+    }),
+    holiday_mondays: normalizeHolidayMondays(user.user_metadata?.holiday_mondays),
   };
 
   return (

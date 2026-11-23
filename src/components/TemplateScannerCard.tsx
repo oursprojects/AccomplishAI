@@ -1,6 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { ChevronDown, ChevronUp, RotateCcw, Type } from "lucide-react";
+import {
+  DEFAULT_TEMPLATE_TEXTS,
+  resolveTemplateTexts,
+  type TemplateTextOverrides,
+} from "@/lib/docx/types";
+import { invalidateTemplateCache } from "@/lib/docx/client-cache";
 import { REPORT_FIELD_META, REPORT_KEYS, type ReportKey } from "@/lib/report-schema";
 import type { TemplateReview } from "@/lib/templates/pipeline";
 import { toast } from "@/components/ui/toast";
@@ -18,6 +25,67 @@ interface EditableRow {
   label: string;
   source: string;
 }
+
+const TEXT_GROUPS: Array<{
+  title: string;
+  description: string;
+  fields: Array<{ key: keyof TemplateTextOverrides; label: string; multiline?: boolean }>;
+}> = [
+  {
+    title: "University Header & Banner",
+    description: "Top header lines, college banner, and report title above the form.",
+    fields: [
+      { key: "country_header", label: "Country Header" },
+      { key: "university_header", label: "University Header" },
+      { key: "campus_header", label: "Campus Header" },
+      { key: "campus_address", label: "Campus Address" },
+      { key: "college_banner", label: "College Banner" },
+      { key: "report_title", label: "Document Title" },
+    ],
+  },
+  {
+    title: "Form Labels, Days & Hours",
+    description: "Every table column heading, weekday code, hour row label, and reflection prompt.",
+    fields: [
+      { key: "label_student_intern", label: "Student Intern Label" },
+      { key: "label_office", label: "Office Label" },
+      { key: "label_from", label: "From Date Label" },
+      { key: "label_to", label: "To Date Label" },
+      { key: "col_day", label: "Day Column Heading" },
+      { key: "col_accomplishments", label: "Accomplishments Column Heading" },
+      { key: "col_verified_by", label: "Verified By Column Heading" },
+      { key: "day_mon", label: "Monday Code" },
+      { key: "day_tue", label: "Tuesday Code" },
+      { key: "day_wed", label: "Wednesday Code" },
+      { key: "day_thu", label: "Thursday Code" },
+      { key: "day_fri", label: "Friday Code" },
+      { key: "label_hours_week", label: "Hours This Week Label" },
+      { key: "label_total_hours", label: "Total Hours Worked Label" },
+      { key: "label_new_trainings", label: "New Trainings Prompt" },
+      { key: "label_problems", label: "Problems Encountered Prompt" },
+      { key: "label_solutions", label: "Solutions Done Prompt" },
+    ],
+  },
+  {
+    title: "Signatories & Bottom Footer",
+    description: "Prepared/Noted signatory lines plus the Vision, Mission & Goals footer.",
+    fields: [
+      { key: "label_prepared_by", label: "Prepared By Heading" },
+      { key: "prepared_by_role", label: "Intern Signature Role" },
+      { key: "label_noted_by", label: "Noted By Heading" },
+      { key: "noted_by_name", label: "Noted By Name" },
+      { key: "noted_by_title", label: "Noted By Position / Title" },
+      { key: "label_date", label: "Date Label" },
+      { key: "date_line", label: "Date Blank Line" },
+      { key: "vision_title", label: "Vision Heading" },
+      { key: "vision_body", label: "Vision Paragraph", multiline: true },
+      { key: "mission_title", label: "Mission Heading" },
+      { key: "mission_body", label: "Mission Paragraph", multiline: true },
+      { key: "pledge_title", label: "Goals / Objectives Heading" },
+      { key: "pledge_body", label: "Goals / Objectives Paragraph", multiline: true },
+    ],
+  },
+];
 
 function toEditableRows(review: TemplateReview): EditableRow[] {
   const mapped: EditableRow[] = review.fields.map((f) => ({
@@ -42,16 +110,22 @@ function toEditableRows(review: TemplateReview): EditableRow[] {
 export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScannerCardProps) {
   const [review, setReview] = useState<TemplateReview | null>(initialReview);
   const [rows, setRows] = useState<EditableRow[]>(initialReview ? toEditableRows(initialReview) : []);
-  const [baselineJson, setBaselineJson] = useState<string>(() =>
-    initialReview ? JSON.stringify(toEditableRows(initialReview)) : "[]",
+  const [customTexts, setCustomTexts] = useState<TemplateTextOverrides>(() =>
+    resolveTemplateTexts(initialReview?.fields),
   );
+  const [baselineJson, setBaselineJson] = useState<string>(() =>
+    JSON.stringify({
+      rows: initialReview ? toEditableRows(initialReview) : [],
+      texts: resolveTemplateTexts(initialReview?.fields),
+    }),
+  );
+  const [textsExpanded, setTextsExpanded] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const hasMappingChanges = JSON.stringify(rows) !== baselineJson;
+  const hasChanges = JSON.stringify({ rows, texts: customTexts }) !== baselineJson;
   const isBusy = scanning || saving;
-  const confirmDisabled = isBusy || (review?.template.status === "confirmed" && !hasMappingChanges);
+  const confirmDisabled = isBusy || (review?.template.status === "confirmed" && !hasChanges);
 
   async function scanDefault() {
     setScanning(true);
@@ -64,35 +138,17 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
       const json = (await res.json()) as { review?: TemplateReview; error?: string };
       if (!res.ok || !json.review) throw new Error(json.error ?? "Scan failed.");
       const nextRows = toEditableRows(json.review);
+      const nextTexts = resolveTemplateTexts(json.review.fields);
       setReview(json.review);
       setRows(nextRows);
-      setBaselineJson(JSON.stringify(nextRows));
-      toast.success("Scanned template fields cleanly.");
+      setCustomTexts(nextTexts);
+      setBaselineJson(JSON.stringify({ rows: nextRows, texts: nextTexts }));
+      invalidateTemplateCache(json.review.template.id);
+      toast.success("Scanned official template fields cleanly.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not scan template.");
     } finally {
       setScanning(false);
-    }
-  }
-
-  async function scanUpload(file: File) {
-    setScanning(true);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/scan-template", { method: "POST", body: form });
-      const json = (await res.json()) as { review?: TemplateReview; error?: string };
-      if (!res.ok || !json.review) throw new Error(json.error ?? "Scan failed.");
-      const nextRows = toEditableRows(json.review);
-      setReview(json.review);
-      setRows(nextRows);
-      setBaselineJson(JSON.stringify(nextRows));
-      toast.success("Uploaded and scanned custom .docx template.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not scan uploaded file.");
-    } finally {
-      setScanning(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
@@ -110,15 +166,19 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
             key: r.key || null,
             label: r.label,
           })),
+          customTexts,
         }),
       });
       const json = (await res.json()) as { review?: TemplateReview; error?: string };
-      if (!res.ok || !json.review) throw new Error(json.error ?? "Could not save field mapping.");
+      if (!res.ok || !json.review) throw new Error(json.error ?? "Could not save template changes.");
       const nextRows = toEditableRows(json.review);
+      const nextTexts = resolveTemplateTexts(json.review.fields);
       setReview(json.review);
       setRows(nextRows);
-      setBaselineJson(JSON.stringify(nextRows));
-      toast.success("Template tagged and saved to your private storage.");
+      setCustomTexts(nextTexts);
+      setBaselineJson(JSON.stringify({ rows: nextRows, texts: nextTexts }));
+      invalidateTemplateCache(json.review.template.id);
+      toast.success("Template mappings and custom texts saved to your private storage.");
       onConfirmed?.(json.review);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not confirm template.");
@@ -131,20 +191,24 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
 
+  function updateText(key: keyof TemplateTextOverrides, value: string) {
+    setCustomTexts((prev) => ({ ...prev, [key]: value }));
+  }
+
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-5">
+    <section className="rounded-2xl border border-[#E6E2D8] bg-white p-4 sm:p-6 shadow-xs space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
-            Official Template Preservation
+          <span className="inline-flex items-center rounded-full bg-[#F4F2EA] px-2.5 py-0.5 text-xs font-medium text-[#57544E]">
+            Official Template · Strict 8.5&quot; × 11&quot;
           </span>
-          <h2 className="mt-1.5 text-lg font-semibold text-slate-900">
+          <h2 className="mt-1.5 text-lg font-semibold text-[#1F1E1C]">
             {review ? `Template: ${review.template.name}` : "Set Up Your Official Report Template"}
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Auto-scans <code className="font-mono text-xs">2026-Weekly-Accomplishment-Report.docx</code>, injects{" "}
-            <code className="font-mono text-xs">{"{tags}"}</code> without altering Word borders, fonts, headers, or
-            signatories, and saves your personal master copy to Supabase Storage.
+          <p className="mt-1 text-sm text-[#6B665E]">
+            Customize every heading, label, signatory, and footer text on{" "}
+            <code className="font-mono text-xs">2026-Weekly-Accomplishment-Report.docx</code> without altering its
+            borders or layout.
           </p>
         </div>
 
@@ -153,29 +217,10 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
             type="button"
             onClick={scanDefault}
             disabled={isBusy}
-            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-50 transition cursor-pointer"
+            className="rounded-xl bg-[#1F1E1C] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#34322E] disabled:pointer-events-none disabled:opacity-50 transition cursor-pointer"
           >
             {scanning ? "Scanning XML..." : review ? "Re-scan Built-in Template" : "Auto-Scan 2026 Template"}
           </button>
-
-          <label
-            className={`rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition ${
-              isBusy ? "pointer-events-none opacity-50" : "cursor-pointer"
-            }`}
-          >
-            Upload .docx
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              className="hidden"
-              disabled={isBusy}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) scanUpload(file);
-              }}
-            />
-          </label>
         </div>
       </div>
 
@@ -188,14 +233,83 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
       )}
 
       {review && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4">
+        <div className="space-y-5">
+          {/* Editable Static Texts across the entire DOCX */}
+          <div className="rounded-2xl border border-[#E6E2D8] bg-[#FAF9F5] overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-[#F4F2EA] border-b border-[#E6E2D8]">
+              <button
+                type="button"
+                onClick={() => setTextsExpanded((v) => !v)}
+                className="flex items-center gap-2 text-left cursor-pointer"
+              >
+                <Type className="h-4 w-4 text-[#D97757]" />
+                <div>
+                  <h3 className="text-sm font-semibold text-[#1F1E1C]">Edit Every Template Text</h3>
+                  <p className="text-xs text-[#6B665E]">
+                    Update headers, school/college banner, column labels, signatory names, or footer text.
+                  </p>
+                </div>
+                {textsExpanded ? (
+                  <ChevronUp className="h-4 w-4 text-[#6B665E]" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-[#6B665E]" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCustomTexts({ ...DEFAULT_TEMPLATE_TEXTS })}
+                disabled={isBusy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#DDD7CB] bg-white px-2.5 py-1.5 text-xs font-medium text-[#4A463F] hover:bg-[#F4F2EA] cursor-pointer disabled:opacity-50"
+              >
+                <RotateCcw className="h-3 w-3 text-[#D97757]" />
+                <span>Reset Texts to Default</span>
+              </button>
+            </div>
+
+            {textsExpanded && (
+              <div className="p-4 space-y-5">
+                {TEXT_GROUPS.map((group) => (
+                  <div key={group.title} className="space-y-2.5">
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-[#57544E]">{group.title}</h4>
+                      <p className="text-[11px] text-[#7A746B]">{group.description}</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {group.fields.map((f) => (
+                        <div key={f.key} className={f.multiline ? "sm:col-span-2 lg:col-span-3" : ""}>
+                          <label className="block text-[11px] font-medium text-[#4A463F] mb-1">{f.label}</label>
+                          {f.multiline ? (
+                            <textarea
+                              rows={2}
+                              value={customTexts[f.key]}
+                              onChange={(e) => updateText(f.key, e.target.value)}
+                              className="w-full rounded-lg border border-[#DDD7CB] bg-white px-2.5 py-1.5 text-xs text-[#1F1E1C] outline-none focus:border-[#D97757]"
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={customTexts[f.key]}
+                              onChange={(e) => updateText(f.key, e.target.value)}
+                              className="w-full rounded-lg border border-[#DDD7CB] bg-white px-2.5 py-1.5 text-xs text-[#1F1E1C] outline-none focus:border-[#D97757]"
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#EFECE3] pt-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">
-                Detected Fields ({rows.filter((r) => r.key).length} mapped)
+              <h3 className="text-sm font-semibold text-[#1F1E1C]">
+                Detected Dynamic Fields ({rows.filter((r) => r.key).length} mapped)
               </h3>
-              <p className="text-xs text-slate-500">
-                Review or rename labels below. Each schema key maps to one Word cell while keeping original styling.
+              <p className="text-xs text-[#6B665E]">
+                Map each fillable Word cell to a report schema tag while keeping borders and typography intact.
               </p>
             </div>
             <span
@@ -209,17 +323,17 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
             </span>
           </div>
 
-          <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 overflow-hidden">
+          <div className="divide-y divide-[#EFECE3] rounded-xl border border-[#E6E2D8] overflow-hidden">
             {rows.map((row, idx) => (
               <div
                 key={row.candidateId}
-                className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 p-3 bg-white hover:bg-slate-50/70"
+                className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 p-3 bg-white hover:bg-[#FAF9F5]/80"
               >
                 <div className="sm:col-span-4 min-w-0">
-                  <p className="text-xs font-medium text-slate-700 truncate">{row.context || row.candidateId}</p>
-                  <p className="text-xs text-slate-500 truncate mt-0.5">
+                  <p className="text-xs font-medium text-[#4A463F] truncate">{row.context || row.candidateId}</p>
+                  <p className="text-xs text-[#6B665E] truncate mt-0.5">
                     Current:{" "}
-                    <span className="font-mono text-[11px] text-slate-600">
+                    <span className="font-mono text-[11px] text-[#57544E]">
                       {row.originalText ? row.originalText.replace(/\n/g, " / ") : "(blank cell)"}
                     </span>
                   </p>
@@ -232,7 +346,7 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
                     value={row.label}
                     onChange={(e) => updateRow(idx, { label: e.target.value })}
                     placeholder="Display label"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-slate-900"
+                    className="w-full rounded-lg border border-[#DDD7CB] bg-white px-2.5 py-1.5 text-xs text-[#1F1E1C] outline-none focus:border-[#D97757]"
                   />
                 </div>
 
@@ -247,7 +361,7 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
                         label: nextKey ? REPORT_FIELD_META[nextKey].label : row.label,
                       });
                     }}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-mono text-slate-800 outline-none focus:border-slate-900"
+                    className="w-full rounded-lg border border-[#DDD7CB] bg-white px-2.5 py-1.5 text-xs font-mono text-[#1F1E1C] outline-none focus:border-[#D97757]"
                   >
                     <option value="">-- Skip / Do not tag --</option>
                     {REPORT_KEYS.map((k) => (
@@ -261,22 +375,6 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
             ))}
           </div>
 
-          {review.preserved.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-              <p className="text-xs font-semibold text-slate-700">Preserved Verbatim (Untouched in .docx)</p>
-              <ul className="mt-1.5 space-y-1 text-xs text-slate-600">
-                {review.preserved.map((p) => (
-                  <li key={p.id} className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-slate-800">{p.context}:</span>
-                    <code className="rounded bg-white px-1.5 py-0.5 border border-slate-200 font-mono text-[11px]">
-                      {p.currentText}
-                    </code>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           <div className="flex justify-end pt-1">
             <button
               type="button"
@@ -285,10 +383,10 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
               className="w-full sm:w-auto rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:pointer-events-none disabled:opacity-50 transition cursor-pointer"
             >
               {saving
-                ? "Tagging & Saving..."
-                : review.template.status === "confirmed" && !hasMappingChanges
-                  ? "Template Confirmed"
-                  : "Confirm & Use This Template"}
+                ? "Saving Template..."
+                : review.template.status === "confirmed" && !hasChanges
+                  ? "Template Up to Date"
+                  : "Save & Use This Template"}
             </button>
           </div>
         </div>

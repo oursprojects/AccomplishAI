@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { Check, Copy, Download, FileText, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { fetchCachedTemplateBytes, warmDocxPreview } from "@/lib/docx/client-cache";
 import { defaultReportFileName, DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
 import { enhanceCsuPreviewChrome, PAPER_DIMENSIONS, type PaperSize } from "@/lib/docx/csu-template-chrome";
-import type { DetectedField } from "@/lib/docx/types";
+import { resolveTemplateTexts, type DetectedField } from "@/lib/docx/types";
 import { DAYS, type ReportData } from "@/lib/report-schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -39,13 +40,16 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
   const templateBytesRef = useRef<ArrayBuffer | null>(null);
   const latestFilledRef = useRef<Uint8Array | null>(null);
   const lastStageWidthRef = useRef<number>(0);
+  const hasRenderedOnceRef = useRef<boolean>(false);
 
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paperSize, setPaperSize] = useState<PaperSize>("letter");
-  const [zoom, setZoom] = useState(0.55);
+  const paperSize: PaperSize = "letter";
+  const [zoom, setZoom] = useState(0.7);
   const [manualZoom, setManualZoom] = useState(false);
+
+  const customTexts = useMemo(() => resolveTemplateTexts(fields), [fields]);
 
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [modalZoom, setModalZoom] = useState(0.75);
@@ -102,16 +106,12 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
   useEffect(() => {
     let cancelled = false;
+    hasRenderedOnceRef.current = false;
+    void warmDocxPreview().catch(() => {});
+
     async function load() {
       try {
-        const res = await fetch(`/api/template-file?templateId=${encodeURIComponent(templateId)}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(j.error ?? "Failed to fetch tagged template.");
-        }
-        const buf = await res.arrayBuffer();
+        const buf = await fetchCachedTemplateBytes(templateId, templateVersion);
         if (!cancelled) {
           templateBytesRef.current = buf;
           setError(null);
@@ -127,7 +127,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     return () => {
       cancelled = true;
     };
-  }, [templateId, targetKey]);
+  }, [templateId, templateVersion, targetKey]);
 
   const computeFitZoom = useCallback(
     (stageEl: HTMLDivElement | null, maxCap: number) => {
@@ -147,11 +147,11 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
       lastStageWidthRef.current = width;
 
       if (becameVisible && inlineContainerRef.current && latestFilledRef.current) {
-        enhanceCsuPreviewChrome(inlineContainerRef.current, latestFilledRef.current, paperSize);
+        enhanceCsuPreviewChrome(inlineContainerRef.current, latestFilledRef.current, paperSize, customTexts);
       }
 
       if (!manualZoom) {
-        const fit = computeFitZoom(inlineStageRef.current, 0.85);
+        const fit = computeFitZoom(inlineStageRef.current, 0.96);
         if (fit !== null) setZoom(fit);
       }
     };
@@ -166,7 +166,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
       window.removeEventListener("resize", sync);
       observer?.disconnect();
     };
-  }, [manualZoom, computeFitZoom, paperSize]);
+  }, [manualZoom, computeFitZoom, paperSize, customTexts]);
 
   // Fit modal preview cleanly when opened or resized on mobile/tablet/desktop
   useEffect(() => {
@@ -192,7 +192,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
   const renderInto = useCallback(
     async (targetEl: HTMLDivElement, filled: Uint8Array) => {
-      const { renderAsync } = await import("docx-preview");
+      const { renderAsync } = await warmDocxPreview();
       targetEl.innerHTML = "";
       await renderAsync(filled.buffer as ArrayBuffer, targetEl, undefined, {
         inWrapper: true,
@@ -202,24 +202,27 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
         breakPages: true,
         useBase64URL: true,
       });
-      enhanceCsuPreviewChrome(targetEl, filled, paperSize);
+      enhanceCsuPreviewChrome(targetEl, filled, paperSize, customTexts);
     },
-    [paperSize],
+    [paperSize, customTexts],
   );
 
-  // Render inline preview whenever data, template, or paperSize changes
+  // Render inline preview immediately on first load, and gently debounce live edits
   useEffect(() => {
     if (loadedKey !== targetKey || !templateBytesRef.current || !inlineContainerRef.current) return;
 
     let cancelled = false;
-    const timer = window.setTimeout(async () => {
+    const delayMs = hasRenderedOnceRef.current ? 120 : 0;
+
+    const run = async () => {
       if (!templateBytesRef.current || !inlineContainerRef.current) return;
       setRendering(true);
       setError(null);
       try {
-        const filled = fillTemplate(templateBytesRef.current, data, fields);
+        const filled = fillTemplate(templateBytesRef.current, data, fields, customTexts);
         latestFilledRef.current = filled;
         await renderInto(inlineContainerRef.current, filled);
+        hasRenderedOnceRef.current = true;
         if (!cancelled && previewModalOpen && modalContainerRef.current) {
           await renderInto(modalContainerRef.current, filled);
         }
@@ -230,13 +233,21 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
       } finally {
         if (!cancelled) setRendering(false);
       }
-    }, 160);
+    };
 
+    if (delayMs === 0) {
+      void run();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = window.setTimeout(() => void run(), delayMs);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [loadedKey, targetKey, data, fields, paperSize, previewModalOpen, renderInto]);
+  }, [loadedKey, targetKey, data, fields, customTexts, paperSize, previewModalOpen, renderInto]);
 
   function openDownloadPrompt() {
     setCustomFileName(defaultReportFileName(data, reportTitle));
@@ -246,7 +257,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
   function confirmDownload(e: React.FormEvent) {
     e.preventDefault();
     if (!templateBytesRef.current) return;
-    const filled = latestFilledRef.current ?? fillTemplate(templateBytesRef.current, data, fields);
+    const filled = latestFilledRef.current ?? fillTemplate(templateBytesRef.current, data, fields, customTexts);
     const cleaned = customFileName
       .trim()
       .replace(/[<>:"/\\|?*]+/g, "-")
@@ -274,15 +285,9 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            <select
-              aria-label="Paper size"
-              value={paperSize}
-              onChange={(e) => setPaperSize(e.target.value as PaperSize)}
-              className="h-8 max-w-[140px] sm:max-w-none rounded-lg border border-[#DDD7CB] bg-white px-2 sm:px-2.5 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
-            >
-              <option value="letter">{PAPER_DIMENSIONS.letter.label}</option>
-              <option value="folio">{PAPER_DIMENSIONS.folio.label}</option>
-            </select>
+            <span className="hidden sm:inline-flex items-center rounded-lg border border-[#DDD7CB] bg-white px-2.5 h-8 text-xs font-medium text-[#4A463F]">
+              {dims.label}
+            </span>
 
             <div className="flex items-center rounded-lg border border-[#DDD7CB] bg-white text-xs overflow-hidden h-8">
               <button
@@ -388,15 +393,9 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <select
-                aria-label="Modal paper size"
-                value={paperSize}
-                onChange={(e) => setPaperSize(e.target.value as PaperSize)}
-                className="h-8 max-w-[140px] sm:max-w-none rounded-lg border border-[#DDD7CB] bg-white px-2 sm:px-2.5 text-xs font-medium text-[#1F1E1C]"
-              >
-                <option value="letter">{PAPER_DIMENSIONS.letter.label}</option>
-                <option value="folio">{PAPER_DIMENSIONS.folio.label}</option>
-              </select>
+              <span className="hidden sm:inline-flex items-center rounded-lg border border-[#DDD7CB] bg-white px-2.5 h-8 text-xs font-medium text-[#4A463F]">
+                {dims.label}
+              </span>
 
               <div className="flex items-center rounded-lg border border-[#DDD7CB] bg-white text-xs overflow-hidden h-8">
                 <button
