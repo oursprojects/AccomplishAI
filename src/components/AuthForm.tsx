@@ -104,7 +104,7 @@ export function AuthForm() {
   }
 
   return (
-    <div className="relative min-h-screen flex flex-col justify-between bg-[#FAF9F5] text-[#1F1E1C] px-4 py-6 sm:px-6 sm:py-10 overflow-x-hidden">
+    <div className="relative min-h-dvh flex flex-col justify-between bg-[#FAF9F5] text-[#1F1E1C] px-4 py-6 sm:px-6 sm:py-10 overflow-x-hidden">
       {/* Generated Editorial WebP Backdrop */}
       <div
         aria-hidden="true"
@@ -113,7 +113,7 @@ export function AuthForm() {
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0 bg-gradient-to-br from-[#FAF9F5]/85 via-[#FAF9F5]/75 to-[#F4EFE6]/90"
+        className="pointer-events-none fixed inset-0 z-0 bg-[#FAF9F5]/82"
       />
 
       <div className="relative z-10" />
@@ -127,10 +127,10 @@ export function AuthForm() {
           </div>
 
           <div className="space-y-2.5">
-            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-[#1F1E1C] leading-[1.15]">
+            <h1 className="text-3xl sm:text-4xl font-semibold text-[#1F1E1C] text-balance leading-[1.15]">
               Build official weekly internship reports in minutes.
             </h1>
-            <p className="text-sm sm:text-base text-[#57544E] leading-relaxed max-w-xl mx-auto lg:mx-0">
+            <p className="text-sm sm:text-base text-[#57544E] text-pretty leading-relaxed max-w-xl mx-auto lg:mx-0">
               Accomplish AI is built specifically for creating your{" "}
               <strong className="text-[#1F1E1C]">Weekly Accomplishment Reports</strong>. Chat or paste rough daily notes
               in English or Tagalog, inspect the strict <strong className="text-[#1F1E1C]">8.5&quot; × 11&quot;</strong>{" "}
@@ -173,7 +173,7 @@ export function AuthForm() {
                   alt="Accomplish AI"
                   width={88}
                   height={88}
-                  className="h-20 w-20 sm:h-24 sm:w-24 object-contain rounded-2xl"
+                  className="size-20 sm:size-24 object-contain rounded-2xl"
                   priority
                 />
               </div>

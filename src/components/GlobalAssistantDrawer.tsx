@@ -244,6 +244,7 @@ export function GlobalAssistantDrawer({
                 disabled={sending}
                 onClick={() => setMessages([INITIAL_WELCOME])}
                 title="Clear conversation"
+                aria-label="Clear conversation"
               >
                 <Eraser className="h-3.5 w-3.5 text-[#D97757]" />
               </Button>
@@ -355,7 +356,7 @@ export function GlobalAssistantDrawer({
             e.preventDefault();
             void submitPrompt(input);
           }}
-          className="border-t border-[#E6E2D8] bg-white p-3 shrink-0"
+          className="border-t border-[#E6E2D8] bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shrink-0"
         >
           <div className="flex items-end gap-2 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 py-1.5 focus-within:border-[#D97757] focus-within:bg-white transition">
             <textarea

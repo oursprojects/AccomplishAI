@@ -53,6 +53,7 @@ interface DashboardClientProps {
     internship_start_date: string | null;
     target_ojt_hours: number;
   };
+  holidayMondays?: string[];
   quota: QuotaStatus;
   templateStatus: "missing" | "pending_review" | "confirmed";
   templateName?: string;
@@ -78,6 +79,7 @@ function OpenLinkButtonLabel() {
 export function DashboardClient({
   reports,
   profile,
+  holidayMondays = [],
   quota,
   templateStatus,
   templateName,
@@ -135,12 +137,13 @@ export function DashboardClient({
     () =>
       inferNextWeekRange({
         startIso: profile.internship_start_date,
+        holidayMondays,
         existingReports: reports.map((r) => ({
           date_from: r.structured_data.date_from,
           date_to: r.structured_data.date_to,
         })),
       }),
-    [profile.internship_start_date, reports],
+    [profile.internship_start_date, holidayMondays, reports],
   );
 
   // Chronological bar chart items (sorted earliest week -> latest, up to 10 weeks)
@@ -150,6 +153,7 @@ export function DashboardClient({
         dateFrom: r.structured_data.date_from,
         dateTo: r.structured_data.date_to,
         startDateIso: profile.internship_start_date,
+        holidayMondays,
       });
       const hours = parseHoursNumber(r.structured_data.hours_this_week) ?? 0;
       return {
@@ -162,12 +166,12 @@ export function DashboardClient({
       };
     });
     return items.sort((a, b) => a.sortKey.localeCompare(b.sortKey)).slice(-10);
-  }, [reports, profile.internship_start_date]);
+  }, [reports, profile.internship_start_date, holidayMondays]);
 
   const maxChartHours = Math.max(40, ...weeklyChartItems.map((i) => i.hours));
   const scheduleWeeks = useMemo(
-    () => buildInternshipWeeks(profile.internship_start_date, 8),
-    [profile.internship_start_date],
+    () => buildInternshipWeeks(profile.internship_start_date, 8, holidayMondays),
+    [profile.internship_start_date, holidayMondays],
   );
 
   async function handleCreateWeekReport(opts?: {
@@ -225,12 +229,12 @@ export function DashboardClient({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1F1E1C] truncate">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#1F1E1C] text-balance truncate">
               Welcome back, {displayName}
             </h1>
             {profile.office && <Badge variant="accent">{profile.office}</Badge>}
           </div>
-          <p className="mt-0.5 text-sm text-[#6B665E]">
+          <p className="mt-0.5 text-sm text-[#6B665E] text-pretty">
             {profile.internship_start_date
               ? `Internship started ${normalizeDateToLongFormat(profile.internship_start_date)} · 1 report per Mon–Fri week`
               : "Track your OJT hours, weekly accomplishment reports, and AI allowance at a glance."}

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
+import { normalizeHolidayMondays } from "@/lib/internship-calendar";
 import { ensureFastActiveTemplateReview } from "@/lib/templates/pipeline";
 import type { ReportData } from "@/lib/report-schema";
 import { AppShell } from "@/components/AppShell";
@@ -55,6 +56,7 @@ async function DashboardContent() {
       <DashboardClient
         reports={reports}
         quota={quota}
+        holidayMondays={normalizeHolidayMondays(user.user_metadata?.holiday_mondays)}
         templateStatus={templateStatus}
         templateName={review?.template.name}
         profile={{

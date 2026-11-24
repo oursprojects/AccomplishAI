@@ -252,7 +252,7 @@ export function AppShell({
     navItems.find((i) => isNavActive(i))?.label ?? "Accomplish AI";
 
   return (
-    <div className="relative min-h-screen flex flex-col md:flex-row bg-[#FAF9F5] text-[#1F1E1C]">
+    <div className="relative min-h-dvh flex flex-col md:flex-row bg-[#FAF9F5] text-[#1F1E1C]">
       {/* Subtle editorial workspace background */}
       <div
         aria-hidden="true"
@@ -298,13 +298,14 @@ export function AppShell({
           <Button
             type="button"
             variant="accent"
-            size="icon"
+            size="sm"
             onClick={() => setGlobalAiOpen(true)}
             title="Ask Overall Accomplish AI"
             aria-label="Ask Overall Accomplish AI"
-            className="rounded-xl"
+            className="rounded-xl px-2.5"
           >
             <Sparkles className="h-3.5 w-3.5" />
+            <span className="text-xs">AI</span>
           </Button>
           <Button
             type="button"
@@ -313,6 +314,7 @@ export function AppShell({
             disabled={signingOut}
             onClick={() => setSignOutModalOpen(true)}
             title="Sign out"
+            aria-label="Sign out"
             className="rounded-xl"
           >
             <LogOut className="h-3.5 w-3.5" />
@@ -431,7 +433,7 @@ export function AppShell({
 
       {/* Desktop sticky sidebar */}
       <aside
-        className={`relative z-20 hidden md:flex sticky top-0 h-screen shrink-0 flex-col justify-between border-r border-[#E5E2D9] bg-[#F4F2EA]/92 backdrop-blur-md transition-all duration-200 ${
+        className={`relative z-20 hidden md:flex sticky top-0 h-dvh shrink-0 flex-col justify-between border-r border-[#E5E2D9] bg-[#F4F2EA]/92 backdrop-blur-md transition-all duration-200 ${
           collapsed ? "w-[76px] px-2.5 py-4" : "w-60 px-3.5 py-4"
         }`}
       >
@@ -572,23 +574,10 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-5">
+        <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
-
-      {/* Floating quick launcher on non-report pages so Overall AI is always one tap away */}
-      {!pathname.startsWith("/reports/") && !globalAiOpen && (
-        <button
-          type="button"
-          onClick={() => setGlobalAiOpen(true)}
-          className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full bg-[#1F1E1C] px-4 py-2.5 text-xs font-semibold text-white shadow-lg border border-white/15 hover:bg-[#34322E] transition cursor-pointer"
-          title="Ask Overall Accomplish AI"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-[#D97757]" />
-          <span>Ask Overall AI</span>
-        </button>
-      )}
 
       <GlobalAssistantDrawer
         open={globalAiOpen}
