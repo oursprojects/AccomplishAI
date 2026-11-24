@@ -5,15 +5,15 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
-  CalendarCheck2,
   Eye,
   EyeOff,
+  Loader2,
   Lock,
   Mail,
 } from "lucide-react";
-import { ReportPenIcon } from "@/components/icons/AccomplishIcons";
-import { AnimatedFileTextIcon, AnimatedShieldIcon } from "@/components/icons/AnimatedIcons";
+import { AnimatedShieldIcon } from "@/components/icons/AnimatedIcons";
 import { BlurFade } from "@/components/magicui/blur-fade";
+import { BorderBeam } from "@/components/magicui/border-beam";
 import { DotPattern } from "@/components/magicui/dot-pattern";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createClient } from "@/lib/supabase/client";
@@ -108,7 +108,8 @@ export function AuthForm() {
   return (
     <div className="relative min-h-dvh flex flex-col justify-between bg-[#F8F8F6] text-[#141413] px-4 py-6 sm:px-8 sm:py-10 overflow-x-hidden">
       <DotPattern className="opacity-45" />
-      <div className="relative z-10 mx-auto w-full max-w-5xl flex items-center justify-between pb-4">
+
+      <header className="relative z-10 mx-auto w-full max-w-5xl flex items-center justify-between gap-4 pb-4">
         <div className="flex items-center gap-2.5">
           <Image
             src="/logo.png"
@@ -120,137 +121,113 @@ export function AuthForm() {
           />
           <span className="text-sm font-medium tracking-tight text-[#141413]">Accomplish AI</span>
         </div>
-        <span className="text-xs text-[#141413]/55">Weekly Accomplishment Report System</span>
-      </div>
+        <span className="text-xs text-[#52524E]">Weekly Accomplishment Report System</span>
+      </header>
 
-      <BlurFade className="relative z-10 mx-auto w-full max-w-5xl my-8">
-        <div className="swiss-frame border border-[#E2E2DC] bg-white/85 grid grid-cols-1 lg:grid-cols-12">
-          <span className="swiss-corner swiss-corner-tl" aria-hidden="true" />
-          <span className="swiss-corner swiss-corner-tr" aria-hidden="true" />
-          <span className="swiss-corner swiss-corner-bl" aria-hidden="true" />
-          <span className="swiss-corner swiss-corner-br" aria-hidden="true" />
-
-          {/* Editorial Overview */}
-          <div className="lg:col-span-7 p-6 sm:p-10 lg:border-r border-b lg:border-b-0 border-[#E2E2DC] flex flex-col justify-between gap-8">
-            <div className="space-y-4">
-              <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-light tracking-tight text-[#141413] text-balance leading-[1.12]">
-                Build official weekly internship reports with precision.
-              </h1>
-              <p className="text-sm sm:text-base text-[#141413]/70 text-pretty leading-relaxed max-w-[60ch]">
-                Convert rough daily voice or text notes in English or Tagalog into formatted, print-ready{" "}
-                <span className="font-medium text-[#141413]">8.5&quot; × 11&quot;</span> Word reports, inspect
-                cumulative OJT hours, and export clean PDFs and Excel summaries.
-              </p>
-            </div>
+      <main className="relative z-10 mx-auto w-full max-w-md my-8">
+        <BlurFade>
+          <div className="swiss-frame relative rounded-xl border border-[#E2E2DC] bg-white p-6 sm:p-8 shadow-xs">
+            <BorderBeam duration={9} />
+            <span className="swiss-corner swiss-corner-tl" aria-hidden="true" />
+            <span className="swiss-corner swiss-corner-tr" aria-hidden="true" />
+            <span className="swiss-corner swiss-corner-bl" aria-hidden="true" />
+            <span className="swiss-corner swiss-corner-br" aria-hidden="true" />
 
             <div className="space-y-6">
+              <div className="space-y-1.5">
+                <h1 className="text-2xl font-light tracking-tight text-[#141413] text-balance">
+                  Sign in to workspace
+                </h1>
+                <p className="text-sm text-[#52524E] text-pretty leading-relaxed">
+                  Enter your assigned intern or admin credentials to continue.
+                </p>
+              </div>
+
+              {error && (
+                <Alert variant="destructive" role="alert">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="email" className="block text-xs font-medium text-[#141413]">
+                    Email address
+                  </label>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#52524E]" />
+                    <Input
+                      id="email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      aria-invalid={Boolean(error)}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="intern@company.com"
+                      className="pl-9 h-11 bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="password" className="block text-xs font-medium text-[#141413]">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#52524E]" />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      autoComplete="current-password"
+                      aria-invalid={Boolean(error)}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className="pl-9 pr-12 h-11 bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[#52524E] hover:text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45 transition-colors cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <Button type="submit" variant="accent" size="lg" disabled={loading} className="w-full min-h-[44px]">
+                  {loading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      <span>Signing in…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Sign in to workspace</span>
+                      <ArrowRight className="size-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+
               <Separator />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <div className="space-y-1.5">
-                  <AnimatedFileTextIcon className="size-4 text-[#1D4ED8]" />
-                  <p className="text-xs font-medium text-[#141413]">Live .docx Preview</p>
-                  <p className="text-xs text-[#141413]/60 text-pretty leading-relaxed">
-                    1-page layout preview with editable headings and verified signatories.
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  <ReportPenIcon className="size-4 text-[#1D4ED8]" />
-                  <p className="text-xs font-medium text-[#141413]">Report &amp; Workspace AI</p>
-                  <p className="text-xs text-[#141413]/60 text-pretty leading-relaxed">
-                    Structures daily logs into formal past-tense tasks, charts, and diagrams.
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  <CalendarCheck2 className="size-4 text-[#1D4ED8]" />
-                  <p className="text-xs font-medium text-[#141413]">Holiday-Aware Schedule</p>
-                  <p className="text-xs text-[#141413]/60 text-pretty leading-relaxed">
-                    Tracks required OJT hours and shifts active weeks around holiday breaks.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Sign-in Column */}
-          <div className="lg:col-span-5 p-6 sm:p-10 bg-white flex flex-col justify-center space-y-6">
-            <div className="space-y-1.5">
-              <h2 className="text-xl font-medium tracking-tight text-[#141413] text-balance">Sign in to workspace</h2>
-              <p className="text-xs sm:text-sm text-[#141413]/60 text-pretty">
-                Enter your assigned intern or admin credentials to continue.
-              </p>
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+              <Alert className="bg-[#F8F8F6] border-[#E2E2DC]">
+                <AnimatedShieldIcon className="size-4 text-[#1D4ED8] shrink-0" />
+                <AlertDescription className="text-[#52524E] opacity-100">
+                  Accounts are provisioned by your team administrator.
+                </AlertDescription>
               </Alert>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-xs font-medium text-[#141413]/70 mb-1.5">
-                  Email address
-                </label>
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#141413]/35" />
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="intern@company.com"
-                    className="pl-9 h-10 bg-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-xs font-medium text-[#141413]/70 mb-1.5">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#141413]/35" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    minLength={6}
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    className="pl-9 pr-10 h-10 bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#141413]/40 hover:text-[#141413] cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <Button type="submit" variant="accent" size="lg" disabled={loading} className="w-full">
-                <span>{loading ? "Signing in…" : "Sign in to workspace"}</span>
-                <ArrowRight className="size-4" />
-              </Button>
-            </form>
-
-            <Alert className="bg-[#F1F1EE]">
-              <AnimatedShieldIcon className="size-4 text-[#1D4ED8] shrink-0" />
-              <AlertDescription className="text-[#141413]/75">
-                Accounts are provisioned by your team administrator.
-              </AlertDescription>
-            </Alert>
+            </div>
           </div>
-        </div>
-      </BlurFade>
+        </BlurFade>
+      </main>
 
-      <footer className="relative z-10 mx-auto w-full max-w-5xl border-t border-[#E2E2DC] pt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-[#141413]/55">
+      <footer className="relative z-10 mx-auto w-full max-w-5xl border-t border-[#E2E2DC] pt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-[#52524E]">
         <span>
           Created by <span className="font-medium text-[#141413]">Mike Ryno Santiago</span> — DNX Intern
         </span>
