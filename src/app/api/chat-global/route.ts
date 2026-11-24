@@ -25,6 +25,16 @@ const requestSchema = z.object({
     )
     .min(1)
     .max(40),
+  attachments: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(120),
+        textContent: z.string().trim().min(1).max(12000),
+      }),
+    )
+    .max(3)
+    .optional()
+    .default([]),
 });
 
 export async function POST(request: Request) {
@@ -161,7 +171,7 @@ Saved Reports snapshot (${reportsSnapshot.length}): ${JSON.stringify(reportsSnap
 
 CAPABILITIES & BEHAVIOR:
 1. **Full ChatGPT-Style General Intelligence:** Answer ANY question across any topic just like ChatGPT — software engineering, debugging, SQL, TypeScript/React/Python code, math, writing/emails, brainstorming, interview/OJT advice, Tagalog↔English translation, explanations, checklists, and study help. Never refuse a general question just because it isn't about a report.
-2. **Live Workspace Intelligence & MCP Actions:** When the user asks about their internship, weekly reports, OJT hours, holidays, profile, or template, use the real workspace snapshot above and call the MCP tools (\`get_report_fields\`, \`list_reports\`, \`get_ojt_hours_summary\`, \`get_workspace_overview\`, \`create_weekly_report\`, \`set_report_fields\`, \`clear_report_fields\`, \`update_holiday_weeks\`, \`save_profile_defaults\`). Never invent Supabase reports, dates, or hours.
+2. **Live Workspace Intelligence & MCP Actions:** When the user asks about their internship, weekly reports, OJT hours, holidays, profile, or template, use the real workspace snapshot above and call the MCP tools (\`get_ojt_analytics\`, \`search_reports\`, \`get_report_fields\`, \`list_reports\`, \`get_ojt_hours_summary\`, \`get_workspace_overview\`, \`create_weekly_report\`, \`set_report_fields\`, \`clear_report_fields\`, \`update_holiday_weeks\`, \`save_profile_defaults\`). Use \`get_ojt_analytics\` whenever building charts, forecasts, or OJT Excel/PDF summaries, and \`search_reports\` for keyword lookups across weeks. Never invent Supabase reports, dates, or hours.
 3. **Interactive Visual Charts (\`\`\`chart):** Whenever the user asks for a **chart, graph, visual breakdown, progress chart, or comparison** (or when visualizing numeric data makes the answer much clearer), output a fenced \`\`\`chart JSON block! Supported types: \`"bar"\`, \`"line"\`, \`"area"\`, \`"pie"\`, \`"donut"\`.
    Format:
    \`\`\`chart
@@ -203,9 +213,22 @@ CAPABILITIES & BEHAVIOR:
 6. **Rich ChatGPT Formatting:** Use clean Markdown headings, crisp bullets, tables, blockquotes, and fenced code blocks with language tags (\`\`\`ts, \`\`\`sql, \`\`\`python, etc.). When writing or updating AccomplishAI report fields, follow past-tense formal wording, ALL CAPS names, and \`Month Day, Year\` dates.`;
 
     const recentMessages = body.data.messages.slice(-16);
+    const attachmentContext =
+      body.data.attachments.length > 0
+        ? `\n\n[ATTACHED FILES FROM USER]\n${body.data.attachments
+            .map((a) => `--- File: ${a.name} ---\n${a.textContent}`)
+            .join("\n\n")}`
+        : "";
+
     const loopMessages: GroqMessage[] = [
       { role: "system", content: systemPrompt },
-      ...recentMessages.map((m) => ({ role: m.role, content: m.content })),
+      ...recentMessages.map((m, idx) => ({
+        role: m.role,
+        content:
+          idx === recentMessages.length - 1 && m.role === "user" && attachmentContext
+            ? `${m.content}${attachmentContext}`
+            : m.content,
+      })),
     ];
 
     const toolActions: string[] = [];

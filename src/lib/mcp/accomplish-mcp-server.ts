@@ -823,5 +823,193 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
     },
   );
 
+  // Tool 10: Search across all saved reports by keyword or inspect all reflections/problems
+  server.registerTool(
+    "search_reports",
+    {
+      title: "Search Reports Across Weeks",
+      description:
+        "Search all saved Weekly Accomplishment Reports in Supabase for a keyword across titles, daily accomplishments, trainings, problems, and solutions.",
+      inputSchema: {
+        query: z
+          .string()
+          .trim()
+          .max(120)
+          .optional()
+          .describe("Keyword or topic to search for (leave empty to summarize tasks/problems across all weeks)."),
+      },
+    },
+    async ({ query }) => {
+      await audit("search_reports");
+      const { data: rows, error } = await ctx.supabase
+        .from("reports")
+        .select("id, title, structured_data, created_at")
+        .eq("user_id", ctx.user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) return jsonContent({ error: error.message });
+
+      const q = (query ?? "").trim().toLowerCase();
+      const matches: Array<{
+        report_id: string;
+        title: string;
+        date_from: string;
+        date_to: string;
+        matched_fields: Array<{ field: string; text: string }>;
+      }> = [];
+
+      const searchableKeys: ReportKey[] = [
+        "mon_accomplishments",
+        "tue_accomplishments",
+        "wed_accomplishments",
+        "thu_accomplishments",
+        "fri_accomplishments",
+        "new_trainings",
+        "problems_encountered",
+        "solutions_done",
+      ];
+
+      for (const r of rows ?? []) {
+        const sd = reportDataSchema.parse(r.structured_data ?? {});
+        const matchedFields: Array<{ field: string; text: string }> = [];
+
+        if (!q || r.title.toLowerCase().includes(q)) {
+          if (q) matchedFields.push({ field: "title", text: r.title });
+        }
+        for (const k of searchableKeys) {
+          const val = sd[k].trim();
+          if (!val) continue;
+          if (!q || val.toLowerCase().includes(q)) {
+            matchedFields.push({ field: k, text: val });
+          }
+        }
+
+        if (matchedFields.length > 0) {
+          matches.push({
+            report_id: r.id,
+            title: r.title || sd.date_from || "Untitled Report",
+            date_from: sd.date_from,
+            date_to: sd.date_to,
+            matched_fields: matchedFields,
+          });
+        }
+      }
+
+      return jsonContent({ query: query ?? "", matchCount: matches.length, matches });
+    },
+  );
+
+  // Tool 11: Full OJT analytics, weekly progression, and projected completion forecast
+  server.registerTool(
+    "get_ojt_analytics",
+    {
+      title: "Get OJT Analytics & Forecast",
+      description:
+        "Compute chronological weekly hours, cumulative hours timeline, average weekly pace, and projected OJT completion date (skipping holidays) ready for charts or Excel/PDF exports.",
+      inputSchema: {},
+    },
+    async () => {
+      await audit("get_ojt_analytics");
+      const [{ data: profile }, { data: rows }] = await Promise.all([
+        ctx.supabase
+          .from("profiles")
+          .select("name_last_first, office, default_daily_hours, internship_start_date, target_ojt_hours")
+          .eq("id", ctx.user.id)
+          .maybeSingle(),
+        ctx.supabase
+          .from("reports")
+          .select("id, title, structured_data, created_at")
+          .eq("user_id", ctx.user.id)
+          .order("created_at", { ascending: true })
+          .limit(100),
+      ]);
+
+      const holidayMondays = ctx.holidayMondays ?? normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
+      const targetHours = profile?.target_ojt_hours ?? 486;
+
+      let runningSum = 0;
+      let maxTotal = 0;
+      const weeklyTimeline = (rows ?? []).map((r, idx) => {
+        const sd = reportDataSchema.parse(r.structured_data ?? {});
+        const wHrs = parseHoursNumber(sd.hours_this_week) ?? 0;
+        const tHrs = parseHoursNumber(sd.total_hours_worked);
+        runningSum += wHrs;
+        if (tHrs !== null && tHrs > maxTotal) maxTotal = tHrs;
+        const cumulative = tHrs !== null ? Math.max(tHrs, runningSum) : runningSum;
+        const status = computeReportStatus(sd);
+        const daysWorked = DAYS.filter((d) => sd[`${d}_accomplishments`].trim().length > 0).length;
+
+        return {
+          report_id: r.id,
+          weekLabel: r.title?.trim() || `Week ${idx + 1}`,
+          date_from: sd.date_from,
+          date_to: sd.date_to,
+          days_worked: daysWorked,
+          hours_this_week: wHrs,
+          cumulative_hours: cumulative,
+          is_complete: status.isComplete,
+        };
+      });
+
+      const completedHours = Math.max(maxTotal, runningSum);
+      const remainingHours = Math.max(0, targetHours - completedHours);
+      const nonZeroWeeks = weeklyTimeline.filter((w) => w.hours_this_week > 0);
+      const avgHoursPerWeek =
+        nonZeroWeeks.length > 0
+          ? Number((nonZeroWeeks.reduce((s, w) => s + w.hours_this_week, 0) / nonZeroWeeks.length).toFixed(1))
+          : (profile?.default_daily_hours ?? 8) * 5;
+
+      const estimatedWeeksRemaining =
+        remainingHours > 0 ? Math.ceil(remainingHours / Math.max(1, avgHoursPerWeek)) : 0;
+
+      const nextWeek = inferNextWeekRange({
+        startIso: profile?.internship_start_date ?? null,
+        existingReports: weeklyTimeline,
+        holidayMondays,
+      });
+
+      let projectedCompletion: { weekNumber: number; fromText: string; toText: string } | null = null;
+      if (estimatedWeeksRemaining > 0 && nextWeek) {
+        const anchorIso = profile?.internship_start_date || nextWeek.mondayIso;
+        const targetWeekIndex = nextWeek.weekNumber + estimatedWeeksRemaining - 1;
+        const startAnchor = parseIsoDate(anchorIso);
+        if (startAnchor) {
+          const holidaySet = new Set(holidayMondays);
+          const mon1 = getMondayOfWeek(startAnchor);
+          let activeCount = 0;
+          for (let offset = 0; offset < 120; offset++) {
+            const m = addDays(mon1, offset * 7);
+            const mIso = toIsoDate(m);
+            if (holidaySet.has(mIso)) continue;
+            activeCount += 1;
+            if (activeCount === targetWeekIndex) {
+              projectedCompletion = {
+                weekNumber: activeCount,
+                fromText: formatLongDate(m),
+                toText: formatLongDate(addDays(m, 4)),
+              };
+              break;
+            }
+          }
+        }
+      }
+
+      return jsonContent({
+        internName: profile?.name_last_first ?? "",
+        office: profile?.office ?? "DNX",
+        completedHours,
+        targetHours,
+        remainingHours,
+        percentComplete: Math.min(100, Math.round((completedHours / Math.max(1, targetHours)) * 100)),
+        averageHoursPerWeek: avgHoursPerWeek,
+        estimatedWeeksRemaining,
+        projectedCompletion,
+        holidayMondays,
+        weeklyTimeline,
+      });
+    },
+  );
+
   return server;
 }
