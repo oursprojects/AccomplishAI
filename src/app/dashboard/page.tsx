@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { getUser } from "@/lib/supabase/server";
+import { getFastUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
 import { normalizeHolidayMondays } from "@/lib/internship-calendar";
 import { ensureFastActiveTemplateReview } from "@/lib/templates/pipeline";
@@ -12,13 +12,13 @@ import DashboardLoading from "./loading";
 
 async function DashboardContent() {
   await connection();
-  const { supabase, user } = await getUser();
+  const { supabase, user } = await getFastUser();
   if (!user) redirect("/login");
 
-  const [{ data }, { data: profile }, quota, review] = await Promise.all([
+  const [{ data }, { data: profile }, review] = await Promise.all([
     supabase
       .from("reports")
-      .select("id, title, raw_notes, structured_data, created_at, updated_at")
+      .select("id, title, structured_data, created_at, updated_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(100),
@@ -29,14 +29,20 @@ async function DashboardContent() {
       )
       .eq("id", user.id)
       .maybeSingle(),
-    getUserQuotaStatus(supabase, user.id, user.email),
     ensureFastActiveTemplateReview(supabase, user.id).catch(() => null),
   ]);
+
+  const fetchedCount = data?.length ?? 0;
+  const quota = await getUserQuotaStatus(
+    supabase,
+    user.id,
+    user.email,
+    fetchedCount < 100 ? fetchedCount : undefined,
+  );
 
   const reports: DashboardReportSummary[] = (data ?? []).map((r) => ({
     id: r.id,
     title: r.title ?? "",
-    raw_notes: r.raw_notes,
     structured_data:
       r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
         ? (r.structured_data as Partial<ReportData>)

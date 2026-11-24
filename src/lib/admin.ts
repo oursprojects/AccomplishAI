@@ -104,6 +104,7 @@ export async function getUserQuotaStatus(
   supabase: SupabaseClient<Database>,
   userId: string,
   email?: string | null,
+  knownReportsCount?: number,
 ): Promise<QuotaStatus> {
   const admin = isAdminEmail(email);
   const dayStart = getManilaDayStartIso();
@@ -124,10 +125,9 @@ export async function getUserQuotaStatus(
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("created_at", dayStart),
-    supabase
-      .from("reports")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId),
+    knownReportsCount !== undefined
+      ? Promise.resolve({ count: knownReportsCount })
+      : supabase.from("reports").select("id", { count: "exact", head: true }).eq("user_id", userId),
   ]);
 
   const defaultLimit = settings?.default_daily_prompt_limit ?? 15;

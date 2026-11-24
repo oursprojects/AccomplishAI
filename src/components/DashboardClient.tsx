@@ -37,7 +37,7 @@ import { toast } from "@/components/ui/toast";
 export interface DashboardReportSummary {
   id: string;
   title: string;
-  raw_notes: string;
+  raw_notes?: string;
   structured_data: Partial<ReportData>;
   created_at: string;
   updated_at: string;

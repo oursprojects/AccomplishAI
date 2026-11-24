@@ -27,10 +27,9 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  // Do not put code between createServerClient and getUser(): it refreshes the token.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Do not put code between createServerClient and getClaims(): it refreshes/verifies the session cleanly.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims ?? null;
 
   const { pathname, searchParams } = request.nextUrl;
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

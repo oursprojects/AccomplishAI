@@ -10,7 +10,7 @@ import {
 } from "@/lib/internship-calendar";
 import { groqErrorResponse } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage } from "@/lib/ai/chat-tools";
-import { emptyReport, reportDataSchema } from "@/lib/report-schema";
+import { emptyReport, reportDataSchema, type ReportData } from "@/lib/report-schema";
 import { computeReportStatus } from "@/lib/mcp/accomplish-mcp-server";
 import { openAccomplishMcpSession, type AccomplishMcpSession } from "@/lib/mcp/in-memory-bridge";
 
@@ -224,6 +224,7 @@ CAPABILITIES & BEHAVIOR:
 
     const toolActions: string[] = [];
     let createdReportId: string | undefined;
+    let updatedReport: { id: string; structuredData: ReportData } | undefined;
     let mutated = false;
     let usedModel = "";
 
@@ -237,6 +238,9 @@ CAPABILITIES & BEHAVIOR:
       toolActions,
       onGlobalMutate: (info) => {
         if (info.createdReportId) createdReportId = info.createdReportId;
+        if (info.updatedReportId && info.updatedData) {
+          updatedReport = { id: info.updatedReportId, structuredData: info.updatedData };
+        }
         if (info.mutated) mutated = true;
       },
     });
@@ -271,6 +275,7 @@ CAPABILITIES & BEHAVIOR:
           toolActions,
           mcpToolsUsed: mcpSession.mcpToolsUsed,
           createdReportId,
+          updatedReport,
           mutated,
           model: usedModel,
           quota: quotaAfter,
@@ -314,6 +319,7 @@ CAPABILITIES & BEHAVIOR:
       toolActions,
       mcpToolsUsed: mcpSession.mcpToolsUsed,
       createdReportId,
+      updatedReport,
       mutated,
       model: usedModel || aiSettings.activeTextModel,
       quota: quotaAfter,

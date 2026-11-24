@@ -194,7 +194,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     async (targetEl: HTMLDivElement, filled: Uint8Array) => {
       const { renderAsync } = await warmDocxPreview();
       targetEl.innerHTML = "";
-      await renderAsync(filled.buffer as ArrayBuffer, targetEl, undefined, {
+      await renderAsync(filled.slice().buffer, targetEl, undefined, {
         inWrapper: true,
         ignoreWidth: false,
         ignoreHeight: false,
@@ -207,12 +207,12 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     [paperSize, customTexts],
   );
 
-  // Render inline preview immediately on first load, and gently debounce live edits
+  // Render inline preview immediately on first load, and quickly debounce live edits
   useEffect(() => {
     if (loadedKey !== targetKey || !templateBytesRef.current || !inlineContainerRef.current) return;
 
     let cancelled = false;
-    const delayMs = hasRenderedOnceRef.current ? 120 : 0;
+    const delayMs = hasRenderedOnceRef.current ? 40 : 0;
 
     const run = async () => {
       if (!templateBytesRef.current || !inlineContainerRef.current) return;

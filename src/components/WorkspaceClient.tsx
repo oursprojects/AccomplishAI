@@ -121,13 +121,15 @@ export function WorkspaceClient({
   const currentSnapshot = useMemo(() => formSnapshotOf(title, data), [title, data]);
   const hasChanges = currentSnapshot !== savedSnapshot;
 
-  // Keep live preview synced when server props refresh (e.g. edited via Overall AI) while user has no unsaved edits
+  // Keep live preview synced ONLY when server props genuinely refresh from SSR (never revert local AI updates)
   const serverSnapshot = useMemo(
     () => formSnapshotOf(initialReport.title ?? "", initialSeeded),
     [initialReport.title, initialSeeded],
   );
+  const lastServerSnapshotRef = useRef(serverSnapshot);
   useEffect(() => {
-    if (serverSnapshot === savedSnapshot) return;
+    if (serverSnapshot === lastServerSnapshotRef.current) return;
+    lastServerSnapshotRef.current = serverSnapshot;
     if (currentSnapshot !== savedSnapshot) return;
     const id = window.requestAnimationFrame(() => {
       savedStateRef.current = { title: initialReport.title ?? "", data: initialSeeded };
@@ -137,6 +139,20 @@ export function WorkspaceClient({
     });
     return () => window.cancelAnimationFrame(id);
   }, [serverSnapshot, savedSnapshot, currentSnapshot, initialReport.title, initialSeeded]);
+
+  // Apply instant live updates when Overall AI edits this currently open report
+  useEffect(() => {
+    const onGlobalReportUpdated = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ id?: string; structuredData?: ReportData }>).detail;
+      if (!detail || detail.id !== initialReport.id || !detail.structuredData) return;
+      setUndoStack((prev) => [...prev.slice(-24), { title, data }]);
+      setData(detail.structuredData);
+      savedStateRef.current = { title, data: detail.structuredData };
+      setSavedSnapshot(formSnapshotOf(title, detail.structuredData));
+    };
+    window.addEventListener("accomplish:report-updated", onGlobalReportUpdated);
+    return () => window.removeEventListener("accomplish:report-updated", onGlobalReportUpdated);
+  }, [initialReport.id, title, data]);
 
   const [tab, setTab] = useState<WorkspaceTab>("preview");
   const [desktopLeftMode, setDesktopLeftMode] = useState<"chat" | "edit">("chat");

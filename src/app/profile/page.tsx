@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { getUser } from "@/lib/supabase/server";
+import { getFastUser } from "@/lib/supabase/server";
 import { getUserQuotaStatus } from "@/lib/admin";
 import { normalizeHolidayMondays } from "@/lib/internship-calendar";
 import { AppShell } from "@/components/AppShell";
@@ -10,7 +10,7 @@ import SubpageLoading from "./loading";
 
 async function ProfileContent() {
   await connection();
-  const { supabase, user } = await getUser();
+  const { supabase, user } = await getFastUser();
   if (!user) redirect("/login");
 
   const [{ data }, quota] = await Promise.all([

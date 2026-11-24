@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { z } from "zod";
-import { getUser } from "@/lib/supabase/server";
+import { getFastUser } from "@/lib/supabase/server";
 import { getQuotaAndAiSettings } from "@/lib/admin";
 import { normalizeHolidayMondays } from "@/lib/internship-calendar";
 import { ensureFastActiveTemplateReview } from "@/lib/templates/pipeline";
@@ -44,7 +44,7 @@ async function ReportDetailContent({
   params: Promise<{ id: string }>;
 }) {
   await connection();
-  const { supabase, user } = await getUser();
+  const { supabase, user } = await getFastUser();
   if (!user) redirect("/login");
 
   const { id } = await params;

@@ -342,6 +342,7 @@ export function GlobalAssistantDrawer({
         toolActions?: string[];
         mcpToolsUsed?: string[];
         createdReportId?: string;
+        updatedReport?: { id: string; structuredData: Record<string, string> };
         mutated?: boolean;
         model?: string;
         retryAfterSeconds?: number;
@@ -369,6 +370,9 @@ export function GlobalAssistantDrawer({
       };
       updateActiveMessages(() => [...historyToSend, assistantTurn]);
 
+      if (json.updatedReport) {
+        window.dispatchEvent(new CustomEvent("accomplish:report-updated", { detail: json.updatedReport }));
+      }
       if (json.mutated || json.createdReportId) {
         router.refresh();
       }

@@ -146,7 +146,10 @@ export function ReportChat({
         throw new Error(json?.error ?? `Could not reach AI assistant (HTTP ${res.status}).`);
       }
 
-      if (json.structuredData && JSON.stringify(json.structuredData) !== JSON.stringify(data)) {
+      if (
+        json.structuredData &&
+        ((json.updatedKeys && json.updatedKeys.length > 0) || JSON.stringify(json.structuredData) !== JSON.stringify(data))
+      ) {
         onAiDataUpdate(json.structuredData);
       }
 

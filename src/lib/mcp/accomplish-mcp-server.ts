@@ -47,7 +47,12 @@ export interface AccomplishMcpSessionState {
   toolActions?: string[];
   onToolCall?: (toolName: string) => void | Promise<void>;
   onMutate?: () => void;
-  onGlobalMutate?: (info: { createdReportId?: string; mutated?: boolean }) => void;
+  onGlobalMutate?: (info: {
+    createdReportId?: string;
+    mutated?: boolean;
+    updatedReportId?: string;
+    updatedData?: ReportData;
+  }) => void;
 }
 
 export function cleanReportFieldValue(key: ReportKey, raw: unknown, maxDayBullets = 3): string {
@@ -524,7 +529,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
           .update({ structured_data: targetData as unknown as Json })
           .eq("id", targetId)
           .eq("user_id", ctx.user.id);
-        ctx.onGlobalMutate?.({ mutated: true });
+        ctx.onGlobalMutate?.({ mutated: true, updatedReportId: targetId, updatedData: targetData });
       }
 
       return jsonContent({
@@ -599,7 +604,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
           .update({ structured_data: targetData as unknown as Json })
           .eq("id", targetId)
           .eq("user_id", ctx.user.id);
-        ctx.onGlobalMutate?.({ mutated: true });
+        ctx.onGlobalMutate?.({ mutated: true, updatedReportId: targetId, updatedData: targetData });
       }
 
       return jsonContent({
