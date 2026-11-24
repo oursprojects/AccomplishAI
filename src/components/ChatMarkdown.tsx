@@ -2,7 +2,10 @@
 
 import React, { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { parseChatFileSpec } from "@/lib/chat-file-export";
 import { ChatChart, parseChartSpec } from "./ChatChart";
+import { ChatFileExport } from "./ChatFileExport";
+import { ChatMermaid } from "./ChatMermaid";
 
 function isSafeHref(href: string): boolean {
   const trimmed = href.trim();
@@ -147,6 +150,17 @@ export function ChatMarkdown({ content }: { content: string }) {
         const spec = parseChartSpec(rawCode);
         if (spec) {
           blocks.push(<ChatChart key={`chart-${i}`} spec={spec} />);
+          continue;
+        }
+      }
+      if (lang === "mermaid") {
+        blocks.push(<ChatMermaid key={`mmd-${i}`} code={rawCode} />);
+        continue;
+      }
+      if (lang === "file" || lang === "export" || lang === "document") {
+        const fileSpec = parseChatFileSpec(rawCode);
+        if (fileSpec) {
+          blocks.push(<ChatFileExport key={`file-${i}`} spec={fileSpec} />);
           continue;
         }
       }

@@ -44,10 +44,10 @@ const THINKING_PHRASES = [
 
 const STARTER_PROMPTS = [
   "Chart my weekly & cumulative OJT hours",
+  "Export my OJT progress to Excel & PDF",
+  "Create a Mermaid flowchart of my OJT workflow",
   "Summarize all my weeks & remaining OJT hours",
-  "Which weekly reports are still incomplete?",
   "Create my next weekly report",
-  "Draft a polite email to my OJT supervisor",
   "Explain REST vs GraphQL with code examples",
 ] as const;
 
@@ -55,7 +55,7 @@ const INITIAL_WELCOME: GlobalChatTurn = {
   id: "global-welcome",
   role: "assistant",
   content:
-    "Hi! I'm **Overall Accomplish AI** — your full **ChatGPT-style assistant** connected via **MCP · Supabase**.\n\n- **Ask anything like ChatGPT:** coding & debugging, SQL, writing, emails, math, translations, charts, or explanations.\n- **Manage your OJT workspace:** summarize all weeks, **render interactive charts**, create/edit reports, check hours, and update holiday weeks.",
+    "Hi! I'm **Overall Accomplish AI** — your full **ChatGPT-style assistant** connected via **MCP · Supabase**.\n\n- **Ask anything like ChatGPT:** coding & debugging, SQL, writing, emails, math, translations, **charts**, **Mermaid diagrams**, or **DOCX / PDF / Excel** file exports.\n- **Manage your OJT workspace:** summarize all weeks, chart hours, create/edit reports, check progress, and update holiday weeks.",
 };
 
 interface GlobalAssistantDrawerProps {
@@ -494,8 +494,8 @@ export function GlobalAssistantDrawer({
             </div>
           </div>
           <p className="text-[10px] text-[#8A847A] px-1">
-            Press <kbd className="font-mono">Enter</kbd> to send · <kbd className="font-mono">Shift+Enter</kbd> for newline · Ask for a{" "}
-            <span className="font-medium text-[#57544E]">bar, line, or pie chart</span> anytime
+            Press <kbd className="font-mono">Enter</kbd> to send · <kbd className="font-mono">Shift+Enter</kbd> for newline · Ask for{" "}
+            <span className="font-medium text-[#57544E]">charts, Mermaid, DOCX, PDF, or Excel</span>
           </p>
         </form>
       </aside>

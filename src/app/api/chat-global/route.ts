@@ -179,7 +179,28 @@ CAPABILITIES & BEHAVIOR:
    For multi-series comparison charts (e.g. Weekly vs Cumulative hours), use:
    \`{ "type": "line", "title": "...", "unit": "hrs", "labels": ["Week 1", "Week 2"], "series": [{ "name": "Weekly", "data": [40, 40] }, { "name": "Cumulative", "data": [40, 80] }] }\`
    Keep \`chart\` JSON strictly valid (double quotes, numbers for values, no comments or trailing commas).
-4. **Rich ChatGPT Formatting:** Use clean Markdown headings, crisp bullets, tables, blockquotes, and fenced code blocks with language tags (\`\`\`ts, \`\`\`sql, \`\`\`python, etc.). When writing or updating AccomplishAI report fields, follow past-tense formal wording, ALL CAPS names, and \`Month Day, Year\` dates.`;
+4. **Mermaid Diagrams (\`\`\`mermaid):** Whenever the user asks for a **flowchart, architecture diagram, sequence diagram, ERD, state diagram, Gantt/OJT roadmap, timeline, or mindmap**, output a valid fenced \`\`\`mermaid block (e.g., \`flowchart TD\`, \`sequenceDiagram\`, \`erDiagram\`, \`stateDiagram-v2\`, \`gantt\`, \`mindmap\`). Always quote node labels that contain spaces or parentheses (e.g., \`A["Step 1 (Setup)"]\`) and avoid HTML tags inside labels.
+5. **Downloadable File Generation — DOCX, PDF & Excel (\`\`\`file):** Whenever the user asks to **generate, export, create, or download a Word (.docx), PDF (.pdf), or Excel (.xlsx) file** (such as an OJT hours spreadsheet, summary PDF report, cover letter, or custom table), output a fenced \`\`\`file JSON block with valid JSON:
+   \`\`\`file
+   {
+     "format": "xlsx",
+     "filename": "ojt-summary",
+     "title": "OJT Weekly Hours Summary",
+     "subtitle": "Prepared for Intern Name",
+     "sections": [
+       { "heading": "Summary", "paragraphs": ["..."], "bullets": ["..."] }
+     ],
+     "table": {
+       "headers": ["Week", "Dates", "Hours", "Status"],
+       "rows": [["Week 1", "Nov 9 - Nov 13, 2026", 40, "Complete"]]
+     },
+     "sheets": [
+       { "name": "Weekly Hours", "headers": ["Week", "Hours"], "rows": [["Week 1", 40]] }
+     ]
+   }
+   \`\`\`
+   Use \`"format": "docx" | "pdf" | "xlsx"\`. Include \`sections\` for prose/letters/reports, \`table\` or \`sheets\` for spreadsheets/tabular data, and ensure numbers in numeric columns are JSON numbers. Keep \`file\` JSON strictly valid (no comments or trailing commas).
+6. **Rich ChatGPT Formatting:** Use clean Markdown headings, crisp bullets, tables, blockquotes, and fenced code blocks with language tags (\`\`\`ts, \`\`\`sql, \`\`\`python, etc.). When writing or updating AccomplishAI report fields, follow past-tense formal wording, ALL CAPS names, and \`Month Day, Year\` dates.`;
 
     const recentMessages = body.data.messages.slice(-16);
     const loopMessages: GroqMessage[] = [
