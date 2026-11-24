@@ -388,10 +388,10 @@ export function AdminClient({
             <ShieldCheck className="w-3.5 h-3.5" />
             Admin Console
           </Badge>
-          <h1 className="mt-1.5 text-xl sm:text-2xl font-bold tracking-tight text-[#1F1E1C]">
+          <h1 className="mt-1.5 text-xl sm:text-2xl font-bold tracking-tight text-[#141413]">
             Interns, AI Controls &amp; API Usage Monitor
           </h1>
-          <p className="text-sm text-[#6B665E]">
+          <p className="text-sm text-[#5C5C57]">
             Monitor live Groq API utilization, enforce per-user prompt &amp; report limits, and manage intern logins.
           </p>
         </div>
@@ -405,48 +405,48 @@ export function AdminClient({
       {/* Summary metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Card className="p-4">
-          <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
+          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
             <span>Registered Interns</span>
-            <Users className="w-4 h-4 text-[#D97757]" />
+            <Users className="w-4 h-4 text-[#1D4ED8]" />
           </div>
-          <p className="mt-1 text-2xl font-bold text-[#1F1E1C]">{totalInterns}</p>
-          <p className="text-[11px] text-[#7A746B] mt-0.5">{totalReports} total saved reports</p>
+          <p className="mt-1 text-2xl font-bold text-[#141413]">{totalInterns}</p>
+          <p className="text-[11px] text-[#7A7A73] mt-0.5">{totalReports} total saved reports</p>
         </Card>
 
         <Card className="p-4">
-          <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
+          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
             <span>API Calls Today (Manila)</span>
-            <Activity className="w-4 h-4 text-[#D97757]" />
+            <Activity className="w-4 h-4 text-[#1D4ED8]" />
           </div>
-          <p className="mt-1 text-2xl font-bold text-[#1F1E1C]">
-            {usageMonitor.requestsToday} <span className="text-xs font-normal text-[#7A746B]">/ 1,000 RPD</span>
+          <p className="mt-1 text-2xl font-bold text-[#141413]">
+            {usageMonitor.requestsToday} <span className="text-xs font-normal text-[#7A7A73]">/ 1,000 RPD</span>
           </p>
-          <div className="mt-2 h-1.5 w-full rounded-full bg-[#EFECE3] overflow-hidden">
-            <div className="h-full bg-[#D97757] rounded-full transition-all" style={{ width: `${rpdPct}%` }} />
+          <div className="mt-2 h-1.5 w-full rounded-full bg-[#F1F1EE] overflow-hidden">
+            <div className="h-full bg-[#1D4ED8] rounded-full transition-all" style={{ width: `${rpdPct}%` }} />
           </div>
         </Card>
 
         <Card className="p-4">
-          <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
+          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
             <span>Burst Rate (Last 60s)</span>
-            <Gauge className="w-4 h-4 text-[#D97757]" />
+            <Gauge className="w-4 h-4 text-[#1D4ED8]" />
           </div>
-          <p className="mt-1 text-2xl font-bold text-[#1F1E1C]">
-            {usageMonitor.requestsLastMinute} <span className="text-xs font-normal text-[#7A746B]">/ 30 RPM</span>
+          <p className="mt-1 text-2xl font-bold text-[#141413]">
+            {usageMonitor.requestsLastMinute} <span className="text-xs font-normal text-[#7A7A73]">/ 30 RPM</span>
           </p>
-          <div className="mt-2 h-1.5 w-full rounded-full bg-[#EFECE3] overflow-hidden">
+          <div className="mt-2 h-1.5 w-full rounded-full bg-[#F1F1EE] overflow-hidden">
             <div className="h-full bg-emerald-600 rounded-full transition-all" style={{ width: `${rpmPct}%` }} />
           </div>
         </Card>
 
         <Card className="p-4">
-          <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
+          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
             <span>Active Groq Models</span>
             <Cpu className="w-4 h-4 text-emerald-700" />
           </div>
           <p className="mt-1 text-xs font-mono font-semibold text-emerald-700 truncate">{aiSettings.activeTextModel}</p>
-          <p className="text-[11px] font-mono text-[#6B665E] truncate mt-0.5">STT: {aiSettings.activeSttModel}</p>
-          <p className="text-[11px] text-[#7A746B] mt-1">{usageMonitor.requestsLast7Days} calls last 7 days</p>
+          <p className="text-[11px] font-mono text-[#5C5C57] truncate mt-0.5">STT: {aiSettings.activeSttModel}</p>
+          <p className="text-[11px] text-[#7A7A73] mt-1">{usageMonitor.requestsLast7Days} calls last 7 days</p>
         </Card>
       </div>
 
@@ -454,11 +454,11 @@ export function AdminClient({
       <Card className="p-4 sm:p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-[#D97757]" />
+            <h2 className="text-sm font-semibold text-[#141413] flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-[#1D4ED8]" />
               <span>API Usage &amp; Security Monitor</span>
             </h2>
-            <p className="text-xs text-[#6B665E]">
+            <p className="text-xs text-[#5C5C57]">
               Protected by per-user 8 RPM burst guard, {aiSettings.globalRpmLimit} shared RPM cap, and multi-model load balancing (~90 RPM pooled).
             </p>
           </div>
@@ -472,11 +472,11 @@ export function AdminClient({
           {poolStatus.models.map((pm) => (
             <div
               key={pm.model}
-              className="rounded-xl border border-[#EFECE3] bg-[#FAF9F5] px-3 py-2 flex items-center justify-between gap-2"
+              className="rounded-xl border border-[#F1F1EE] bg-[#F8F8F6] px-3 py-2 flex items-center justify-between gap-2"
             >
               <div className="min-w-0">
-                <p className="text-[11px] font-mono font-semibold text-[#1F1E1C] truncate">{pm.model}</p>
-                <p className="text-[11px] text-[#6B665E]">{pm.callsLastMinute} / 24 soft RPM</p>
+                <p className="text-[11px] font-mono font-semibold text-[#141413] truncate">{pm.model}</p>
+                <p className="text-[11px] text-[#5C5C57]">{pm.callsLastMinute} / 24 soft RPM</p>
               </div>
               {pm.cooldownRemainingSeconds > 0 ? (
                 <Badge variant="warning">Cooldown {pm.cooldownRemainingSeconds}s</Badge>
@@ -489,22 +489,22 @@ export function AdminClient({
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* 7-day chart */}
-          <div className="rounded-xl border border-[#EFECE3] bg-[#FAF9F5] p-3.5 space-y-2.5">
-            <p className="text-xs font-semibold text-[#4A463F]">Last 7 Days Activity (Manila)</p>
+          <div className="rounded-xl border border-[#F1F1EE] bg-[#F8F8F6] p-3.5 space-y-2.5">
+            <p className="text-xs font-semibold text-[#3D3D39]">Last 7 Days Activity (Manila)</p>
             <div className="flex items-end gap-2 h-24 pt-2">
               {usageMonitor.dailySeries.map((day) => {
                 const heightPct = Math.max(8, Math.round((day.count / maxDayCount) * 100));
                 return (
                   <div key={day.date} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-                    <span className="text-[10px] font-mono text-[#6B665E]">{day.count}</span>
+                    <span className="text-[10px] font-mono text-[#5C5C57]">{day.count}</span>
                     <div className="w-full flex-1 flex items-end">
                       <div
-                        className="w-full rounded-t-md bg-[#D97757]/85 transition-all"
+                        className="w-full rounded-t-md bg-[#1D4ED8]/85 transition-all"
                         style={{ height: `${heightPct}%` }}
                         title={`${day.label}: ${day.count} requests`}
                       />
                     </div>
-                    <span className="text-[10px] text-[#7A746B] truncate">{day.label.split(" ")[1]}</span>
+                    <span className="text-[10px] text-[#7A7A73] truncate">{day.label.split(" ")[1]}</span>
                   </div>
                 );
               })}
@@ -512,19 +512,19 @@ export function AdminClient({
           </div>
 
           {/* Endpoint breakdown */}
-          <div className="rounded-xl border border-[#EFECE3] bg-[#FAF9F5] p-3.5 space-y-2">
-            <p className="text-xs font-semibold text-[#4A463F]">Usage by Endpoint</p>
+          <div className="rounded-xl border border-[#F1F1EE] bg-[#F8F8F6] p-3.5 space-y-2">
+            <p className="text-xs font-semibold text-[#3D3D39]">Usage by Endpoint</p>
             {usageMonitor.byEndpoint.length === 0 ? (
-              <p className="text-xs text-[#7A746B]">No API requests recorded yet.</p>
+              <p className="text-xs text-[#7A7A73]">No API requests recorded yet.</p>
             ) : (
               <div className="space-y-2">
                 {usageMonitor.byEndpoint.map((ep) => (
                   <div key={ep.kind} className="flex items-center justify-between text-xs">
-                    <span className="text-[#1F1E1C] font-medium truncate">
+                    <span className="text-[#141413] font-medium truncate">
                       {ENDPOINT_LABELS[ep.kind] ?? ep.kind}
                     </span>
-                    <span className="font-mono text-[#6B665E] shrink-0">
-                      <strong className="text-[#1F1E1C]">{ep.today}</strong> today · {ep.total} total
+                    <span className="font-mono text-[#5C5C57] shrink-0">
+                      <strong className="text-[#141413]">{ep.today}</strong> today · {ep.total} total
                     </span>
                   </div>
                 ))}
@@ -533,17 +533,17 @@ export function AdminClient({
           </div>
 
           {/* Model breakdown */}
-          <div className="rounded-xl border border-[#EFECE3] bg-[#FAF9F5] p-3.5 space-y-2">
-            <p className="text-xs font-semibold text-[#4A463F]">Usage by Groq Model</p>
+          <div className="rounded-xl border border-[#F1F1EE] bg-[#F8F8F6] p-3.5 space-y-2">
+            <p className="text-xs font-semibold text-[#3D3D39]">Usage by Groq Model</p>
             {usageMonitor.byModel.length === 0 ? (
-              <p className="text-xs text-[#7A746B]">No model telemetry recorded yet.</p>
+              <p className="text-xs text-[#7A7A73]">No model telemetry recorded yet.</p>
             ) : (
               <div className="space-y-2">
                 {usageMonitor.byModel.map((m) => (
                   <div key={m.model} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-mono text-[#1F1E1C] truncate">{m.model}</span>
-                    <span className="font-mono text-[#6B665E] shrink-0">
-                      <strong className="text-[#1F1E1C]">{m.today}</strong> today · {m.total}
+                    <span className="font-mono text-[#141413] truncate">{m.model}</span>
+                    <span className="font-mono text-[#5C5C57] shrink-0">
+                      <strong className="text-[#141413]">{m.today}</strong> today · {m.total}
                     </span>
                   </div>
                 ))}
@@ -558,11 +558,11 @@ export function AdminClient({
         <form onSubmit={handleSaveAiControls} className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
-                <Bot className="w-4 h-4 text-[#D97757]" />
+              <h2 className="text-sm font-semibold text-[#141413] flex items-center gap-1.5">
+                <Bot className="w-4 h-4 text-[#1D4ED8]" />
                 <span>AI Model &amp; Output Controls</span>
               </h2>
-              <p className="text-xs text-[#6B665E]">
+              <p className="text-xs text-[#5C5C57]">
                 Switch active Groq models cleanly for future releases or traffic spikes, with automatic fallback.
               </p>
             </div>
@@ -571,11 +571,11 @@ export function AdminClient({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[#4A463F] mb-1">Primary Chat / Report Model</label>
+              <label className="block text-xs font-medium text-[#3D3D39] mb-1">Primary Chat / Report Model</label>
               <select
                 value={activeTextModel}
                 onChange={(e) => setActiveTextModel(e.target.value as AllowedTextModel)}
-                className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
+                className="w-full rounded-xl border border-[#D8D8D0] bg-[#F8F8F6] px-3 py-2 text-xs font-medium text-[#141413] outline-none focus:border-[#1D4ED8]"
               >
                 {ALLOWED_TEXT_MODELS.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -583,20 +583,20 @@ export function AdminClient({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-[#7A746B]">
+              <p className="mt-1 text-[11px] text-[#7A7A73]">
                 {ALLOWED_TEXT_MODELS.find((m) => m.id === activeTextModel)?.notes}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#4A463F] mb-1 flex items-center gap-1">
-                <Mic className="w-3.5 h-3.5 text-[#D97757]" />
+              <label className="block text-xs font-medium text-[#3D3D39] mb-1 flex items-center gap-1">
+                <Mic className="w-3.5 h-3.5 text-[#1D4ED8]" />
                 Voice Transcription (STT) Model
               </label>
               <select
                 value={activeSttModel}
                 onChange={(e) => setActiveSttModel(e.target.value as AllowedSttModel)}
-                className="w-full rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#1F1E1C] outline-none focus:border-[#D97757]"
+                className="w-full rounded-xl border border-[#D8D8D0] bg-[#F8F8F6] px-3 py-2 text-xs font-medium text-[#141413] outline-none focus:border-[#1D4ED8]"
               >
                 {ALLOWED_STT_MODELS.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -604,13 +604,13 @@ export function AdminClient({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-[#7A746B]">
+              <p className="mt-1 text-[11px] text-[#7A7A73]">
                 {ALLOWED_STT_MODELS.find((m) => m.id === activeSttModel)?.notes}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#4A463F] mb-1">Max Bullets per Day Cell</label>
+              <label className="block text-xs font-medium text-[#3D3D39] mb-1">Max Bullets per Day Cell</label>
               <Input
                 type="number"
                 min={1}
@@ -619,13 +619,13 @@ export function AdminClient({
                 onChange={(e) => setMaxBulletsPerDay(Math.max(1, Math.min(5, Number(e.target.value) || 3)))}
                 className="text-xs font-semibold"
               />
-              <p className="mt-1 text-[11px] text-[#7A746B]">
+              <p className="mt-1 text-[11px] text-[#7A7A73]">
                 Keeps daily tasks inside 1 page (recommended: 3).
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#4A463F] mb-1">Max Chat Context Messages</label>
+              <label className="block text-xs font-medium text-[#3D3D39] mb-1">Max Chat Context Messages</label>
               <Input
                 type="number"
                 min={4}
@@ -634,13 +634,13 @@ export function AdminClient({
                 onChange={(e) => setMaxChatMessages(Math.max(4, Math.min(60, Number(e.target.value) || 16)))}
                 className="text-xs font-semibold"
               />
-              <p className="mt-1 text-[11px] text-[#7A746B]">
+              <p className="mt-1 text-[11px] text-[#7A7A73]">
                 Messages kept per report chat before Clear Chat (default: 16).
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#4A463F] mb-1">Shared Team RPM Limit</label>
+              <label className="block text-xs font-medium text-[#3D3D39] mb-1">Shared Team RPM Limit</label>
               <Input
                 type="number"
                 min={10}
@@ -649,7 +649,7 @@ export function AdminClient({
                 onChange={(e) => setGlobalRpmLimit(Math.max(10, Math.min(300, Number(e.target.value) || 60)))}
                 className="text-xs font-semibold"
               />
-              <p className="mt-1 text-[11px] text-[#7A746B]">
+              <p className="mt-1 text-[11px] text-[#7A7A73]">
                 Pooled across 3 models (default: 60 RPM safely below 90 RPM ceiling).
               </p>
             </div>
@@ -668,18 +668,18 @@ export function AdminClient({
       <Card className="p-4 sm:p-5">
         <form onSubmit={handleSaveDefault} className="space-y-3">
           <div>
-            <h2 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
-              <FileStack className="w-4 h-4 text-[#D97757]" />
+            <h2 className="text-sm font-semibold text-[#141413] flex items-center gap-1.5">
+              <FileStack className="w-4 h-4 text-[#1D4ED8]" />
               <span>Global Default Limits (All Interns)</span>
             </h2>
-            <p className="text-xs text-[#6B665E]">
+            <p className="text-xs text-[#5C5C57]">
               Daily prompt allowance resets at 12:00 AM (Asia/Manila). Leave Max Saved Reports blank for unlimited.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-xs font-medium text-[#4A463F]">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#3D3D39]">
                 Daily Prompts:
                 <Input
                   type="number"
@@ -689,10 +689,10 @@ export function AdminClient({
                   onChange={(e) => setDefaultLimit(Number(e.target.value))}
                   className="w-20 font-semibold"
                 />
-                <span className="text-[#7A746B]">/ day</span>
+                <span className="text-[#7A7A73]">/ day</span>
               </label>
 
-              <label className="flex items-center gap-2 text-xs font-medium text-[#4A463F]">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#3D3D39]">
                 Max Saved Reports:
                 <Input
                   type="number"
@@ -716,15 +716,15 @@ export function AdminClient({
 
       {/* Member list */}
       <Card className="overflow-hidden">
-        <div className="border-b border-[#EFECE3] px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-[#1F1E1C]">Members ({members.length})</h2>
-          <span className="text-xs text-[#6B665E]">
+        <div className="border-b border-[#F1F1EE] px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-[#141413]">Members ({members.length})</h2>
+          <span className="text-xs text-[#5C5C57]">
             Leave custom fields blank to inherit defaults ({defaultLimit}/day ·{" "}
             {defaultMaxReports === "" ? "Unlimited reports" : `${defaultMaxReports} reports`})
           </span>
         </div>
 
-        <div className="divide-y divide-[#F2EFE8]">
+        <div className="divide-y divide-[#E2E2DC]">
           {members.map((m) => {
             const anyMutationBusy = creating || savingAi || savingDefault || busyId !== null;
             const savedLimit = m.customDailyLimit === null ? "" : String(m.customDailyLimit);
@@ -734,11 +734,11 @@ export function AdminClient({
             return (
               <div
                 key={m.userId}
-                className="p-4 sm:px-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 hover:bg-[#FAF9F5]/80"
+                className="p-4 sm:px-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 hover:bg-[#F8F8F6]/80"
               >
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-[#1F1E1C] truncate">{m.email}</p>
+                    <p className="text-sm font-semibold text-[#141413] truncate">{m.email}</p>
                     {m.isAdmin ? (
                       <Badge variant="accent">Admin · Unlimited</Badge>
                     ) : m.isBlocked ? (
@@ -747,18 +747,18 @@ export function AdminClient({
                       <Badge variant="success">Active</Badge>
                     )}
                   </div>
-                  <p className="text-xs text-[#6B665E]">
+                  <p className="text-xs text-[#5C5C57]">
                     {m.nameLastFirst || "No profile name"} · {m.office || "DNX"} ·{" "}
-                    <strong className="text-[#1F1E1C]">{m.usedToday}</strong>
+                    <strong className="text-[#141413]">{m.usedToday}</strong>
                     {!m.isAdmin && ` / ${m.effectiveDailyLimit}`} prompts today · {m.usedTotal} total prompts ·{" "}
-                    <strong className="text-[#1F1E1C]">{m.reportsCount}</strong>
+                    <strong className="text-[#141413]">{m.reportsCount}</strong>
                     {!m.isAdmin && ` / ${m.effectiveMaxReports === null ? "∞" : m.effectiveMaxReports}`} saved reports
                   </p>
                 </div>
 
                 {!m.isAdmin && (
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <label className="flex items-center gap-1 text-xs text-[#6B665E]">
+                    <label className="flex items-center gap-1 text-xs text-[#5C5C57]">
                       Prompts:
                       <Input
                         type="number"
@@ -771,7 +771,7 @@ export function AdminClient({
                       />
                     </label>
 
-                    <label className="flex items-center gap-1 text-xs text-[#6B665E]">
+                    <label className="flex items-center gap-1 text-xs text-[#5C5C57]">
                       Reports:
                       <Input
                         type="number"
@@ -835,7 +835,7 @@ export function AdminClient({
             <DialogHeader>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FDF3EF] text-[#D97757]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#1D4ED8]">
                     <UserPlus className="h-4 w-4" />
                   </span>
                   <div>
@@ -866,7 +866,7 @@ export function AdminClient({
               )}
 
               <div>
-                <label htmlFor="create-intern-email" className="block text-xs font-medium text-[#4A463F] mb-1">
+                <label htmlFor="create-intern-email" className="block text-xs font-medium text-[#3D3D39] mb-1">
                   Email Address
                 </label>
                 <Input
@@ -881,7 +881,7 @@ export function AdminClient({
               </div>
 
               <div>
-                <label htmlFor="create-intern-password" className="block text-xs font-medium text-[#4A463F] mb-1">
+                <label htmlFor="create-intern-password" className="block text-xs font-medium text-[#3D3D39] mb-1">
                   Temporary Password
                 </label>
                 <div className="relative">
@@ -899,7 +899,7 @@ export function AdminClient({
                     type="button"
                     onClick={() => setShowNewPassword((v) => !v)}
                     aria-label={showNewPassword ? "Hide password" : "Show password"}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8A847A] hover:text-[#1F1E1C] cursor-pointer"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#7A7A73] hover:text-[#141413] cursor-pointer"
                   >
                     {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -908,7 +908,7 @@ export function AdminClient({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="create-intern-prompts" className="block text-xs font-medium text-[#4A463F] mb-1">
+                  <label htmlFor="create-intern-prompts" className="block text-xs font-medium text-[#3D3D39] mb-1">
                     Daily Prompt Limit
                   </label>
                   <Input
@@ -922,7 +922,7 @@ export function AdminClient({
                   />
                 </div>
                 <div>
-                  <label htmlFor="create-intern-reports" className="block text-xs font-medium text-[#4A463F] mb-1">
+                  <label htmlFor="create-intern-reports" className="block text-xs font-medium text-[#3D3D39] mb-1">
                     Max Saved Reports
                   </label>
                   <Input
@@ -938,25 +938,25 @@ export function AdminClient({
               </div>
 
               {/* Optional Profile, Office & OJT Hour Defaults */}
-              <div className="rounded-xl border border-[#E6E2D8] bg-[#FAF9F5]/80 p-3 space-y-3">
+              <div className="rounded-xl border border-[#E2E2DC] bg-[#F8F8F6]/80 p-3 space-y-3">
                 <button
                   type="button"
                   onClick={() => setShowOptionalDefaults((v) => !v)}
-                  className="w-full flex items-center justify-between gap-2 text-xs font-semibold text-[#1F1E1C] cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 text-xs font-semibold text-[#141413] cursor-pointer"
                 >
                   <span>Optional Intern Defaults (Name, Office, Hours, Start Date)</span>
                   {showOptionalDefaults ? (
-                    <ChevronUp className="h-4 w-4 text-[#6B665E]" />
+                    <ChevronUp className="h-4 w-4 text-[#5C5C57]" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-[#6B665E]" />
+                    <ChevronDown className="h-4 w-4 text-[#5C5C57]" />
                   )}
                 </button>
 
                 {showOptionalDefaults && (
-                  <div className="space-y-2.5 pt-1 border-t border-[#E6E2D8]">
+                  <div className="space-y-2.5 pt-1 border-t border-[#E2E2DC]">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
-                        <label htmlFor="create-intern-name-lf" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                        <label htmlFor="create-intern-name-lf" className="block text-[11px] font-medium text-[#3D3D39] mb-1">
                           Header Name (Optional)
                         </label>
                         <Input
@@ -969,7 +969,7 @@ export function AdminClient({
                         />
                       </div>
                       <div>
-                        <label htmlFor="create-intern-name-fl" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                        <label htmlFor="create-intern-name-fl" className="block text-[11px] font-medium text-[#3D3D39] mb-1">
                           Signature Name (Optional)
                         </label>
                         <Input
@@ -985,7 +985,7 @@ export function AdminClient({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
-                        <label htmlFor="create-intern-office" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                        <label htmlFor="create-intern-office" className="block text-[11px] font-medium text-[#3D3D39] mb-1">
                           Office / Company (Optional)
                         </label>
                         <Input
@@ -998,7 +998,7 @@ export function AdminClient({
                         />
                       </div>
                       <div>
-                        <label htmlFor="create-intern-verifier" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                        <label htmlFor="create-intern-verifier" className="block text-[11px] font-medium text-[#3D3D39] mb-1">
                           Default Verified By (Optional)
                         </label>
                         <Input
@@ -1014,7 +1014,7 @@ export function AdminClient({
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <div>
-                        <label htmlFor="create-intern-daily-hrs" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                        <label htmlFor="create-intern-daily-hrs" className="block text-[11px] font-medium text-[#3D3D39] mb-1">
                           Hours / Day (Opt.)
                         </label>
                         <Input
@@ -1030,7 +1030,7 @@ export function AdminClient({
                         />
                       </div>
                       <div>
-                        <label htmlFor="create-intern-ojt-hrs" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                        <label htmlFor="create-intern-ojt-hrs" className="block text-[11px] font-medium text-[#3D3D39] mb-1">
                           Target OJT Hrs (Opt.)
                         </label>
                         <Input
@@ -1045,7 +1045,7 @@ export function AdminClient({
                         />
                       </div>
                       <div>
-                        <label htmlFor="create-intern-start" className="block text-[11px] font-medium text-[#4A463F] mb-1">
+                        <label htmlFor="create-intern-start" className="block text-[11px] font-medium text-[#3D3D39] mb-1">
                           Week 1 Date (Opt.)
                         </label>
                         <Input

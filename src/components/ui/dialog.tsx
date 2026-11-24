@@ -39,7 +39,7 @@ export function Dialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F1E1C]/50 backdrop-blur-[2px] p-2 sm:p-5 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#141413]/45 p-2 sm:p-5 overflow-y-auto"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
@@ -62,7 +62,7 @@ export function DialogContent({
       role="dialog"
       aria-modal="true"
       className={cn(
-        "w-full max-w-md max-h-[94dvh] rounded-2xl border border-[#E6E2D8] bg-white shadow-2xl overflow-hidden",
+        "w-full max-w-md max-h-[94dvh] rounded-xl border border-[#E2E2DC] bg-white shadow-xl overflow-hidden",
         className,
       )}
     >
@@ -76,11 +76,11 @@ export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLD
 }
 
 export function DialogTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("text-sm sm:text-base font-semibold text-[#1F1E1C]", className)} {...props} />;
+  return <h2 className={cn("text-sm sm:text-base font-medium text-balance text-[#141413]", className)} {...props} />;
 }
 
 export function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn("text-xs text-[#6B665E]", className)} {...props} />;
+  return <p className={cn("text-xs text-pretty text-[#141413]/65", className)} {...props} />;
 }
 
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

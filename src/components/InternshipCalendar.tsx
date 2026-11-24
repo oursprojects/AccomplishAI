@@ -216,8 +216,8 @@ export function InternshipCalendar({
       {/* Calendar Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-[#D97757]" />
-          <span className="text-sm font-semibold text-[#1F1E1C]">{monthTitle}</span>
+          <CalendarDays className="h-4 w-4 text-[#1D4ED8]" />
+          <span className="text-sm font-semibold text-[#141413]">{monthTitle}</span>
         </div>
         <div className="flex items-center gap-1">
           <Button type="button" size="icon" variant="outline" onClick={prevMonth} aria-label="Previous month">
@@ -241,8 +241,8 @@ export function InternshipCalendar({
               }}
               className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition cursor-pointer ${
                 customRangeOpen && !editingHolidays
-                  ? "border-[#1F1E1C] bg-[#1F1E1C] text-white"
-                  : "border-[#DDD7CB] bg-white text-[#4A463F] hover:bg-[#F4F2EA]"
+                  ? "border-[#141413] bg-[#141413] text-white"
+                  : "border-[#D8D8D0] bg-white text-[#3D3D39] hover:bg-[#F1F1EE]"
               }`}
             >
               <CalendarRange className="h-3 w-3" />
@@ -260,7 +260,7 @@ export function InternshipCalendar({
               className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition cursor-pointer ${
                 editingHolidays
                   ? "border-amber-500 bg-amber-100 text-amber-900"
-                  : "border-[#DDD7CB] bg-white text-[#4A463F] hover:bg-[#F4F2EA]"
+                  : "border-[#D8D8D0] bg-white text-[#3D3D39] hover:bg-[#F1F1EE]"
               }`}
             >
               <CalendarOff className="h-3 w-3" />
@@ -278,13 +278,13 @@ export function InternshipCalendar({
       )}
 
       {customRangeOpen && !editingHolidays && mode === "week" && (
-        <div className="rounded-xl border border-[#E6E2D8] bg-[#FAF9F5] p-2.5 space-y-2">
-          <p className="text-[11px] font-medium text-[#57544E]">
+        <div className="rounded-xl border border-[#E2E2DC] bg-[#F8F8F6] p-2.5 space-y-2">
+          <p className="text-[11px] font-medium text-[#52524E]">
             Edit exact From &amp; To dates for partial or holiday-adjusted weeks:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] font-semibold uppercase text-[#6B665E] mb-0.5">From Date</label>
+              <label className="block text-[10px] font-semibold uppercase text-[#5C5C57] mb-0.5">From Date</label>
               <Input
                 type="date"
                 value={customFromIso}
@@ -293,7 +293,7 @@ export function InternshipCalendar({
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold uppercase text-[#6B665E] mb-0.5">To Date</label>
+              <label className="block text-[10px] font-semibold uppercase text-[#5C5C57] mb-0.5">To Date</label>
               <Input
                 type="date"
                 value={customToIso}
@@ -317,7 +317,7 @@ export function InternshipCalendar({
       )}
 
       {/* Weekday columns */}
-      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-[#6B665E]">
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-[#5C5C57]">
         {WEEKDAY_HEADERS.map((h, i) => (
           <div key={h} className={i >= 5 ? "text-[#A0998E]" : ""}>
             {h}
@@ -357,28 +357,28 @@ export function InternshipCalendar({
               }
               className={`relative flex flex-col items-center justify-center rounded-lg py-1.5 text-xs transition cursor-pointer ${
                 isSelectedDay
-                  ? "bg-[#D97757] text-white font-bold shadow-2xs"
+                  ? "bg-[#1D4ED8] text-white font-bold shadow-2xs"
                   : isHolidayWeek && isWorkday
                     ? "bg-amber-50 text-amber-800 border border-dashed border-amber-300 font-medium"
                     : isSelectedWorkweek
-                      ? "bg-[#D97757]/18 text-[#9F4427] font-semibold border border-[#D97757]/40"
+                      ? "bg-[#1D4ED8]/18 text-[#1E3A8A] font-semibold border border-[#1D4ED8]/40"
                       : isCoveredWorkweek
                         ? "bg-emerald-50 text-emerald-900 border border-emerald-200/80 font-medium"
                         : isWeekend
-                          ? "text-[#A7A196] hover:bg-[#F4F2EA]/70"
+                          ? "text-[#A7A196] hover:bg-[#F1F1EE]/70"
                           : inCurrentMonth
-                            ? "text-[#1F1E1C] hover:bg-[#F4F2EA]"
-                            : "text-[#A7A196] hover:bg-[#F4F2EA]/70"
+                            ? "text-[#141413] hover:bg-[#F1F1EE]"
+                            : "text-[#A7A196] hover:bg-[#F1F1EE]/70"
               }`}
             >
               <span>{d.getDate()}</span>
               {d.getDay() === 1 && isHolidayWeek ? (
                 <span className="text-[9px] leading-none font-bold text-amber-700">Hol</span>
               ) : d.getDay() === 1 && weekMeta ? (
-                <span className="text-[9px] leading-none font-bold text-[#C86343]">W{weekMeta.weekNumber}</span>
+                <span className="text-[9px] leading-none font-bold text-[#1E40AF]">W{weekMeta.weekNumber}</span>
               ) : null}
               {isToday && !isSelectedDay && (
-                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-[#D97757]" />
+                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-[#1D4ED8]" />
               )}
             </button>
           );
@@ -416,7 +416,7 @@ export function InternshipCalendar({
 
       {/* Helpful legend + quick week pills */}
       {mode === "anchor" ? (
-        <div className="rounded-xl bg-[#FAF9F5] border border-[#E6E2D8] px-3 py-2 text-xs text-[#57544E]">
+        <div className="rounded-xl bg-[#F8F8F6] border border-[#E2E2DC] px-3 py-2 text-xs text-[#52524E]">
           {anchorPreview ? (
             <span>
               <strong>Week 1 (Mon–Fri):</strong> {anchorPreview.fromText} – {anchorPreview.toText}
@@ -428,7 +428,7 @@ export function InternshipCalendar({
       ) : (
         internshipWeeks.length > 0 && (
           <div className="space-y-1.5 pt-1">
-            <p className="text-[11px] font-semibold text-[#57544E]">Active Schedule Quick Pick (Holidays Skipped):</p>
+            <p className="text-[11px] font-semibold text-[#52524E]">Active Schedule Quick Pick (Holidays Skipped):</p>
             <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
               {internshipWeeks.slice(0, 10).map((wk) => {
                 const active = selectedMondayIso === wk.mondayIso;
@@ -453,10 +453,10 @@ export function InternshipCalendar({
                     }}
                     className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition cursor-pointer ${
                       active
-                        ? "bg-[#D97757] text-white border-[#D97757]"
+                        ? "bg-[#1D4ED8] text-white border-[#1D4ED8]"
                         : covered
                           ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100/70"
-                          : "bg-white text-[#4A463F] border-[#DDD7CB] hover:bg-[#F4F2EA]"
+                          : "bg-white text-[#3D3D39] border-[#D8D8D0] hover:bg-[#F1F1EE]"
                     }`}
                   >
                     <span>W{wk.weekNumber}:</span>

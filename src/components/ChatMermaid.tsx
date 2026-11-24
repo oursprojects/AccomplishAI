@@ -54,14 +54,14 @@ export function ChatMermaid({ code }: { code: string }) {
             securityLevel: "strict",
             theme: "base",
             themeVariables: {
-              fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif",
-              primaryColor: "#FDF3EF",
-              primaryBorderColor: "#D97757",
-              primaryTextColor: "#1F1E1C",
-              secondaryColor: "#F4F2EA",
+              fontFamily: "var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif",
+              primaryColor: "#EFF4FF",
+              primaryBorderColor: "#1D4ED8",
+              primaryTextColor: "#141413",
+              secondaryColor: "#F1F1EE",
               tertiaryColor: "#FFFFFF",
-              lineColor: "#57544E",
-              edgeLabelBackground: "#FAF9F5",
+              lineColor: "#141413",
+              edgeLabelBackground: "#F8F8F6",
             },
           });
           mermaidInitialized = true;
@@ -117,20 +117,20 @@ export function ChatMermaid({ code }: { code: string }) {
   }
 
   return (
-    <div className="my-2.5 overflow-hidden rounded-2xl border border-[#E6E2D8] bg-[#FAF9F5] shadow-2xs">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] bg-white px-3 py-2 text-[11px]">
-        <span className="inline-flex items-center gap-1.5 font-semibold text-[#1F1E1C]">
-          <GitBranch className="h-3.5 w-3.5 text-[#D97757]" />
+    <div className="my-2.5 overflow-hidden rounded-xl border border-[#E2E2DC] bg-[#F8F8F6]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E2DC] bg-white px-3 py-2 text-[11px]">
+        <span className="inline-flex items-center gap-1.5 font-medium text-[#141413]">
+          <GitBranch className="size-3.5 text-[#1D4ED8]" />
           <span>Mermaid Diagram</span>
         </span>
 
         <div className="flex items-center gap-1">
-          <div className="inline-flex rounded-lg border border-[#DDD7CB] bg-[#FAF9F5] p-0.5 text-[10px] font-medium">
+          <div className="inline-flex rounded-md border border-[#D8D8D0] bg-[#F8F8F6] p-0.5 text-[10px] font-medium">
             <button
               type="button"
               onClick={() => setView("diagram")}
-              className={`rounded-md px-2 py-0.5 transition cursor-pointer ${
-                view === "diagram" ? "bg-[#1F1E1C] text-white" : "text-[#57544E] hover:bg-white"
+              className={`rounded px-2 py-0.5 transition duration-150 cursor-pointer ${
+                view === "diagram" ? "bg-[#141413] text-white" : "text-[#141413]/70 hover:bg-white"
               }`}
             >
               Diagram
@@ -138,11 +138,11 @@ export function ChatMermaid({ code }: { code: string }) {
             <button
               type="button"
               onClick={() => setView("code")}
-              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 transition cursor-pointer ${
-                view === "code" ? "bg-[#1F1E1C] text-white" : "text-[#57544E] hover:bg-white"
+              className={`inline-flex items-center gap-1 rounded px-2 py-0.5 transition duration-150 cursor-pointer ${
+                view === "code" ? "bg-[#141413] text-white" : "text-[#141413]/70 hover:bg-white"
               }`}
             >
-              <Code2 className="h-3 w-3" />
+              <Code2 className="size-3" />
               <span>Code</span>
             </button>
           </div>
@@ -152,9 +152,9 @@ export function ChatMermaid({ code }: { code: string }) {
               type="button"
               onClick={handleDownloadSvg}
               title="Download SVG"
-              className="inline-flex items-center gap-1 rounded-lg border border-[#DDD7CB] bg-white px-2 py-1 text-[10px] font-medium text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-md border border-[#D8D8D0] bg-white px-2 py-1 text-[10px] font-medium text-[#141413]/75 hover:bg-[#F1F1EE] cursor-pointer"
             >
-              <Download className="h-3 w-3" />
+              <Download className="size-3" />
               <span>SVG</span>
             </button>
           )}
@@ -163,9 +163,9 @@ export function ChatMermaid({ code }: { code: string }) {
             type="button"
             onClick={() => void handleCopy()}
             title="Copy Mermaid source"
-            className="inline-flex items-center gap-1 rounded-lg border border-[#DDD7CB] bg-white px-2 py-1 text-[10px] font-medium text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+            className="inline-flex items-center gap-1 rounded-md border border-[#D8D8D0] bg-white px-2 py-1 text-[10px] font-medium text-[#141413]/75 hover:bg-[#F1F1EE] cursor-pointer"
           >
-            {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+            {copied ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
             <span>{copied ? "Copied" : "Copy"}</span>
           </button>
         </div>
@@ -178,16 +178,16 @@ export function ChatMermaid({ code }: { code: string }) {
               Could not render Mermaid diagram: {renderError}
             </p>
           )}
-          <pre className="overflow-x-auto rounded-xl bg-[#1F1E1C] p-3 font-mono text-[12px] leading-relaxed text-[#FAF9F5]">
+          <pre className="overflow-x-auto rounded-lg bg-[#141413] p-3 font-mono text-[12px] leading-relaxed text-[#F8F8F6]">
             <code>{code}</code>
           </pre>
         </div>
       ) : (
         <div className="overflow-x-auto p-3 flex justify-center min-h-24 items-center">
           {loading ? (
-            <div className="inline-flex items-center gap-2 text-xs text-[#6B665E]">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#D97757]" />
-              <span>Rendering Mermaid diagram...</span>
+            <div className="inline-flex items-center gap-2 text-xs text-[#141413]/60">
+              <Loader2 className="size-3.5 animate-spin text-[#1D4ED8]" />
+              <span>Rendering Mermaid diagram…</span>
             </div>
           ) : (
             <div ref={hostRef} className="w-full flex justify-center [&>svg]:max-w-full [&>svg]:h-auto" />

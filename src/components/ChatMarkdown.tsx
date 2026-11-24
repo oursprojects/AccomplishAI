@@ -36,7 +36,7 @@ function renderInline(text: string): React.ReactNode[] {
             key={i}
             href={href}
             {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-            className="font-medium text-[#C86343] underline underline-offset-2 hover:text-[#9F4427]"
+            className="font-medium text-[#1D4ED8] underline underline-offset-2 hover:text-[#1E40AF]"
           >
             {label}
           </a>
@@ -46,21 +46,21 @@ function renderInline(text: string): React.ReactNode[] {
     }
     if (tok.startsWith("**") && tok.endsWith("**") && tok.length > 4) {
       return (
-        <strong key={i} className="font-semibold text-[#1F1E1C]">
+        <strong key={i} className="font-medium text-[#141413]">
           {tok.slice(2, -2)}
         </strong>
       );
     }
     if (tok.startsWith("*") && tok.endsWith("*") && tok.length > 2) {
       return (
-        <em key={i} className="italic text-[#4A463F]">
+        <em key={i} className="italic text-[#141413]/75">
           {tok.slice(1, -1)}
         </em>
       );
     }
     if (tok.startsWith("`") && tok.endsWith("`") && tok.length > 2) {
       return (
-        <code key={i} className="rounded bg-[#F4F2EA] px-1 py-0.5 font-mono text-[12px] text-[#1F1E1C]">
+        <code key={i} className="rounded bg-[#F1F1EE] px-1 py-0.5 font-mono text-[12px] text-[#141413]">
           {tok.slice(1, -1)}
         </code>
       );
@@ -83,9 +83,9 @@ function CodeBlockCard({ lang, code }: { lang: string; code: string }) {
   }
 
   return (
-    <div className="my-2 overflow-hidden rounded-xl border border-[#2D2B28] bg-[#1F1E1C] text-[#FAF9F5]">
-      <div className="flex items-center justify-between border-b border-white/10 bg-[#2A2825] px-3 py-1.5 text-[11px] text-[#C8C3B8]">
-        <span className="font-mono uppercase tracking-wide">{lang || "code"}</span>
+    <div className="my-2 overflow-hidden rounded-xl border border-[#242422] bg-[#141413] text-[#F8F8F6]">
+      <div className="flex items-center justify-between border-b border-white/10 bg-[#1E1E1C] px-3 py-1.5 text-[11px] text-[#F8F8F6]/70">
+        <span className="font-mono uppercase">{lang || "code"}</span>
         <button
           type="button"
           onClick={() => void handleCopy()}
@@ -170,7 +170,7 @@ export function ChatMarkdown({ content }: { content: string }) {
 
     // Horizontal rule
     if (/^\s*(?:---+|===+|\*\*\*+)\s*$/.test(line)) {
-      blocks.push(<hr key={`hr-${i}`} className="my-2.5 border-[#E6E2D8]" />);
+      blocks.push(<hr key={`hr-${i}`} className="my-2.5 border-[#E2E2DC]" />);
       i++;
       continue;
     }
@@ -185,10 +185,10 @@ export function ChatMarkdown({ content }: { content: string }) {
       blocks.push(
         <blockquote
           key={`bq-${i}`}
-          className="my-2 border-l-3 border-[#D97757] bg-[#FAF9F5] px-3 py-1.5 text-xs sm:text-sm text-[#4A463F] rounded-r-lg"
+          className="my-2 border-l-2 border-[#1D4ED8] bg-[#F8F8F6] px-3 py-1.5 text-xs sm:text-sm text-[#141413]/75 rounded-r-lg"
         >
           {quoteLines.map((q, idx) => (
-            <p key={idx} className="leading-relaxed">
+            <p key={idx} className="leading-relaxed text-pretty">
               {renderInline(q)}
             </p>
           ))}
@@ -207,22 +207,22 @@ export function ChatMarkdown({ content }: { content: string }) {
         i++;
       }
       blocks.push(
-        <div key={`tbl-${i}`} className="my-2 overflow-x-auto rounded-xl border border-[#E6E2D8]">
-          <table className="w-full border-collapse text-left text-xs">
-            <thead className="bg-[#F7F6F0] text-[#1F1E1C]">
+        <div key={`tbl-${i}`} className="my-2 overflow-x-auto rounded-lg border border-[#E2E2DC]">
+          <table className="w-full border-collapse text-left text-xs tabular-nums">
+            <thead className="bg-[#F1F1EE] text-[#141413]">
               <tr>
                 {headers.map((h, idx) => (
-                  <th key={idx} className="border-b border-[#E6E2D8] px-2.5 py-1.5 font-semibold">
+                  <th key={idx} className="border-b border-[#E2E2DC] px-2.5 py-1.5 font-medium">
                     {renderInline(h)}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F0ECE2] bg-white">
+            <tbody className="divide-y divide-[#E2E2DC]/60 bg-white">
               {rows.map((cells, rIdx) => (
                 <tr key={rIdx}>
                   {headers.map((_, cIdx) => (
-                    <td key={cIdx} className="px-2.5 py-1.5 text-[#4A463F] align-top leading-relaxed">
+                    <td key={cIdx} className="px-2.5 py-1.5 text-[#141413]/75 align-top leading-relaxed">
                       {renderInline(cells[cIdx] ?? "")}
                     </td>
                   ))}
@@ -243,7 +243,7 @@ export function ChatMarkdown({ content }: { content: string }) {
         i++;
       }
       blocks.push(
-        <ul key={`ul-${i}`} className="my-1.5 list-disc pl-4 space-y-0.5 text-[#1F1E1C]">
+        <ul key={`ul-${i}`} className="my-1.5 list-disc pl-4 space-y-0.5 text-[#141413]">
           {items.map((item, idx) => (
             <li key={idx}>{renderInline(item)}</li>
           ))}
@@ -260,7 +260,7 @@ export function ChatMarkdown({ content }: { content: string }) {
         i++;
       }
       blocks.push(
-        <ol key={`ol-${i}`} className="my-1.5 list-decimal pl-4 space-y-0.5 text-[#1F1E1C]">
+        <ol key={`ol-${i}`} className="my-1.5 list-decimal pl-4 space-y-0.5 text-[#141413]">
           {items.map((item, idx) => (
             <li key={idx}>{renderInline(item)}</li>
           ))}
@@ -275,10 +275,10 @@ export function ChatMarkdown({ content }: { content: string }) {
       const level = headingMatch[1].length;
       const cls =
         level === 1
-          ? "mt-2.5 mb-1 text-base font-bold text-[#1F1E1C]"
+          ? "mt-2.5 mb-1 text-base font-medium text-balance text-[#141413]"
           : level === 2
-            ? "mt-2 mb-1 text-sm font-bold text-[#1F1E1C]"
-            : "mt-1.5 mb-1 text-sm font-semibold text-[#1F1E1C]";
+            ? "mt-2 mb-1 text-sm font-medium text-balance text-[#141413]"
+            : "mt-1.5 mb-1 text-sm font-medium text-[#141413]";
       blocks.push(
         <p key={`h-${i}`} className={cls}>
           {renderInline(headingMatch[2])}

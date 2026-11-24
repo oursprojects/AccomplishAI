@@ -64,19 +64,19 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
     <Card className="mx-auto max-w-xl p-5 sm:p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FDF3EF] text-[#D97757] border border-[#F0D5C9]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#1D4ED8] border border-[#C7D7FE]">
             <UserRound className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="text-lg font-semibold text-[#1F1E1C]">Intern Profile &amp; Calendar Anchor</h1>
-            <p className="mt-0.5 text-sm text-[#6B665E]">
+            <h1 className="text-lg font-semibold text-[#141413]">Intern Profile &amp; Calendar Anchor</h1>
+            <p className="mt-0.5 text-sm text-[#5C5C57]">
               Saved details and your internship start date automatically fill Week 1, Week 2, etc. (Monday–Friday).
             </p>
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E] mb-1">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-[#52524E] mb-1">
             Header Name (<span className="font-mono normal-case">LASTNAME, FIRSTNAME MI.</span>)
           </label>
           <Input
@@ -90,7 +90,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
 
         <div>
           <div className="flex items-center justify-between gap-2 mb-1">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E]">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[#52524E]">
               Signature Name (<span className="font-mono normal-case">FIRSTNAME MI. LASTNAME</span>)
             </label>
             {form.name_last_first.includes(",") && (
@@ -102,7 +102,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
                   const formatted = deriveSignatureName(form.name_last_first).toUpperCase();
                   if (formatted) setForm({ ...form, name_first_last: formatted });
                 }}
-                className="h-6 px-2 text-[11px] text-[#C86343]"
+                className="h-6 px-2 text-[11px] text-[#1E40AF]"
               >
                 <PenLine className="h-3 w-3" />
                 <span>Auto-fill</span>
@@ -120,7 +120,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E] mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[#52524E] mb-1">
               Default Office / Company
             </label>
             <Input
@@ -132,7 +132,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E] mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[#52524E] mb-1">
               Default Hours / Day
             </label>
             <Input
@@ -147,7 +147,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E] mb-1">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-[#52524E] mb-1">
             Default Verified By / Supervisor
           </label>
           <Input
@@ -161,7 +161,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
 
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E]">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[#52524E]">
               Required OJT Hours Target
             </label>
             <div className="flex items-center gap-1">
@@ -173,8 +173,8 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
                   onClick={() => setForm({ ...form, target_ojt_hours: hrs })}
                   className={`rounded-md border px-2 py-0.5 text-[11px] font-medium cursor-pointer transition disabled:pointer-events-none disabled:opacity-50 ${
                     form.target_ojt_hours === hrs
-                      ? "border-[#D97757] bg-[#FDF3EF] text-[#C86343]"
-                      : "border-[#DDD7CB] bg-white text-[#57544E] hover:bg-[#F4F2EA]"
+                      ? "border-[#1D4ED8] bg-[#EFF4FF] text-[#1E40AF]"
+                      : "border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE]"
                   }`}
                 >
                   {hrs}h
@@ -192,10 +192,10 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
         </div>
 
         {/* Internship Start Date Calendar */}
-        <div className="rounded-2xl border border-[#E6E2D8] bg-[#FAF9F5]/80 p-4 space-y-3">
+        <div className="rounded-2xl border border-[#E2E2DC] bg-[#F8F8F6]/80 p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[#57544E] flex items-center gap-1.5">
-              <CalendarDays className="h-3.5 w-3.5 text-[#D97757]" />
+            <label className="text-xs font-semibold uppercase tracking-wide text-[#52524E] flex items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5 text-[#1D4ED8]" />
               <span>Internship Start Date (Week 1)</span>
             </label>
             <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#E6E2D8] bg-white p-3">
+          <div className="rounded-xl border border-[#E2E2DC] bg-white p-3">
             <InternshipCalendar
               mode="anchor"
               startDateIso={form.internship_start_date}

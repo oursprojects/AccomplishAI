@@ -201,14 +201,14 @@ export function ReportChat({
   return (
     <Card className="overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="border-b border-[#E6E2D8] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 bg-[#F7F6F0]">
+      <div className="border-b border-[#E2E2DC] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 bg-[#F1F1EE]">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#D97757] text-white shadow-2xs shrink-0">
-            <ReportPenIcon className="h-4 w-4" />
+          <span className="flex size-8 items-center justify-center rounded-lg bg-[#1D4ED8] text-white shrink-0">
+            <ReportPenIcon className="size-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-[#1F1E1C] leading-tight">Report Assistant</h2>
-            <p className="text-[11px] text-[#6B665E] truncate">
+            <h2 className="text-sm font-medium text-[#141413] leading-tight">Report Assistant</h2>
+            <p className="text-[11px] text-[#141413]/60 truncate">
               {missing.length === 0
                 ? "Main sections complete — ask anytime for tweaks or polish"
                 : "Share rough notes in English or Tagalog to build your preview"}
@@ -222,7 +222,7 @@ export function ReportChat({
             title="AI reads & updates your Supabase database via AccomplishAI's built-in MCP server (/api/mcp)"
             className="gap-1 text-[10px]"
           >
-            <Database className="h-3 w-3 text-[#D97757]" />
+            <Database className="size-3 text-[#1D4ED8]" />
             <span>MCP · Supabase</span>
           </Badge>
           <Badge
@@ -241,7 +241,7 @@ export function ReportChat({
               disabled={sending}
               title="Undo last change made to the report"
             >
-              <Undo2 className="h-3 w-3 text-[#D97757]" />
+              <Undo2 className="size-3 text-[#1D4ED8]" />
               <span>Undo</span>
             </Button>
           )}
@@ -255,7 +255,7 @@ export function ReportChat({
               disabled={sending}
               title="Clear chat messages only — keeps your filled .docx document intact"
             >
-              <Eraser className="h-3 w-3 text-[#D97757]" />
+              <Eraser className="size-3 text-[#1D4ED8]" />
               <span>Clear Chat</span>
             </Button>
           )}
@@ -268,15 +268,15 @@ export function ReportChat({
         role="log"
         aria-live="polite"
         aria-label="Accomplish AI conversation"
-        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 min-h-[260px] max-h-[54vh] bg-[#FAF9F5]/70"
+        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 min-h-[260px] max-h-[54vh] bg-[#F8F8F6]"
       >
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
             <div
-              className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-2xs ${
+              className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
                 m.role === "user"
-                  ? "bg-[#1F1E1C] text-white rounded-br-sm whitespace-pre-wrap"
-                  : "bg-white border border-[#E6E2D8] text-[#1F1E1C] rounded-bl-sm"
+                  ? "bg-[#141413] text-white rounded-br-xs whitespace-pre-wrap"
+                  : "bg-white border border-[#E2E2DC] text-[#141413] rounded-bl-xs"
               }`}
             >
               {m.role === "assistant" ? <ChatMarkdown content={m.content} /> : m.content}
@@ -285,7 +285,7 @@ export function ReportChat({
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {m.toolActions?.map((act, idx) => (
                   <Badge key={idx} variant="success" className="font-medium">
-                    <Check className="h-3 w-3" />
+                    <Check className="size-3" />
                     {act}
                   </Badge>
                 ))}
@@ -296,7 +296,7 @@ export function ReportChat({
                     className="font-mono text-[10px] gap-1"
                     title="Executed over AccomplishAI's Supabase-backed MCP server"
                   >
-                    <Database className="h-2.5 w-2.5 text-[#D97757]" />
+                    <Database className="size-2.5 text-[#1D4ED8]" />
                     <span>{`MCP: ${toolName}`}</span>
                   </Badge>
                 ))}
@@ -304,10 +304,10 @@ export function ReportChat({
                   <button
                     type="button"
                     onClick={() => void handleCopyReply(m.id, m.content)}
-                    className="inline-flex items-center gap-1 rounded-full border border-[#DDD7CB] bg-white px-2 py-0.5 text-[11px] font-medium text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                    className="inline-flex items-center gap-1 rounded-md border border-[#D8D8D0] bg-white px-2 py-0.5 text-[11px] font-medium text-[#141413]/70 hover:bg-[#F1F1EE] cursor-pointer"
                     title="Copy reply"
                   >
-                    {copiedId === m.id ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                    {copiedId === m.id ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
                     <span>{copiedId === m.id ? "Copied" : "Copy"}</span>
                   </button>
                 )}
@@ -315,9 +315,9 @@ export function ReportChat({
                   <button
                     type="button"
                     onClick={onOpenPreview}
-                    className="lg:hidden inline-flex items-center gap-1 rounded-full bg-[#1F1E1C] px-2.5 py-0.5 text-[11px] font-medium text-white cursor-pointer"
+                    className="lg:hidden inline-flex items-center gap-1 rounded-md bg-[#141413] px-2.5 py-0.5 text-[11px] font-medium text-white cursor-pointer"
                   >
-                    <Eye className="h-3 w-3" />
+                    <Eye className="size-3" />
                     <span>View Preview</span>
                   </button>
                 )}
@@ -328,8 +328,8 @@ export function ReportChat({
 
         {sending && (
           <div className="flex items-start">
-            <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-[#E6E2D8] bg-white px-3.5 py-2 text-xs text-[#6B665E] animate-pulse">
-              <ReportPenIcon className="h-3.5 w-3.5 text-[#D97757]" />
+            <div className="inline-flex items-center gap-2 rounded-xl rounded-bl-xs border border-[#E2E2DC] bg-white px-3.5 py-2 text-xs text-[#141413]/65 animate-pulse">
+              <ReportPenIcon className="size-3.5 text-[#1D4ED8]" />
               <span>{queueNotice ?? THINKING_PHRASES[thinkingIdx]}</span>
             </div>
           </div>
@@ -337,7 +337,7 @@ export function ReportChat({
       </div>
 
       {error && (
-        <div className="mx-3.5 mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-center justify-between gap-2">
+        <div className="mx-3.5 mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-center justify-between gap-2">
           <span>{error}</span>
           {failedRetryPayload && (
             <Button type="button" size="sm" variant="destructive" onClick={() => void retryLastFailed()}>
@@ -347,15 +347,15 @@ export function ReportChat({
         </div>
       )}
 
-      {/* Compact integrated composer (no mic, no bulky footer) */}
+      {/* Composer */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void sendMessage();
         }}
-        className="border-t border-[#E6E2D8] bg-white p-2.5"
+        className="border-t border-[#E2E2DC] bg-white p-2.5"
       >
-        <div className="flex items-end gap-2 rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 py-1.5 focus-within:border-[#D97757] focus-within:bg-white transition">
+        <div className="flex items-end gap-2 rounded-lg border border-[#D8D8D0] bg-[#F8F8F6] px-2.5 py-1.5 focus-within:border-[#1D4ED8] focus-within:bg-white transition duration-150">
           <textarea
             rows={2}
             value={input}
@@ -367,8 +367,8 @@ export function ReportChat({
               }
             }}
             disabled={composerDisabled}
-            placeholder="Share your accomplishments or edits... (Enter to send)"
-            className="flex-1 bg-transparent py-1 text-sm text-[#1F1E1C] placeholder:text-[#8A847A] outline-none resize-none max-h-28 disabled:opacity-60"
+            placeholder="Share your accomplishments or edits… (Enter to send)"
+            className="flex-1 bg-transparent py-1 text-sm text-[#141413] placeholder:text-[#141413]/35 outline-none resize-none max-h-28 disabled:opacity-60"
           />
 
           <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
@@ -380,7 +380,7 @@ export function ReportChat({
               className="lg:hidden h-8 px-2.5"
               title="View document preview"
             >
-              <Eye className="h-3.5 w-3.5" />
+              <Eye className="size-3.5" />
             </Button>
             <Button
               type="submit"
@@ -389,8 +389,8 @@ export function ReportChat({
               disabled={composerDisabled || !input.trim()}
               className="h-8 px-3"
             >
-              <Send className="h-3.5 w-3.5" />
-              <span>{sending ? "..." : "Send"}</span>
+              <Send className="size-3.5" />
+              <span>{sending ? "…" : "Send"}</span>
             </Button>
           </div>
         </div>

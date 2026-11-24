@@ -2,8 +2,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#FAF9F5]">
-      <aside className="hidden md:flex w-60 shrink-0 flex-col justify-between border-r border-[#E5E2D9] bg-[#F4F2EA] p-4">
+    <div className="min-h-screen flex flex-col md:flex-row bg-[#F8F8F6]">
+      <aside className="hidden md:flex w-60 shrink-0 flex-col justify-between border-r border-[#E2E2DC] bg-[#F1F1EE] p-4">
         <div className="space-y-5">
           <div className="flex items-center gap-2.5 px-1">
             <Skeleton className="h-11 w-11 rounded-xl" />
@@ -23,7 +23,7 @@ export default function Loading() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="hidden md:flex items-center justify-between border-b border-[#E5E2D9] px-6 py-3">
+        <div className="hidden md:flex items-center justify-between border-b border-[#E2E2DC] px-6 py-3">
           <Skeleton className="h-5 w-32" />
           <Skeleton className="h-6 w-36 rounded-full" />
         </div>
@@ -35,10 +35,10 @@ export default function Loading() {
             </div>
             <Skeleton className="h-9 w-32 rounded-xl" />
           </div>
-          <Skeleton className="h-10 w-full rounded-xl bg-white border border-[#E6E2D8]" />
+          <Skeleton className="h-10 w-full rounded-xl bg-white border border-[#E2E2DC]" />
           <div className="space-y-3">
             {[1, 2, 3].map((n) => (
-              <Skeleton key={n} className="h-24 w-full rounded-2xl bg-white border border-[#E6E2D8]" />
+              <Skeleton key={n} className="h-24 w-full rounded-2xl bg-white border border-[#E2E2DC]" />
             ))}
           </div>
         </div>

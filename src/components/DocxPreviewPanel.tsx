@@ -273,43 +273,43 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     <>
       <Card className="overflow-hidden flex flex-col">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] bg-[#F7F6F0] px-3 sm:px-4 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E2DC] bg-[#F8F8F6] px-3 sm:px-4 py-2.5">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-[#D97757]" />
-            <h3 className="text-sm font-semibold text-[#1F1E1C]">Live Document Preview</h3>
+            <FileText className="h-4 w-4 text-[#1D4ED8]" />
+            <h3 className="text-sm font-semibold text-[#141413]">Live Document Preview</h3>
             {(loadingTemplate || rendering) && (
-              <span className="inline-flex items-center rounded-full bg-[#FDF3EF] px-2 py-0.5 text-[11px] font-medium text-[#C86343] animate-pulse">
+              <span className="inline-flex items-center rounded-full bg-[#EFF4FF] px-2 py-0.5 text-[11px] font-medium text-[#1E40AF] animate-pulse">
                 {loadingTemplate ? "Loading..." : "Updating..."}
               </span>
             )}
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="hidden sm:inline-flex items-center rounded-lg border border-[#DDD7CB] bg-white px-2.5 h-8 text-xs font-medium text-[#4A463F]">
+            <span className="hidden sm:inline-flex items-center rounded-lg border border-[#D8D8D0] bg-white px-2.5 h-8 text-xs font-medium text-[#3D3D39]">
               {dims.label}
             </span>
 
-            <div className="flex items-center rounded-lg border border-[#DDD7CB] bg-white text-xs overflow-hidden h-8">
+            <div className="flex items-center rounded-lg border border-[#D8D8D0] bg-white text-xs overflow-hidden h-8">
               <button
                 type="button"
                 onClick={() => {
                   setManualZoom(true);
                   setZoom((z) => Math.max(0.28, +(z - 0.08).toFixed(2)));
                 }}
-                className="px-2 h-full text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                className="px-2 h-full text-[#52524E] hover:bg-[#F1F1EE] cursor-pointer"
                 title="Zoom out"
                 aria-label="Zoom out"
               >
                 <ZoomOut className="h-3.5 w-3.5" />
               </button>
-              <span className="px-1.5 text-[11px] text-[#1F1E1C] font-mono">{Math.round(zoom * 100)}%</span>
+              <span className="px-1.5 text-[11px] text-[#141413] font-mono">{Math.round(zoom * 100)}%</span>
               <button
                 type="button"
                 onClick={() => {
                   setManualZoom(true);
                   setZoom((z) => Math.min(1.25, +(z + 0.08).toFixed(2)));
                 }}
-                className="px-2 h-full text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                className="px-2 h-full text-[#52524E] hover:bg-[#F1F1EE] cursor-pointer"
                 title="Zoom in"
                 aria-label="Zoom in"
               >
@@ -319,7 +319,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
                 <button
                   type="button"
                   onClick={() => setManualZoom(false)}
-                  className="border-l border-[#DDD7CB] px-2 h-full text-[10px] font-medium text-[#C86343] hover:bg-[#F4F2EA] cursor-pointer"
+                  className="border-l border-[#D8D8D0] px-2 h-full text-[10px] font-medium text-[#1E40AF] hover:bg-[#F1F1EE] cursor-pointer"
                   title="Fit to screen"
                 >
                   Fit
@@ -385,31 +385,31 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
       {/* Large Preview Modal */}
       <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
-        <DialogContent className="flex h-[94dvh] max-h-[94dvh] w-full max-w-5xl flex-col bg-[#FAF9F5]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] bg-white px-3 sm:px-4 py-2.5 sm:py-3 shrink-0">
+        <DialogContent className="flex h-[94dvh] max-h-[94dvh] w-full max-w-5xl flex-col bg-[#F8F8F6]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E2DC] bg-white px-3 sm:px-4 py-2.5 sm:py-3 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-              <FileText className="h-4 w-4 text-[#D97757] shrink-0" />
-              <h2 className="text-xs sm:text-sm font-semibold text-[#1F1E1C] truncate">Document Preview</h2>
+              <FileText className="h-4 w-4 text-[#1D4ED8] shrink-0" />
+              <h2 className="text-xs sm:text-sm font-semibold text-[#141413] truncate">Document Preview</h2>
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="hidden sm:inline-flex items-center rounded-lg border border-[#DDD7CB] bg-white px-2.5 h-8 text-xs font-medium text-[#4A463F]">
+              <span className="hidden sm:inline-flex items-center rounded-lg border border-[#D8D8D0] bg-white px-2.5 h-8 text-xs font-medium text-[#3D3D39]">
                 {dims.label}
               </span>
 
-              <div className="flex items-center rounded-lg border border-[#DDD7CB] bg-white text-xs overflow-hidden h-8">
+              <div className="flex items-center rounded-lg border border-[#D8D8D0] bg-white text-xs overflow-hidden h-8">
                 <button
                   type="button"
                   onClick={() => {
                     setModalManualZoom(true);
                     setModalZoom((z) => Math.max(0.3, +(z - 0.1).toFixed(2)));
                   }}
-                  className="px-2 h-full text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                  className="px-2 h-full text-[#52524E] hover:bg-[#F1F1EE] cursor-pointer"
                   aria-label="Zoom out"
                 >
                   <ZoomOut className="h-3.5 w-3.5" />
                 </button>
-                <span className="px-1.5 sm:px-2 text-[11px] font-mono text-[#1F1E1C]">
+                <span className="px-1.5 sm:px-2 text-[11px] font-mono text-[#141413]">
                   {Math.round(modalZoom * 100)}%
                 </span>
                 <button
@@ -418,7 +418,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
                     setModalManualZoom(true);
                     setModalZoom((z) => Math.min(1.4, +(z + 0.1).toFixed(2)));
                   }}
-                  className="px-2 h-full text-[#57544E] hover:bg-[#F4F2EA] cursor-pointer"
+                  className="px-2 h-full text-[#52524E] hover:bg-[#F1F1EE] cursor-pointer"
                   aria-label="Zoom in"
                 >
                   <ZoomIn className="h-3.5 w-3.5" />
@@ -427,7 +427,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
                   <button
                     type="button"
                     onClick={() => setModalManualZoom(false)}
-                    className="border-l border-[#DDD7CB] px-2 h-full text-[10px] font-medium text-[#C86343] hover:bg-[#F4F2EA] cursor-pointer"
+                    className="border-l border-[#D8D8D0] px-2 h-full text-[10px] font-medium text-[#1E40AF] hover:bg-[#F1F1EE] cursor-pointer"
                   >
                     <RotateCcw className="h-3 w-3 inline mr-0.5" />
                     Fit
@@ -484,7 +484,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
             <DialogHeader>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FDF3EF] text-[#D97757]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EFF4FF] text-[#1D4ED8]">
                     <Download className="h-4 w-4" />
                   </span>
                   <div>
@@ -505,10 +505,10 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
             </DialogHeader>
 
             <div className="px-5 py-2">
-              <label htmlFor="docx-filename" className="block text-xs font-medium text-[#57544E] mb-1.5">
+              <label htmlFor="docx-filename" className="block text-xs font-medium text-[#52524E] mb-1.5">
                 File name
               </label>
-              <div className="flex items-center rounded-xl border border-[#DDD7CB] bg-[#FAF9F5] focus-within:border-[#D97757] focus-within:bg-white overflow-hidden">
+              <div className="flex items-center rounded-xl border border-[#D8D8D0] bg-[#F8F8F6] focus-within:border-[#1D4ED8] focus-within:bg-white overflow-hidden">
                 <Input
                   id="docx-filename"
                   type="text"
@@ -518,7 +518,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
                   placeholder="Weekly-Accomplishment-Report"
                   className="border-0 bg-transparent focus:bg-transparent"
                 />
-                <span className="border-l border-[#DDD7CB] bg-[#F4F2EA] px-3 py-2 text-xs font-mono text-[#6B665E]">
+                <span className="border-l border-[#D8D8D0] bg-[#F1F1EE] px-3 py-2 text-xs font-mono text-[#5C5C57]">
                   .docx
                 </span>
               </div>

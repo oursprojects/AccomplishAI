@@ -355,9 +355,9 @@ export function WorkspaceClient({
   if (!review) {
     return (
       <div className="mx-auto max-w-3xl space-y-4">
-        <div className="rounded-2xl border border-[#D97757]/30 bg-[#FDF3EF] p-4 text-sm text-[#1F1E1C]">
+        <div className="rounded-2xl border border-[#1D4ED8]/30 bg-[#EFF4FF] p-4 text-sm text-[#141413]">
           <p className="font-semibold">Template Setup</p>
-          <p className="mt-1 text-xs sm:text-sm text-[#57544E]">
+          <p className="mt-1 text-xs sm:text-sm text-[#52524E]">
             Click <strong>Auto-Scan 2026 Template</strong> to initialize your personal{" "}
             <code className="font-mono text-xs">2026-Weekly-Accomplishment-Report.docx</code>.
           </p>
@@ -375,17 +375,17 @@ export function WorkspaceClient({
   return (
     <div className="space-y-4 pb-8">
       {/* Top report bar showing exact report being edited + Undo / Cancel / Save */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[#E6E2D8] bg-white px-3.5 sm:px-4 py-2.5 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[#E2E2DC] bg-white px-3.5 sm:px-4 py-2.5 shadow-xs">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <Link
             href="/"
-            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#DDD7CB] bg-[#FAF9F5] px-2.5 text-xs font-medium text-[#4A463F] hover:bg-[#F4F2EA] transition shrink-0"
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#D8D8D0] bg-[#F8F8F6] px-2.5 text-xs font-medium text-[#3D3D39] hover:bg-[#F1F1EE] transition shrink-0"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Reports</span>
           </Link>
 
-          <FileText className="h-4 w-4 text-[#D97757] shrink-0" />
+          <FileText className="h-4 w-4 text-[#1D4ED8] shrink-0" />
           <div className="min-w-0 flex-1">
             <input
               type="text"
@@ -394,7 +394,7 @@ export function WorkspaceClient({
               onChange={(e) => handleTitleChange(e.target.value)}
               placeholder={fallbackTitle}
               aria-label="Report title"
-              className="w-full max-w-md bg-transparent text-sm font-semibold text-[#1F1E1C] placeholder:text-[#6B665E] outline-none border-b border-transparent focus:border-[#D97757] py-0.5 transition"
+              className="w-full max-w-md bg-transparent text-sm font-semibold text-[#141413] placeholder:text-[#5C5C57] outline-none border-b border-transparent focus:border-[#1D4ED8] py-0.5 transition"
             />
           </div>
 
@@ -412,12 +412,12 @@ export function WorkspaceClient({
             onClick={() => setQuickNotesOpen(true)}
             title="Paste a whole week of raw notes and fill the report in 1 prompt"
           >
-            <ClipboardPaste className="h-3.5 w-3.5 text-[#D97757]" />
+            <ClipboardPaste className="h-3.5 w-3.5 text-[#1D4ED8]" />
             <span className="hidden sm:inline">Paste Notes</span>
           </Button>
           {undoStack.length > 0 && (
             <Button type="button" size="sm" variant="outline" onClick={handleUndo} disabled={workspaceBusy}>
-              <Undo2 className="h-3.5 w-3.5 text-[#D97757]" />
+              <Undo2 className="h-3.5 w-3.5 text-[#1D4ED8]" />
               <span>Undo</span>
             </Button>
           )}
@@ -435,16 +435,16 @@ export function WorkspaceClient({
       </div>
 
       {review.template.status === "pending_review" && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#D97757]/30 bg-[#FDF3EF] px-4 py-2.5 text-xs sm:text-sm text-[#1F1E1C]">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#1D4ED8]/30 bg-[#EFF4FF] px-4 py-2.5 text-xs sm:text-sm text-[#141413]">
           <span className="inline-flex items-center gap-2">
-            <AccomplishCheckIcon className="h-4 w-4 text-[#C86343] shrink-0" />
+            <AccomplishCheckIcon className="h-4 w-4 text-[#1E40AF] shrink-0" />
             <span>
               Auto-detected <strong>{review.fields.length} fields</strong> from{" "}
               <code className="font-mono text-xs">{review.template.name}</code> — original design preserved.
             </span>
           </span>
           <div className="flex items-center gap-3 shrink-0">
-            <Link href="/template" className="font-medium underline underline-offset-4 text-[#C86343]">
+            <Link href="/template" className="font-medium underline underline-offset-4 text-[#1E40AF]">
               Review Fields
             </Link>
             <Button type="button" size="sm" variant="accent" disabled={confirming} onClick={handleQuickConfirm}>
@@ -464,12 +464,12 @@ export function WorkspaceClient({
       )}
 
       {/* Mobile & tablet tab bar — Live Preview is front and center alongside Chat & Edit */}
-      <div className="lg:hidden sticky top-[53px] z-20 grid grid-cols-3 gap-1 rounded-2xl border border-[#E6E2D8] bg-white/95 backdrop-blur p-1 shadow-xs">
+      <div className="lg:hidden sticky top-[53px] z-20 grid grid-cols-3 gap-1 rounded-2xl border border-[#E2E2DC] bg-white/95 backdrop-blur p-1 shadow-xs">
         <button
           type="button"
           onClick={() => setTab("preview")}
           className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-            tab === "preview" ? "bg-[#1F1E1C] text-white shadow-2xs" : "text-[#57544E] hover:bg-[#F4F2EA]"
+            tab === "preview" ? "bg-[#141413] text-white shadow-2xs" : "text-[#52524E] hover:bg-[#F1F1EE]"
           }`}
         >
           <Eye className="h-3.5 w-3.5" />
@@ -479,7 +479,7 @@ export function WorkspaceClient({
           type="button"
           onClick={() => setTab("chat")}
           className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-            tab === "chat" ? "bg-[#1F1E1C] text-white shadow-2xs" : "text-[#57544E] hover:bg-[#F4F2EA]"
+            tab === "chat" ? "bg-[#141413] text-white shadow-2xs" : "text-[#52524E] hover:bg-[#F1F1EE]"
           }`}
         >
           <MessageSquareText className="h-3.5 w-3.5" />
@@ -489,7 +489,7 @@ export function WorkspaceClient({
           type="button"
           onClick={() => setTab("edit")}
           className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-            tab === "edit" ? "bg-[#1F1E1C] text-white shadow-2xs" : "text-[#57544E] hover:bg-[#F4F2EA]"
+            tab === "edit" ? "bg-[#141413] text-white shadow-2xs" : "text-[#52524E] hover:bg-[#F1F1EE]"
           }`}
         >
           <Edit3 className="h-3.5 w-3.5" />
@@ -515,12 +515,12 @@ export function WorkspaceClient({
 
         {/* Interactive Chat + Manual Edit Column */}
         <div className="lg:col-span-5 lg:order-1 space-y-3.5">
-          <div className="hidden lg:grid grid-cols-2 rounded-2xl border border-[#E6E2D8] bg-white p-1 shadow-2xs">
+          <div className="hidden lg:grid grid-cols-2 rounded-2xl border border-[#E2E2DC] bg-white p-1 shadow-2xs">
             <button
               type="button"
               onClick={() => setDesktopLeftMode("chat")}
               className={`inline-flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-                desktopLeftMode === "chat" ? "bg-[#1F1E1C] text-white" : "text-[#57544E] hover:bg-[#F4F2EA]"
+                desktopLeftMode === "chat" ? "bg-[#141413] text-white" : "text-[#52524E] hover:bg-[#F1F1EE]"
               }`}
             >
               <MessageSquareText className="h-3.5 w-3.5" />
@@ -530,7 +530,7 @@ export function WorkspaceClient({
               type="button"
               onClick={() => setDesktopLeftMode("edit")}
               className={`inline-flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-                desktopLeftMode === "edit" ? "bg-[#1F1E1C] text-white" : "text-[#57544E] hover:bg-[#F4F2EA]"
+                desktopLeftMode === "edit" ? "bg-[#141413] text-white" : "text-[#52524E] hover:bg-[#F1F1EE]"
               }`}
             >
               <Edit3 className="h-3.5 w-3.5" />

@@ -115,10 +115,10 @@ function HeaderClock({ compact = false }: { compact?: boolean }) {
   if (!text) return null;
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E2D9] bg-white px-2.5 py-1 text-xs font-medium text-[#57544E] shadow-2xs tabular-nums"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E2E2DC] bg-white px-2.5 py-1 text-xs font-medium text-[#141413]/75 tabular-nums"
       title="Current local date and time"
     >
-      <Clock className="h-3.5 w-3.5 text-[#D97757] shrink-0" />
+      <Clock className="size-3.5 text-[#1D4ED8] shrink-0" />
       <span>{text}</span>
     </span>
   );
@@ -127,7 +127,7 @@ function HeaderClock({ compact = false }: { compact?: boolean }) {
 function NavPendingSpinner() {
   const { pending } = useLinkStatus();
   if (!pending) return null;
-  return <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-[#C86343] shrink-0" />;
+  return <Loader2 className="ml-auto size-3.5 animate-spin text-[#1D4ED8] shrink-0" />;
 }
 
 function AllowancePill({ quota }: { quota?: QuotaStatus }) {
@@ -145,16 +145,16 @@ function AllowancePill({ quota }: { quota?: QuotaStatus }) {
     <Badge
       variant={variant}
       title="Remaining AI prompts today (resets 12:00 AM Manila time)"
-      className="py-1 shadow-2xs"
+      className="py-1"
     >
-      <QuotaGaugeIcon className="h-3.5 w-3.5 text-[#D97757] shrink-0" />
+      <QuotaGaugeIcon className="size-3.5 text-[#1D4ED8] shrink-0" />
       {quota.isAdmin ? (
-        <span>Admin · Unlimited AI</span>
+        <span>Admin · Unlimited</span>
       ) : quota.isBlocked ? (
         <span>AI Paused</span>
       ) : (
         <span>
-          <strong>{quota.remaining}</strong>/{quota.dailyLimit} prompts left
+          <strong>{quota.remaining}</strong>/{quota.dailyLimit} left
         </span>
       )}
     </Badge>
@@ -263,41 +263,34 @@ export function AppShell({
     navItems.find((i) => isNavActive(i))?.label ?? "Accomplish AI";
 
   return (
-    <div className="relative min-h-dvh flex flex-col md:flex-row bg-[#FAF9F5] text-[#1F1E1C]">
-      {/* Subtle editorial workspace background */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-[0.16]"
-        style={{ backgroundImage: "url('/bg-accomplish.webp')" }}
-      />
-
-      {/* Subtle top progress bar during imperative route transitions */}
+    <div className="relative min-h-dvh flex flex-col md:flex-row bg-[#F8F8F6] text-[#141413]">
+      {/* Top progress bar during imperative route transitions */}
       {(creatingReport || isNavTransition) && (
-        <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-[#F0D5C9] overflow-hidden">
-          <div className="h-full w-1/2 bg-[#D97757] animate-[pulse_0.9s_ease-in-out_infinite] rounded-full" />
+        <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-[#EFF4FF] overflow-hidden">
+          <div className="h-full w-1/2 bg-[#1D4ED8] animate-[pulse_0.9s_ease-in-out_infinite]" />
         </div>
       )}
 
       {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-[#E5E2D9] bg-[#FAF9F5]/90 backdrop-blur-md px-3.5 py-2">
+      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-[#E2E2DC] bg-[#F8F8F6]/95 px-3.5 py-2">
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation menu"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#E5E2D9] bg-white text-[#1F1E1C] hover:bg-[#F4F2EA] cursor-pointer"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[#E2E2DC] bg-white text-[#141413] hover:bg-[#F1F1EE] cursor-pointer"
           >
-            <Menu className="h-4 w-4" />
+            <Menu className="size-4" />
           </button>
           <Link href="/" className="flex items-center gap-2 min-w-0">
             <Image
               src="/logo.png"
               alt="Accomplish AI"
-              width={40}
-              height={40}
-              className="h-9 w-9 rounded-xl object-contain shrink-0"
+              width={36}
+              height={36}
+              className="size-9 rounded-lg object-contain shrink-0"
             />
-            <span className="text-sm font-semibold tracking-tight truncate">{currentLabel}</span>
+            <span className="text-sm font-medium tracking-tight truncate">{currentLabel}</span>
           </Link>
         </div>
 
@@ -314,9 +307,8 @@ export function AppShell({
             onClick={() => setSignOutModalOpen(true)}
             title="Sign out"
             aria-label="Sign out"
-            className="rounded-xl"
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <LogOut className="size-3.5" />
           </Button>
         </div>
       </header>
@@ -325,10 +317,10 @@ export function AppShell({
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div
-            className="fixed inset-0 bg-[#1F1E1C]/35 backdrop-blur-[1px]"
+            className="fixed inset-0 bg-[#141413]/40"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="relative z-10 flex w-72 max-w-[82vw] flex-col justify-between border-r border-[#E5E2D9] bg-[#F4F2EA] p-4 shadow-xl">
+          <aside className="relative z-10 flex w-72 max-w-[82vw] flex-col justify-between border-r border-[#E2E2DC] bg-[#F1F1EE] p-4 shadow-xl">
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <Link
@@ -339,22 +331,22 @@ export function AppShell({
                   <Image
                     src="/logo.png"
                     alt="Accomplish AI"
-                    width={52}
-                    height={52}
-                    className="h-12 w-12 rounded-xl object-contain shrink-0"
+                    width={44}
+                    height={44}
+                    className="size-11 rounded-lg object-contain shrink-0"
                   />
                   <div>
-                    <span className="block text-sm font-semibold text-[#1F1E1C]">Accomplish AI</span>
-                    <span className="block text-[11px] text-[#66645E]">Weekly Report Workspace</span>
+                    <span className="block text-sm font-medium text-[#141413]">Accomplish AI</span>
+                    <span className="block text-[11px] text-[#141413]/55">Weekly Report Workspace</span>
                   </div>
                 </Link>
                 <button
                   type="button"
                   onClick={() => setMobileOpen(false)}
                   aria-label="Close menu"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#66645E] hover:bg-[#EAE7DD] cursor-pointer"
+                  className="flex size-8 items-center justify-center rounded-lg text-[#141413]/60 hover:bg-[#E7E7E2] cursor-pointer"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="size-4" />
                 </button>
               </div>
 
@@ -366,11 +358,11 @@ export function AppShell({
                 className="w-full"
               >
                 {creatingReport || isNavTransition ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="size-3.5 animate-spin" />
                 ) : (
-                  <FilePlus2 className="h-3.5 w-3.5" />
+                  <FilePlus2 className="size-3.5" />
                 )}
-                <span>{creatingReport || isNavTransition ? "Creating..." : "New Report"}</span>
+                <span>{creatingReport || isNavTransition ? "Creating…" : "New Report"}</span>
               </Button>
 
               <nav className={`space-y-1 ${isShellBusy ? "pointer-events-none opacity-60" : ""}`}>
@@ -383,13 +375,13 @@ export function AppShell({
                       href={item.href}
                       aria-current={active ? "page" : undefined}
                       onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition duration-150 ${
                         active
-                          ? "bg-white text-[#1F1E1C] shadow-2xs border border-[#E5E2D9]"
-                          : "text-[#57544E] hover:bg-[#EAE7DD]/70 hover:text-[#1F1E1C]"
+                          ? "bg-white text-[#141413] border border-[#E2E2DC]"
+                          : "text-[#141413]/70 hover:bg-[#E7E7E2]/70 hover:text-[#141413]"
                       }`}
                     >
-                      <Icon className={`h-4 w-4 ${active ? "text-[#C96442]" : "text-[#7A776F]"}`} />
+                      <Icon className={`size-4 ${active ? "text-[#1D4ED8]" : "text-[#141413]/45"}`} />
                       <span>{item.label}</span>
                       <NavPendingSpinner />
                     </Link>
@@ -398,12 +390,12 @@ export function AppShell({
               </nav>
             </div>
 
-            <div className="border-t border-[#E5E2D9] pt-3 space-y-2.5">
-              <div className="rounded-xl bg-white/80 border border-[#E5E2D9] px-3 py-2">
+            <div className="border-t border-[#E2E2DC] pt-3 space-y-2.5">
+              <div className="rounded-lg bg-white border border-[#E2E2DC] px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-[#1F1E1C] truncate">{userEmail}</span>
+                  <span className="text-xs font-medium text-[#141413] truncate">{userEmail}</span>
                   {isAdmin && (
-                    <Badge variant="accent" className="text-[10px] px-2 py-0">
+                    <Badge variant="accent" className="text-[10px] px-1.5 py-0">
                       Admin
                     </Badge>
                   )}
@@ -419,10 +411,10 @@ export function AppShell({
                 }}
                 className="w-full"
               >
-                <LogOut className="h-3.5 w-3.5" />
-                <span>{signingOut ? "Signing out..." : "Sign out"}</span>
+                <LogOut className="size-3.5" />
+                <span>{signingOut ? "Signing out…" : "Sign out"}</span>
               </Button>
-              <p className="text-center text-[10px] text-[#7A746B]">
+              <p className="text-center text-[10px] text-[#141413]/50">
                 Created by Mike Ryno Santiago — DNX Intern
               </p>
             </div>
@@ -432,8 +424,8 @@ export function AppShell({
 
       {/* Desktop sticky sidebar */}
       <aside
-        className={`relative z-20 hidden md:flex sticky top-0 h-dvh shrink-0 flex-col justify-between border-r border-[#E5E2D9] bg-[#F4F2EA]/92 backdrop-blur-md transition-all duration-200 ${
-          collapsed ? "w-[76px] px-2.5 py-4" : "w-60 px-3.5 py-4"
+        className={`relative z-20 hidden md:flex sticky top-0 h-dvh shrink-0 flex-col justify-between border-r border-[#E2E2DC] bg-[#F1F1EE] transition-all duration-150 ${
+          collapsed ? "w-[72px] px-2.5 py-4" : "w-60 px-3.5 py-4"
         }`}
       >
         <div className="space-y-4">
@@ -446,15 +438,15 @@ export function AppShell({
                 <Image
                   src="/logo.png"
                   alt="Accomplish AI"
-                  width={48}
-                  height={48}
-                  className="h-12 w-12 shrink-0 rounded-xl object-contain"
+                  width={40}
+                  height={40}
+                  className="size-10 shrink-0 rounded-lg object-contain"
                 />
                 <div className="min-w-0">
-                  <span className="block text-sm font-semibold tracking-tight text-[#1F1E1C] truncate">
+                  <span className="block text-sm font-medium tracking-tight text-[#141413] truncate">
                     Accomplish AI
                   </span>
-                  <span className="block text-[10px] text-[#66645E] truncate">Weekly Report</span>
+                  <span className="block text-[10px] text-[#141413]/55 truncate">Weekly Report</span>
                 </div>
               </Link>
             )}
@@ -462,9 +454,10 @@ export function AppShell({
               type="button"
               onClick={() => setCollapsed((c) => !c)}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#66645E] hover:bg-[#EAE7DD] hover:text-[#1F1E1C] transition cursor-pointer"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="flex size-8 items-center justify-center rounded-md text-[#141413]/55 hover:bg-[#E7E7E2] hover:text-[#141413] transition cursor-pointer"
             >
-              {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
             </button>
           </div>
 
@@ -477,11 +470,11 @@ export function AppShell({
             className={`w-full ${collapsed ? "px-0" : ""}`}
           >
             {creatingReport || isNavTransition ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+              <Loader2 className="size-3.5 animate-spin shrink-0" />
             ) : (
-              <FilePlus2 className="h-3.5 w-3.5 shrink-0" />
+              <FilePlus2 className="size-3.5 shrink-0" />
             )}
-            {!collapsed && <span>{creatingReport || isNavTransition ? "Creating..." : "New Report"}</span>}
+            {!collapsed && <span>{creatingReport || isNavTransition ? "Creating…" : "New Report"}</span>}
           </Button>
 
           <nav className={`space-y-1 ${isShellBusy ? "pointer-events-none opacity-60" : ""}`}>
@@ -496,13 +489,13 @@ export function AppShell({
                   title={collapsed ? item.label : undefined}
                   className={`flex items-center ${
                     collapsed ? "justify-center px-2" : "gap-3 px-3"
-                  } rounded-xl py-2.5 text-sm font-medium transition ${
+                  } rounded-lg py-2 text-sm font-medium transition duration-150 ${
                     active
-                      ? "bg-white text-[#1F1E1C] shadow-2xs border border-[#E5E2D9]"
-                      : "text-[#57544E] hover:bg-[#EAE7DD]/80 hover:text-[#1F1E1C]"
+                      ? "bg-white text-[#141413] border border-[#E2E2DC]"
+                      : "text-[#141413]/70 hover:bg-[#E7E7E2]/70 hover:text-[#141413]"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 shrink-0 ${active ? "text-[#C96442]" : "text-[#7A776F]"}`} />
+                  <Icon className={`size-4 shrink-0 ${active ? "text-[#1D4ED8]" : "text-[#141413]/45"}`} />
                   {!collapsed && <span className="truncate">{item.label}</span>}
                   {!collapsed && <NavPendingSpinner />}
                 </Link>
@@ -511,13 +504,13 @@ export function AppShell({
           </nav>
         </div>
 
-        <div className="border-t border-[#E5E2D9] pt-3 space-y-2">
+        <div className="border-t border-[#E2E2DC] pt-3 space-y-2">
           {!collapsed && (
-            <div className="rounded-xl bg-white/80 border border-[#E5E2D9] px-3 py-2">
+            <div className="rounded-lg bg-white border border-[#E2E2DC] px-3 py-2">
               <div className="flex items-center justify-between gap-1.5">
-                <span className="text-xs font-medium text-[#1F1E1C] truncate">{userEmail}</span>
+                <span className="text-xs font-medium text-[#141413] truncate">{userEmail}</span>
                 {isAdmin && (
-                  <Badge variant="accent" className="text-[10px] px-2 py-0">
+                  <Badge variant="accent" className="text-[10px] px-1.5 py-0">
                     Admin
                   </Badge>
                 )}
@@ -533,25 +526,25 @@ export function AppShell({
             title="Sign out"
             className="w-full"
           >
-            <LogOut className="h-3.5 w-3.5 shrink-0" />
-            {!collapsed && <span>{signingOut ? "Signing out..." : "Sign out"}</span>}
+            <LogOut className="size-3.5 shrink-0" />
+            {!collapsed && <span>{signingOut ? "Signing out…" : "Sign out"}</span>}
           </Button>
 
           {!collapsed && (
-            <p className="pt-1 text-center text-[10px] leading-snug text-[#7A746B]">
-              Created by <span className="font-semibold text-[#4A463F]">Mike Ryno Santiago</span> — DNX Intern
+            <p className="pt-1 text-center text-[10px] leading-snug text-[#141413]/50">
+              Created by <span className="font-medium text-[#141413]/75">Mike Ryno Santiago</span> — DNX Intern
             </p>
           )}
         </div>
       </aside>
 
-      {/* Main workspace canvas with desktop header allowance bar */}
+      {/* Main workspace canvas */}
       <div className="relative z-10 flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex sticky top-0 z-20 items-center justify-between border-b border-[#E5E2D9] bg-[#FAF9F5]/90 backdrop-blur-md px-6 py-3">
+        <header className="hidden md:flex sticky top-0 z-20 items-center justify-between border-b border-[#E2E2DC] bg-[#F8F8F6]/95 px-6 py-3">
           <div className="flex items-center gap-2.5">
-            <span className="text-sm font-semibold text-[#1F1E1C]">{currentLabel}</span>
+            <span className="text-sm font-medium text-[#141413]">{currentLabel}</span>
             {quota && !quota.isAdmin && (
-              <Badge variant="default" className="font-medium">
+              <Badge variant="default">
                 {quota.reportsCount}
                 {quota.maxReports === null ? " saved reports" : `/${quota.maxReports} reports`}
               </Badge>
@@ -563,8 +556,12 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-5 pb-[max(5rem,env(safe-area-inset-bottom))]">
-          <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+        <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-6 pb-[max(5rem,env(safe-area-inset-bottom))]">
+          <div className="swiss-frame mx-auto w-full max-w-[1440px] md:border-x md:border-[#E2E2DC]/75 md:px-5">
+            <span className="hidden md:block swiss-corner swiss-corner-tl" aria-hidden="true" />
+            <span className="hidden md:block swiss-corner swiss-corner-tr" aria-hidden="true" />
+            {children}
+          </div>
         </main>
       </div>
 
@@ -575,11 +572,11 @@ export function AppShell({
           onClick={() => setGlobalAiOpen(true)}
           title="Open Overall Accomplish AI (Ctrl+K)"
           aria-label="Open Overall Accomplish AI chat bubble"
-          className="group fixed bottom-[max(1.125rem,env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 inline-flex items-center gap-2 rounded-full bg-[#D97757] text-white h-12 w-12 sm:w-auto sm:h-12 sm:px-4 justify-center shadow-[0_10px_28px_-6px_rgba(31,30,28,0.35)] ring-1 ring-black/10 hover:bg-[#C86343] hover:scale-[1.03] active:scale-[0.98] transition-all cursor-pointer"
+          className="fixed bottom-[max(1.125rem,env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 inline-flex items-center justify-center gap-2 rounded-full bg-[#1D4ED8] text-white size-12 sm:w-auto sm:h-11 sm:px-4 shadow-lg ring-1 ring-black/10 hover:bg-[#1E40AF] active:scale-[0.98] transition duration-150 cursor-pointer"
         >
-          <MessageCircle className="h-5 w-5" />
-          <span className="hidden sm:inline text-xs font-semibold tracking-tight">Overall AI</span>
-          <kbd className="hidden lg:inline-flex items-center rounded-md bg-white/18 px-1.5 py-0.5 font-mono text-[10px] font-medium text-white/95">
+          <MessageCircle className="size-4.5" />
+          <span className="hidden sm:inline text-xs font-medium">Overall AI</span>
+          <kbd className="hidden lg:inline-flex items-center rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] font-medium text-white">
             Ctrl K
           </kbd>
         </button>
@@ -603,13 +600,14 @@ export function AppShell({
           <DialogHeader>
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FDF3EF] text-[#D97757] border border-[#F0D5C9]">
-                  <LogOut className="h-4 w-4" />
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#EFF4FF] text-[#1D4ED8] border border-[#C7D7FE]">
+                  <LogOut className="size-4" />
                 </span>
                 <div>
                   <DialogTitle>Sign out of Accomplish AI?</DialogTitle>
                   <DialogDescription>
-                    Signed in as <strong className="text-[#1F1E1C]">{userEmail}</strong>. Your saved reports stay safe.
+                    Signed in as <strong className="font-medium text-[#141413]">{userEmail}</strong>. Your saved reports
+                    stay safe.
                   </DialogDescription>
                 </div>
               </div>
@@ -621,7 +619,7 @@ export function AppShell({
                 onClick={() => setSignOutModalOpen(false)}
                 aria-label="Close sign out dialog"
               >
-                <X className="h-4 w-4" />
+                <X className="size-4" />
               </Button>
             </div>
           </DialogHeader>
@@ -633,7 +631,7 @@ export function AppShell({
               disabled={signingOut}
               onClick={() => setSignOutModalOpen(false)}
             >
-              Stay Signed In
+              Stay signed in
             </Button>
             <Button
               type="button"
@@ -641,8 +639,8 @@ export function AppShell({
               disabled={signingOut}
               onClick={() => void handleSignOut()}
             >
-              {signingOut ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
-              <span>{signingOut ? "Signing out..." : "Confirm Sign Out"}</span>
+              {signingOut ? <Loader2 className="size-3.5 animate-spin" /> : <LogOut className="size-3.5" />}
+              <span>{signingOut ? "Signing out…" : "Confirm sign out"}</span>
             </Button>
           </DialogFooter>
         </DialogContent>

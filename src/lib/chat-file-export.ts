@@ -186,10 +186,10 @@ async function exportDocx(spec: ChatFileSpec): Promise<void> {
           children: tbl.headers.map(
             (h) =>
               new TableCell({
-                shading: { type: ShadingType.CLEAR, color: "auto", fill: "F4F2EA" },
+                shading: { type: ShadingType.CLEAR, color: "auto", fill: "F1F1EE" },
                 children: [
                   new Paragraph({
-                    children: [new TextRun({ text: h, bold: true, size: 20, color: "1F1E1C" })],
+                    children: [new TextRun({ text: h, bold: true, size: 20, color: "141413" })],
                   }),
                 ],
               }),
@@ -322,7 +322,7 @@ async function exportPdf(spec: ChatFileSpec): Promise<void> {
     y += subLines.length * 14 + 6;
   }
 
-  doc.setDrawColor(217, 119, 87);
+  doc.setDrawColor(29, 78, 216);
   doc.setLineWidth(1.2);
   doc.line(margin, y, pageWidth - margin, y);
   y += 16;
@@ -333,9 +333,9 @@ async function exportPdf(spec: ChatFileSpec): Promise<void> {
       margin: { left: margin, right: margin },
       head: tbl.headers.length ? [tbl.headers] : undefined,
       body: tbl.rows.map((r) => r.map((c) => (c === null || c === undefined ? "" : String(c)))),
-      styles: { fontSize: 9, cellPadding: 5, textColor: [31, 30, 28], lineColor: [230, 226, 216], lineWidth: 0.5 },
-      headStyles: { fillColor: [217, 119, 87], textColor: [255, 255, 255], fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [250, 249, 245] },
+      styles: { fontSize: 9, cellPadding: 5, textColor: [20, 20, 19], lineColor: [226, 226, 220], lineWidth: 0.5 },
+      headStyles: { fillColor: [29, 78, 216], textColor: [255, 255, 255], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 248, 246] },
     });
     const last = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable;
     y = (last?.finalY ?? y + 40) + 16;
@@ -407,9 +407,9 @@ async function exportExcel(spec: ChatFileSpec): Promise<void> {
     const headerRow: BrowserRow = tbl.headers.map((h) => ({
       value: h,
       fontWeight: "bold",
-      backgroundColor: "#FDF3EF",
-      color: "#1F1E1C",
-      borderColor: "#DDD7CB",
+      backgroundColor: "#EFF4FF",
+      color: "#141413",
+      borderColor: "#D8D8D0",
     }));
 
     const dataRows: BrowserRow[] = tbl.rows.map((row) =>

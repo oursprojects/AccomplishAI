@@ -108,12 +108,12 @@ export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorder
           type="button"
           disabled={disabled || transcribing}
           onClick={recording ? stopRecording : startRecording}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-xl font-medium transition cursor-pointer disabled:opacity-60 ${
-            compact ? "px-3 py-2 text-xs" : "px-4 py-2.5 text-sm"
+          className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition duration-150 cursor-pointer disabled:opacity-60 ${
+            compact ? "px-2.5 py-1.5 text-xs h-8" : "px-4 py-2.5 text-sm"
           } ${
             recording
               ? "bg-red-600 text-white hover:bg-red-700"
-              : "border border-[#E0DDD3] bg-white text-[#1F1E1C] hover:bg-[#F4F2EA]"
+              : "border border-[#D8D8D0] bg-white text-[#141413] hover:bg-[#F1F1EE]"
           }`}
         >
           {recording ? (

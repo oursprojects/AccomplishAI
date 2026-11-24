@@ -510,12 +510,12 @@ export function HistoryClient({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold text-[#1F1E1C]">My Weekly Reports</h1>
+            <h1 className="text-xl font-semibold text-[#141413]">My Weekly Reports</h1>
             <Badge>
               {reports.length} {maxReports === null ? "saved" : `/ ${maxReports} max`}
             </Badge>
           </div>
-          <p className="mt-0.5 text-sm text-[#6B665E]">
+          <p className="mt-0.5 text-sm text-[#5C5C57]">
             Open any report to chat with Accomplish AI, edit fields, undo changes, and export to Word.
           </p>
         </div>
@@ -530,7 +530,7 @@ export function HistoryClient({
               onClick={() => void handleExportAllZip()}
               title="Download all saved Weekly Accomplishment Reports bundled in a single .zip"
             >
-              {exportingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5 text-[#D97757]" />}
+              {exportingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5 text-[#1D4ED8]" />}
               <span>{exportingAll ? "Bundling..." : "Export All (.zip)"}</span>
             </Button>
           )}
@@ -562,27 +562,27 @@ export function HistoryClient({
       <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1.5 flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1F1E1C]">
-              <Target className="h-4 w-4 text-[#D97757]" />
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#141413]">
+              <Target className="h-4 w-4 text-[#1D4ED8]" />
               <span>OJT Hours Progress</span>
             </span>
-            <span className="text-xs font-mono font-semibold text-[#1F1E1C]">
+            <span className="text-xs font-mono font-semibold text-[#141413]">
               {ojtStats.completed} / {targetOjtHours} hrs ({ojtStats.pct}%)
             </span>
           </div>
-          <div className="h-2 w-full rounded-full bg-[#EFECE3] overflow-hidden">
+          <div className="h-2 w-full rounded-full bg-[#F1F1EE] overflow-hidden">
             <div
-              className="h-full rounded-full bg-[#D97757] transition-all"
+              className="h-full rounded-full bg-[#1D4ED8] transition-all"
               style={{ width: `${ojtStats.pct}%` }}
             />
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#6B665E]">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#5C5C57]">
             <span>
               {ojtStats.remaining === 0
                 ? "Target OJT hours reached!"
                 : `${ojtStats.remaining} hrs remaining (~${ojtStats.estWeeksLeft} week${ojtStats.estWeeksLeft === 1 ? "" : "s"} left)`}
             </span>
-            <Link href="/profile" className="font-medium text-[#C86343] hover:underline">
+            <Link href="/profile" className="font-medium text-[#1E40AF] hover:underline">
               Adjust target
             </Link>
           </div>
@@ -591,14 +591,14 @@ export function HistoryClient({
 
       {/* Internship Calendar Schedule Card */}
       <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#F7F6F0] px-4 py-3 border-b border-[#E6E2D8]">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#F8F8F6] px-4 py-3 border-b border-[#E2E2DC]">
           <div className="flex items-center gap-2.5 min-w-0">
-            <CalendarDays className="h-4 w-4 text-[#D97757] shrink-0" />
+            <CalendarDays className="h-4 w-4 text-[#1D4ED8] shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs sm:text-sm font-semibold text-[#1F1E1C]">
+              <p className="text-xs sm:text-sm font-semibold text-[#141413]">
                 Internship Calendar (Mon–Fri Schedule)
               </p>
-              <p className="text-[11px] text-[#6B665E] truncate">
+              <p className="text-[11px] text-[#5C5C57] truncate">
                 {startDate
                   ? nextWeekPreview
                     ? `Week 1 started ${normalizeDateToLongFormat(startDate)} · Next up: Week ${nextWeekPreview.weekNumber} (${nextWeekPreview.fromText} – ${nextWeekPreview.toText})`
@@ -618,7 +618,7 @@ export function HistoryClient({
           <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <div className="md:col-span-5 space-y-3">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-[#57544E] mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-[#52524E] mb-1">
                   Week 1 Start Date
                 </label>
                 <div className="flex items-center gap-2">
@@ -630,18 +630,18 @@ export function HistoryClient({
                     className="bg-white"
                   />
                 </div>
-                <p className="mt-1.5 text-xs text-[#6B665E]">
+                <p className="mt-1.5 text-xs text-[#5C5C57]">
                   For example, if you began Monday <strong>November 9</strong>, Week 1 is{" "}
                   <strong>Nov 9 – Nov 13</strong>, and Week 2 is automatically <strong>Nov 16 – Nov 20</strong>.
                 </p>
               </div>
 
               {nextWeekPreview && (
-                <div className="rounded-xl border border-[#F0D5C9] bg-[#FDF3EF] p-3 space-y-2">
-                  <p className="text-xs font-semibold text-[#9F4427]">
+                <div className="rounded-xl border border-[#C7D7FE] bg-[#EFF4FF] p-3 space-y-2">
+                  <p className="text-xs font-semibold text-[#1E3A8A]">
                     Next Report: Week {nextWeekPreview.weekNumber}
                   </p>
-                  <p className="text-xs text-[#4A463F]">
+                  <p className="text-xs text-[#3D3D39]">
                     {nextWeekPreview.fromText} – {nextWeekPreview.toText}
                   </p>
                   <Button
@@ -665,7 +665,7 @@ export function HistoryClient({
               )}
             </div>
 
-            <div className={`md:col-span-7 rounded-xl border border-[#E6E2D8] bg-white p-3 ${isBusy ? "pointer-events-none opacity-60" : ""}`}>
+            <div className={`md:col-span-7 rounded-xl border border-[#E2E2DC] bg-white p-3 ${isBusy ? "pointer-events-none opacity-60" : ""}`}>
               <InternshipCalendar
                 mode={startDate ? "week" : "anchor"}
                 startDateIso={startDate}
@@ -697,7 +697,7 @@ export function HistoryClient({
         <div className="space-y-2.5">
           {/* Week Category filter pills */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#6B665E] mr-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#5C5C57] mr-1">
               Week Category:
             </span>
             <button
@@ -705,8 +705,8 @@ export function HistoryClient({
               onClick={() => setWeekFilter("all")}
               className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer transition ${
                 weekFilter === "all"
-                  ? "border-[#D97757] bg-[#FDF3EF] text-[#9F4427]"
-                  : "border-[#DDD7CB] bg-white text-[#57544E] hover:bg-[#F4F2EA]"
+                  ? "border-[#1D4ED8] bg-[#EFF4FF] text-[#1E3A8A]"
+                  : "border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE]"
               }`}
             >
               <span>All Weeks</span>
@@ -722,11 +722,11 @@ export function HistoryClient({
                   title={`${meta.rangeText} (${count} report${count === 1 ? "" : "s"})`}
                   className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer transition ${
                     active
-                      ? "border-[#D97757] bg-[#FDF3EF] text-[#9F4427]"
-                      : "border-[#DDD7CB] bg-white text-[#57544E] hover:bg-[#F4F2EA]"
+                      ? "border-[#1D4ED8] bg-[#EFF4FF] text-[#1E3A8A]"
+                      : "border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE]"
                   }`}
                 >
-                  <Calendar className="h-3 w-3 text-[#D97757]" />
+                  <Calendar className="h-3 w-3 text-[#1D4ED8]" />
                   <span>{meta.label}</span>
                   {meta.mondayIso !== null && (
                     <span className="rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 px-1 text-[10px] font-semibold">
@@ -740,7 +740,7 @@ export function HistoryClient({
 
           <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div className="relative flex-1 min-w-[220px] max-w-md">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A847A]" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#7A7A73]" />
             <Input
               type="search"
               value={query}
@@ -758,8 +758,8 @@ export function HistoryClient({
                 onClick={() => setStatusFilter(st)}
                 className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium capitalize cursor-pointer transition ${
                   statusFilter === st
-                    ? "border-[#1F1E1C] bg-[#1F1E1C] text-white"
-                    : "border-[#DDD7CB] bg-white text-[#57544E] hover:bg-[#F4F2EA]"
+                    ? "border-[#141413] bg-[#141413] text-white"
+                    : "border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE]"
                 }`}
               >
                 {st}
@@ -770,7 +770,7 @@ export function HistoryClient({
               aria-label="Sort reports"
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="h-8 rounded-lg border border-[#DDD7CB] bg-white px-2.5 text-xs font-medium text-[#1F1E1C] outline-none"
+              className="h-8 rounded-lg border border-[#D8D8D0] bg-white px-2.5 text-xs font-medium text-[#141413] outline-none"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -782,13 +782,13 @@ export function HistoryClient({
       )}
 
       {reports.length === 0 ? (
-        <Card className="border-dashed border-[#DDD7CB] p-10 text-center space-y-3">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FDF3EF] text-[#D97757]">
+        <Card className="border-dashed border-[#D8D8D0] p-10 text-center space-y-3">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF4FF] text-[#1D4ED8]">
             <FileText className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#1F1E1C]">No reports created yet</p>
-            <p className="mt-1 text-xs text-[#6B665E]">
+            <p className="text-sm font-semibold text-[#141413]">No reports created yet</p>
+            <p className="mt-1 text-xs text-[#5C5C57]">
               Create your first Weekly Accomplishment Report to start chatting with the AI assistant inside that report.
             </p>
           </div>
@@ -805,8 +805,8 @@ export function HistoryClient({
           </div>
         </Card>
       ) : visibleReports.length === 0 ? (
-        <Card className="border-dashed border-[#DDD7CB] p-8 text-center">
-          <p className="text-sm font-medium text-[#1F1E1C]">No matching reports found</p>
+        <Card className="border-dashed border-[#D8D8D0] p-8 text-center">
+          <p className="text-sm font-medium text-[#141413]">No matching reports found</p>
         </Card>
       ) : (
         <div
@@ -815,15 +815,15 @@ export function HistoryClient({
         >
           {groupedVisibleReports.map((group) => (
             <section key={group.meta.key} className="space-y-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D8] pb-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E2DC] pb-1.5">
                 <div className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-[#D97757]" />
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-[#4A463F]">
+                  <CalendarDays className="h-4 w-4 text-[#1D4ED8]" />
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-[#3D3D39]">
                     {group.meta.label}
                   </h2>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-[#6B665E] hidden sm:inline">{group.meta.rangeText}</span>
+                  <span className="text-[11px] text-[#5C5C57] hidden sm:inline">{group.meta.rangeText}</span>
                   <Badge variant={group.meta.mondayIso ? "success" : "warning"} className="text-[10px]">
                     {group.meta.mondayIso
                       ? `${group.items.length}/1 Report this week`
@@ -885,7 +885,7 @@ export function HistoryClient({
                               maxLength={120}
                               autoFocus
                               placeholder="Enter report title..."
-                              className="h-8 max-w-sm border-[#D97757]"
+                              className="h-8 max-w-sm border-[#1D4ED8]"
                             />
                             <Button
                               type="submit"
@@ -909,10 +909,10 @@ export function HistoryClient({
                           </form>
                         ) : (
                           <div className="flex flex-wrap items-center gap-2">
-                            <FileText className="h-4 w-4 text-[#D97757] shrink-0" />
+                            <FileText className="h-4 w-4 text-[#1D4ED8] shrink-0" />
                             <Link
                               href={`/reports/${report.id}`}
-                              className="text-sm font-semibold text-[#1F1E1C] hover:text-[#C86343] transition-colors"
+                              className="text-sm font-semibold text-[#141413] hover:text-[#1E40AF] transition-colors"
                             >
                               {displayTitle}
                             </Link>
@@ -921,7 +921,7 @@ export function HistoryClient({
                             <button
                               type="button"
                               onClick={() => startRename(report)}
-                              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[#6B665E] hover:bg-[#F4F2EA] hover:text-[#1F1E1C] transition cursor-pointer"
+                              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[#5C5C57] hover:bg-[#F1F1EE] hover:text-[#141413] transition cursor-pointer"
                               title="Rename report"
                             >
                               <Pencil className="h-3 w-3" />
@@ -937,7 +937,7 @@ export function HistoryClient({
                           </div>
                         )}
 
-                        <p className="inline-flex items-center gap-1 text-xs text-[#6B665E]">
+                        <p className="inline-flex items-center gap-1 text-xs text-[#5C5C57]">
                           <Calendar className="h-3 w-3" />
                           Created {created}
                           {d.intern_name_last_first ? ` · ${d.intern_name_last_first}` : ""}
@@ -946,7 +946,7 @@ export function HistoryClient({
                             : ""}
                         </p>
                         {report.raw_notes && (
-                          <p className="text-xs text-[#57544E] line-clamp-2 pt-0.5">{report.raw_notes}</p>
+                          <p className="text-xs text-[#52524E] line-clamp-2 pt-0.5">{report.raw_notes}</p>
                         )}
                       </div>
 
@@ -961,7 +961,7 @@ export function HistoryClient({
                               onClick={() => setPreviewReport(report)}
                               title="Preview 1-page Word document without leaving My Reports"
                             >
-                              <Eye className="h-3.5 w-3.5 text-[#D97757]" />
+                              <Eye className="h-3.5 w-3.5 text-[#1D4ED8]" />
                               <span>Preview</span>
                             </Button>
                             <Button
@@ -975,7 +975,7 @@ export function HistoryClient({
                               {downloadingId === report.id ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : (
-                                <Download className="h-3.5 w-3.5 text-[#57544E]" />
+                                <Download className="h-3.5 w-3.5 text-[#52524E]" />
                               )}
                               <span>{downloadingId === report.id ? "Saving..." : "Download"}</span>
                             </Button>
@@ -983,17 +983,17 @@ export function HistoryClient({
                         )}
                         <Link
                           href={`/reports/${report.id}`}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#1F1E1C] px-3 text-xs font-medium text-white hover:bg-[#33312E] transition"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#141413] px-3 text-xs font-medium text-white hover:bg-[#2A2A27] transition"
                         >
                           <OpenLinkContent />
                         </Link>
                         {nextExisting ? (
                           <Link
                             href={`/reports/${nextExisting.id}`}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#DDD7CB] bg-white px-3 text-xs font-medium text-[#4A463F] hover:bg-[#F4F2EA] transition"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#D8D8D0] bg-white px-3 text-xs font-medium text-[#3D3D39] hover:bg-[#F1F1EE] transition"
                             title="Only 1 report per week — open the existing next week's report"
                           >
-                            <ExternalLink className="h-3.5 w-3.5 text-[#6B665E]" />
+                            <ExternalLink className="h-3.5 w-3.5 text-[#5C5C57]" />
                             <span>{nextWkNum ? `Open Week ${nextWkNum}` : "Next Week Exists"}</span>
                           </Link>
                         ) : (
@@ -1019,7 +1019,7 @@ export function HistoryClient({
                             {duplicatingId === report.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                              <CopyPlus className="h-3.5 w-3.5 text-[#D97757]" />
+                              <CopyPlus className="h-3.5 w-3.5 text-[#1D4ED8]" />
                             )}
                             <span>
                               {duplicatingId === report.id
@@ -1085,7 +1085,7 @@ export function HistoryClient({
                   <DialogTitle>Delete Weekly Report?</DialogTitle>
                   <DialogDescription>
                     This permanently deletes{" "}
-                    <strong className="text-[#1F1E1C]">{confirmDelete?.title}</strong> and its AI conversation.
+                    <strong className="text-[#141413]">{confirmDelete?.title}</strong> and its AI conversation.
                   </DialogDescription>
                 </div>
               </div>

@@ -1,15 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, UnifrakturMaguntia } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, UnifrakturMaguntia } from "next/font/google";
 import { Toaster } from "@/components/ui/toast";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const ibmPlexSans = IBM_Plex_Sans({
+  weight: ["300", "400", "500", "600"],
+  variable: "--font-plex-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
   subsets: ["latin"],
 });
 
@@ -20,7 +22,7 @@ const oldEnglish = UnifrakturMaguntia({
 });
 
 export const metadata: Metadata = {
-  title: "Accomplish AI — Weekly Accomplishment Report Generator",
+  title: "Accomplish AI — Weekly Accomplishment Report System",
   description:
     "Turn daily voice or text notes into a formatted, print-ready 2026 Weekly Accomplishment Report (.docx).",
 };
@@ -28,13 +30,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#FAF9F5",
+  themeColor: "#F8F8F6",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${oldEnglish.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#FAF9F5] text-[#1F1E1C]">
+    <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} ${oldEnglish.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-[#F8F8F6] text-[#141413]">
         {children}
         <Toaster />
       </body>

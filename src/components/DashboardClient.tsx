@@ -229,12 +229,12 @@ export function DashboardClient({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#1F1E1C] text-balance truncate">
+            <h1 className="text-xl sm:text-2xl font-light tracking-tight text-[#141413] text-balance truncate">
               Welcome back, {displayName}
             </h1>
             {profile.office && <Badge variant="accent">{profile.office}</Badge>}
           </div>
-          <p className="mt-0.5 text-sm text-[#6B665E] text-pretty">
+          <p className="mt-0.5 text-sm text-[#5C5C57] text-pretty">
             {profile.internship_start_date
               ? `Internship started ${normalizeDateToLongFormat(profile.internship_start_date)} · 1 report per Mon–Fri week`
               : "Track your OJT hours, weekly accomplishment reports, and AI allowance at a glance."}
@@ -245,11 +245,11 @@ export function DashboardClient({
           <Link
             href="/"
             aria-disabled={isBusy}
-            className={`inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#DDD7CB] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#1F1E1C] hover:bg-[#F4F2EA] transition ${
+            className={`inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#D8D8D0] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#141413] hover:bg-[#F1F1EE] transition ${
               isBusy ? "pointer-events-none opacity-50" : ""
             }`}
           >
-            <FolderKanban className="h-4 w-4 text-[#D97757]" />
+            <FolderKanban className="h-4 w-4 text-[#1D4ED8]" />
             <span>My Reports</span>
           </Link>
           <Button
@@ -306,21 +306,21 @@ export function DashboardClient({
           )}
 
           {templateStatus !== "confirmed" && (
-            <Card className="p-3.5 bg-[#FDF3EF] border-[#F0D5C9] flex items-center justify-between gap-3">
+            <Card className="p-3.5 bg-[#EFF4FF] border-[#C7D7FE] flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <FileCheck2 className="h-4 w-4 text-[#C86343] shrink-0" />
+                <FileCheck2 className="h-4 w-4 text-[#1E40AF] shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-[#1F1E1C]">
+                  <p className="text-xs font-semibold text-[#141413]">
                     {templateStatus === "pending_review" ? "Confirm Word Template" : "Scan Word Template"}
                   </p>
-                  <p className="text-[11px] text-[#57544E] truncate">
+                  <p className="text-[11px] text-[#52524E] truncate">
                     {templateName ?? "2026-Weekly-Accomplishment-Report.docx"}
                   </p>
                 </div>
               </div>
               <Link
                 href="/template"
-                className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-[#D97757] px-2.5 py-1.5 text-xs font-medium text-white hover:bg-[#C86343] transition"
+                className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-[#1D4ED8] px-2.5 py-1.5 text-xs font-medium text-white hover:bg-[#1E40AF] transition"
               >
                 <span>Review</span>
                 <ArrowRight className="h-3 w-3" />
@@ -333,18 +333,18 @@ export function DashboardClient({
       {/* 4 KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
+          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
             <span>OJT Hours Completed</span>
-            <Target className="h-4 w-4 text-[#D97757]" />
+            <Target className="size-4 text-[#1D4ED8]" />
           </div>
-          <p className="text-2xl font-bold text-[#1F1E1C] tabular-nums">
+          <p className="text-2xl font-light tracking-tight text-[#141413] tabular-nums">
             {stats.completedHours}{" "}
-            <span className="text-xs font-normal text-[#6B665E]">/ {stats.target} hrs</span>
+            <span className="text-xs font-normal text-[#5C5C57]">/ {stats.target} hrs</span>
           </p>
-          <div className="h-1.5 w-full rounded-full bg-[#EFECE3] overflow-hidden">
-            <div className="h-full rounded-full bg-[#D97757] transition-all" style={{ width: `${stats.ojtPct}%` }} />
+          <div className="h-1.5 w-full rounded-full bg-[#F1F1EE] overflow-hidden">
+            <div className="h-full rounded-full bg-[#1D4ED8] transition-all" style={{ width: `${stats.ojtPct}%` }} />
           </div>
-          <p className="text-[11px] text-[#6B665E]">
+          <p className="text-[11px] text-[#5C5C57] tabular-nums">
             {stats.remainingHours === 0
               ? "Target OJT hours completed!"
               : `${stats.ojtPct}% · ${stats.remainingHours} hrs left (~${stats.estWeeksLeft} wk${stats.estWeeksLeft === 1 ? "" : "s"})`}
@@ -352,14 +352,14 @@ export function DashboardClient({
         </Card>
 
         <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
+          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
             <span>Saved Reports</span>
-            <FileText className="h-4 w-4 text-[#D97757]" />
+            <FileText className="size-4 text-[#1D4ED8]" />
           </div>
-          <p className="text-2xl font-bold text-[#1F1E1C] tabular-nums">
+          <p className="text-2xl font-light tracking-tight text-[#141413] tabular-nums">
             {reports.length}
             {quota.maxReports !== null && (
-              <span className="text-xs font-normal text-[#6B665E]"> / {quota.maxReports}</span>
+              <span className="text-xs font-normal text-[#5C5C57]"> / {quota.maxReports}</span>
             )}
           </p>
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
@@ -373,17 +373,17 @@ export function DashboardClient({
         </Card>
 
         <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
+          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
             <span>AI Prompts Today</span>
-            <Gauge className="h-4 w-4 text-[#D97757]" />
+            <Gauge className="size-4 text-[#1D4ED8]" />
           </div>
-          <p className="text-2xl font-bold text-[#1F1E1C] tabular-nums">
+          <p className="text-2xl font-light tracking-tight text-[#141413] tabular-nums">
             {quota.isAdmin ? "Unlimited" : quota.remaining}
             {!quota.isAdmin && (
-              <span className="text-xs font-normal text-[#6B665E]"> / {quota.dailyLimit}</span>
+              <span className="text-xs font-normal text-[#5C5C57]"> / {quota.dailyLimit}</span>
             )}
           </p>
-          <p className="text-[11px] text-[#6B665E]">
+          <p className="text-[11px] text-[#5C5C57]">
             {quota.isBlocked
               ? "AI access paused by admin"
               : quota.isAdmin
@@ -393,21 +393,23 @@ export function DashboardClient({
         </Card>
 
         <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-[#6B665E]">
+          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
             <span>Next Report Week</span>
-            <CalendarDays className="h-4 w-4 text-[#D97757]" />
+            <CalendarDays className="size-4 text-[#1D4ED8]" />
           </div>
           {nextWeekPreview ? (
             <>
-              <p className="text-xl font-bold text-[#1F1E1C]">Week {nextWeekPreview.weekNumber}</p>
-              <p className="text-[11px] text-[#6B665E]">
+              <p className="text-xl font-light tracking-tight text-[#141413] tabular-nums">
+                Week {nextWeekPreview.weekNumber}
+              </p>
+              <p className="text-[11px] text-[#5C5C57]">
                 {nextWeekPreview.fromText} – {nextWeekPreview.toText}
               </p>
             </>
           ) : (
             <>
-              <p className="text-base font-semibold text-[#1F1E1C]">No Start Date Yet</p>
-              <Link href="/profile" className="inline-block text-[11px] font-medium text-[#C86343] hover:underline">
+              <p className="text-base font-medium text-[#141413]">No Start Date Yet</p>
+              <Link href="/profile" className="inline-block text-[11px] font-medium text-[#1E40AF] hover:underline">
                 Set Week 1 date in Profile →
               </Link>
             </>
@@ -420,8 +422,8 @@ export function DashboardClient({
         <Card className="lg:col-span-7 p-4 sm:p-5 flex flex-col justify-between space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold text-[#1F1E1C]">Weekly Hours Logged</h2>
-              <p className="text-xs text-[#6B665E]">Click any week bar to jump straight into that report.</p>
+              <h2 className="text-sm font-semibold text-[#141413]">Weekly Hours Logged</h2>
+              <p className="text-xs text-[#5C5C57]">Click any week bar to jump straight into that report.</p>
             </div>
             <Badge variant="outline">
               <Clock className="h-3 w-3" />
@@ -430,9 +432,9 @@ export function DashboardClient({
           </div>
 
           {weeklyChartItems.length === 0 ? (
-            <div className="h-40 rounded-xl border border-dashed border-[#DDD7CB] bg-[#FAF9F5] flex flex-col items-center justify-center text-center p-4">
-              <p className="text-xs font-medium text-[#1F1E1C]">No weekly hours recorded yet</p>
-              <p className="mt-1 text-[11px] text-[#6B665E]">
+            <div className="h-40 rounded-xl border border-dashed border-[#D8D8D0] bg-[#F8F8F6] flex flex-col items-center justify-center text-center p-4">
+              <p className="text-xs font-medium text-[#141413]">No weekly hours recorded yet</p>
+              <p className="mt-1 text-[11px] text-[#5C5C57]">
                 Create your first Weekly Accomplishment Report to see weekly hours charted here.
               </p>
             </div>
@@ -447,18 +449,18 @@ export function DashboardClient({
                     title={`${item.fullLabel}: ${item.hours} hrs`}
                     className="group flex-1 min-w-[44px] h-full flex flex-col items-center gap-1.5"
                   >
-                    <span className="text-[11px] font-mono font-semibold text-[#4A463F] tabular-nums">
+                    <span className="text-[11px] font-mono font-semibold text-[#3D3D39] tabular-nums">
                       {item.hours}h
                     </span>
                     <div className="w-full flex-1 flex items-end justify-center">
                       <div
                         className={`w-full max-w-[42px] rounded-t-lg transition-all group-hover:opacity-90 ${
-                          item.ready ? "bg-[#D97757]" : "bg-[#E7B5A2]"
+                          item.ready ? "bg-[#1D4ED8]" : "bg-[#93C5FD]"
                         }`}
                         style={{ height: `${heightPct}%` }}
                       />
                     </div>
-                    <span className="text-[11px] font-medium text-[#57544E] group-hover:text-[#C86343] truncate max-w-full">
+                    <span className="text-[11px] font-medium text-[#52524E] group-hover:text-[#1E40AF] truncate max-w-full">
                       {item.label}
                     </span>
                   </Link>
@@ -471,23 +473,23 @@ export function DashboardClient({
         <Card className="lg:col-span-5 p-4 sm:p-5 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold text-[#1F1E1C]">Accomplishment Week Tracker</h2>
-              <p className="text-xs text-[#6B665E]">1 report allowed per Monday–Friday week.</p>
+              <h2 className="text-sm font-semibold text-[#141413]">Accomplishment Week Tracker</h2>
+              <p className="text-xs text-[#5C5C57]">1 report allowed per Monday–Friday week.</p>
             </div>
-            <Link href="/" className="text-xs font-medium text-[#C86343] hover:underline">
+            <Link href="/" className="text-xs font-medium text-[#1E40AF] hover:underline">
               Full calendar
             </Link>
           </div>
 
           {scheduleWeeks.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[#DDD7CB] bg-[#FAF9F5] p-4 space-y-2">
-              <p className="text-xs font-medium text-[#1F1E1C]">Set your Internship Start Date</p>
-              <p className="text-[11px] text-[#6B665E]">
+            <div className="rounded-xl border border-dashed border-[#D8D8D0] bg-[#F8F8F6] p-4 space-y-2">
+              <p className="text-xs font-medium text-[#141413]">Set your Internship Start Date</p>
+              <p className="text-[11px] text-[#5C5C57]">
                 Choose Week 1 Monday in My Reports or Profile so every Week 1–Week 8 date auto-calculates cleanly.
               </p>
               <Link
                 href="/profile"
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[#C86343] hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#1E40AF] hover:underline"
               >
                 <span>Open Profile Settings</span>
                 <ArrowRight className="h-3 w-3" />
@@ -519,11 +521,11 @@ export function DashboardClient({
                 ) : (
                   <div
                     key={wk.weekNumber}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-[#EFECE3] bg-[#FAF9F5] px-3 py-2 text-xs"
+                    className="flex items-center justify-between gap-2 rounded-xl border border-[#F1F1EE] bg-[#F8F8F6] px-3 py-2 text-xs"
                   >
                     <div className="min-w-0">
-                      <span className="font-semibold text-[#1F1E1C]">Week {wk.weekNumber}</span>
-                      <span className="ml-2 text-[#6B665E] truncate">
+                      <span className="font-semibold text-[#141413]">Week {wk.weekNumber}</span>
+                      <span className="ml-2 text-[#5C5C57] truncate">
                         {wk.fromText} – {wk.toText}
                       </span>
                     </div>
@@ -538,7 +540,7 @@ export function DashboardClient({
                           sourceKey: weekKey,
                         })
                       }
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#C86343] hover:underline cursor-pointer disabled:pointer-events-none disabled:opacity-50 shrink-0"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#1E40AF] hover:underline cursor-pointer disabled:pointer-events-none disabled:opacity-50 shrink-0"
                     >
                       {creatingThisWeek && <Loader2 className="h-3 w-3 animate-spin" />}
                       <span>{creatingThisWeek ? "Creating..." : "+ Create"}</span>
@@ -553,20 +555,20 @@ export function DashboardClient({
 
       {/* Recent Reports */}
       <Card className="overflow-hidden">
-        <div className="border-b border-[#EFECE3] px-4 sm:px-5 py-3 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-[#1F1E1C]">Recent Weekly Reports</h2>
-          <Link href="/" className="text-xs font-medium text-[#C86343] hover:underline">
+        <div className="border-b border-[#F1F1EE] px-4 sm:px-5 py-3 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-[#141413]">Recent Weekly Reports</h2>
+          <Link href="/" className="text-xs font-medium text-[#1E40AF] hover:underline">
             View all ({reports.length}) →
           </Link>
         </div>
 
         {reports.length === 0 ? (
           <div className="p-6 text-center space-y-2">
-            <p className="text-sm font-medium text-[#1F1E1C]">No reports created yet</p>
-            <p className="text-xs text-[#6B665E]">Click Create Week 1 above to start your first weekly report.</p>
+            <p className="text-sm font-medium text-[#141413]">No reports created yet</p>
+            <p className="text-xs text-[#5C5C57]">Click Create Week 1 above to start your first weekly report.</p>
           </div>
         ) : (
-          <div className="divide-y divide-[#F2EFE8]">
+          <div className="divide-y divide-[#E2E2DC]">
             {reports.slice(0, 4).map((r) => {
               const d = r.structured_data;
               const cat = resolveWeekCategory({
@@ -580,16 +582,16 @@ export function DashboardClient({
               return (
                 <div
                   key={r.id}
-                  className="p-3.5 sm:px-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 hover:bg-[#FAF9F5]/80 transition-colors"
+                  className="p-3.5 sm:px-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 hover:bg-[#F8F8F6]/80 transition-colors"
                 >
                   <div className="min-w-0 space-y-0.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-[#1F1E1C] truncate">{titleText}</span>
+                      <span className="text-sm font-semibold text-[#141413] truncate">{titleText}</span>
                       {cat.weekNumber !== null && <Badge variant="accent">Week {cat.weekNumber}</Badge>}
                       <Badge variant={ready ? "success" : "warning"}>{ready ? "Ready" : "Draft"}</Badge>
                       {d.hours_this_week && <Badge variant="outline">{d.hours_this_week} hrs</Badge>}
                     </div>
-                    <p className="inline-flex items-center gap-1 text-xs text-[#6B665E]">
+                    <p className="inline-flex items-center gap-1 text-xs text-[#5C5C57]">
                       <Calendar className="h-3 w-3" />
                       <span>{cat.rangeText}</span>
                     </p>
@@ -597,7 +599,7 @@ export function DashboardClient({
 
                   <Link
                     href={`/reports/${r.id}`}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#1F1E1C] px-3 text-xs font-medium text-white hover:bg-[#33312E] transition self-start sm:self-center shrink-0"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#141413] px-3 text-xs font-medium text-white hover:bg-[#2A2A27] transition self-start sm:self-center shrink-0"
                   >
                     <OpenLinkButtonLabel />
                   </Link>

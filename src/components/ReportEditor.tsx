@@ -171,9 +171,9 @@ export function ReportEditor({
   return (
     <div className="space-y-4">
       {/* Quick readiness & Undo / Cancel strip */}
-      <Card className="bg-[#F7F6F0] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs text-[#4A463F]">
-          <CheckCheck className="h-4 w-4 text-[#D97757]" />
+      <Card className="bg-[#F8F8F6] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs text-[#3D3D39]">
+          <CheckCheck className="h-4 w-4 text-[#1D4ED8]" />
           <span>
             <strong>{completedSections}/6</strong> main sections · <strong>{workedDaysCount}</strong> day
             {workedDaysCount === 1 ? "" : "s"} logged
@@ -182,7 +182,7 @@ export function ReportEditor({
         <div className="flex items-center gap-1.5">
           {canUndo && (
             <Button type="button" size="sm" variant="outline" onClick={onUndo}>
-              <Undo2 className="h-3 w-3 text-[#D97757]" />
+              <Undo2 className="h-3 w-3 text-[#1D4ED8]" />
               <span>Undo</span>
             </Button>
           )}
@@ -198,8 +198,8 @@ export function ReportEditor({
       {/* Header metadata */}
       <Card className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-[#1F1E1C] flex items-center gap-1.5">
-            <PenLine className="h-3.5 w-3.5 text-[#D97757]" />
+          <h3 className="text-sm font-semibold text-[#141413] flex items-center gap-1.5">
+            <PenLine className="h-3.5 w-3.5 text-[#1D4ED8]" />
             <span>Report Title, Header &amp; Period</span>
           </h3>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -217,7 +217,7 @@ export function ReportEditor({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-[#4A463F] mb-1">Report Name</label>
+          <label className="block text-xs font-medium text-[#3D3D39] mb-1">Report Name</label>
           <Input
             type="text"
             maxLength={120}
@@ -229,7 +229,7 @@ export function ReportEditor({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">
+            <label className="block text-xs font-medium text-[#3D3D39] mb-1">
               Student Intern (LASTNAME, FIRSTNAME MI.)
             </label>
             <Input
@@ -240,7 +240,7 @@ export function ReportEditor({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">Office</label>
+            <label className="block text-xs font-medium text-[#3D3D39] mb-1">Office</label>
             <Input
               type="text"
               value={data.office}
@@ -249,7 +249,7 @@ export function ReportEditor({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">Period From</label>
+            <label className="block text-xs font-medium text-[#3D3D39] mb-1">Period From</label>
             <Input
               type="text"
               value={data.date_from}
@@ -262,7 +262,7 @@ export function ReportEditor({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">Period To</label>
+            <label className="block text-xs font-medium text-[#3D3D39] mb-1">Period To</label>
             <Input
               type="text"
               value={data.date_to}
@@ -281,14 +281,14 @@ export function ReportEditor({
       <Card className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold text-[#1F1E1C]">Daily Accomplishments (M – F)</h3>
-            <p className="text-xs text-[#6B665E] mt-0.5">
+            <h3 className="text-sm font-semibold text-[#141413]">Daily Accomplishments (M – F)</h3>
+            <p className="text-xs text-[#5C5C57] mt-0.5">
               One accomplished task per line — each line renders as a Word bullet.
             </p>
           </div>
           {canFillVerifier && workedDaysCount > 0 && (
             <Button type="button" size="sm" variant="secondary" onClick={applyVerifierToWorkedDays}>
-              <UserCheck className="h-3 w-3 text-[#D97757]" />
+              <UserCheck className="h-3 w-3 text-[#1D4ED8]" />
               <span>Fill Verifiers</span>
             </Button>
           )}
@@ -299,13 +299,13 @@ export function ReportEditor({
             const accKey = `${day}_accomplishments` as ReportKey;
             const verKey = `${day}_verified_by` as ReportKey;
             return (
-              <div key={day} className="rounded-xl border border-[#EAE6DC] bg-[#FAF9F5]/80 p-3 space-y-2">
+              <div key={day} className="rounded-xl border border-[#EAE6DC] bg-[#F8F8F6]/80 p-3 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#1F1E1C] text-xs font-semibold text-white">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#141413] text-xs font-semibold text-white">
                       {DAY_LABELS[day].short}
                     </span>
-                    <span className="text-xs font-semibold text-[#1F1E1C]">{DAY_LABELS[day].full}</span>
+                    <span className="text-xs font-semibold text-[#141413]">{DAY_LABELS[day].full}</span>
                   </div>
                   <Input
                     type="text"
@@ -332,9 +332,9 @@ export function ReportEditor({
       <Card className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold text-[#1F1E1C]">Hours, Reflections &amp; Signature</h3>
+            <h3 className="text-sm font-semibold text-[#141413]">Hours, Reflections &amp; Signature</h3>
             {previousTotalHours && (
-              <p className="text-[11px] text-[#6B665E]">
+              <p className="text-[11px] text-[#5C5C57]">
                 Previous cumulative total: <strong>{previousTotalHours} hrs</strong> (automatically added to this week)
               </p>
             )}
@@ -348,12 +348,12 @@ export function ReportEditor({
                 onClick={autoCalcHours}
                 title={`Calculate ${workedDaysCount} worked day(s) × ${defaultDailyHours} hrs/day + previous total`}
               >
-                <Calculator className="h-3 w-3 text-[#D97757]" />
+                <Calculator className="h-3 w-3 text-[#1D4ED8]" />
                 <span>Auto-calc Hours</span>
               </Button>
             )}
             <Button type="button" size="sm" variant="secondary" onClick={fillNoneReflections}>
-              <AccomplishCheckIcon className="h-3 w-3 text-[#D97757]" />
+              <AccomplishCheckIcon className="h-3 w-3 text-[#1D4ED8]" />
               <span>Fill &ldquo;None&rdquo;</span>
             </Button>
           </div>
@@ -361,7 +361,7 @@ export function ReportEditor({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">Hours Worked This Week</label>
+            <label className="block text-xs font-medium text-[#3D3D39] mb-1">Hours Worked This Week</label>
             <Input
               type="text"
               value={data.hours_this_week}
@@ -370,7 +370,7 @@ export function ReportEditor({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#4A463F] mb-1">
+            <label className="block text-xs font-medium text-[#3D3D39] mb-1">
               Total Hours Worked (Prev + This Week)
             </label>
             <Input
@@ -383,7 +383,7 @@ export function ReportEditor({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-[#4A463F] mb-1">New training/s took place this week</label>
+          <label className="block text-xs font-medium text-[#3D3D39] mb-1">New training/s took place this week</label>
           <Textarea
             rows={2}
             value={data.new_trainings}
@@ -394,7 +394,7 @@ export function ReportEditor({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-[#4A463F] mb-1">Problems encountered this week</label>
+          <label className="block text-xs font-medium text-[#3D3D39] mb-1">Problems encountered this week</label>
           <Textarea
             rows={2}
             value={data.problems_encountered}
@@ -405,7 +405,7 @@ export function ReportEditor({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-[#4A463F] mb-1">Solutions done to solve the problem/s</label>
+          <label className="block text-xs font-medium text-[#3D3D39] mb-1">Solutions done to solve the problem/s</label>
           <Textarea
             rows={2}
             value={data.solutions_done}
@@ -416,7 +416,7 @@ export function ReportEditor({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-[#4A463F] mb-1">
+          <label className="block text-xs font-medium text-[#3D3D39] mb-1">
             Prepared by (FIRSTNAME MI. LASTNAME)
           </label>
           <Input
@@ -425,7 +425,7 @@ export function ReportEditor({
             onChange={(e) => setField("intern_name_first_last", e.target.value)}
             placeholder="JUAN A. DELA CRUZ"
           />
-          <p className="mt-1 text-[11px] text-[#7A746B]">
+          <p className="mt-1 text-[11px] text-[#7A7A73]">
             Noted by (NIÑO R. GUILLERMO) and the wet-ink Date line remain untouched on the official form.
           </p>
         </div>

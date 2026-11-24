@@ -22,14 +22,14 @@ export interface ParsedChartSpec {
 }
 
 const PALETTE = [
-  "#D97757", // AccomplishAI Terracotta
-  "#2E7D32", // Forest Emerald
-  "#1F1E1C", // Charcoal Ink
-  "#D97706", // Warm Amber
-  "#2563EB", // Cobalt Blue
-  "#7C3AED", // Violet
-  "#0D9488", // Teal
-  "#DB2777", // Rose
+  "#1D4ED8", // Blueprint Cobalt
+  "#15803D", // Archival Green
+  "#141413", // Obsidian Ink
+  "#B45309", // Amber Ochre
+  "#0F766E", // Deep Teal
+  "#6D28D9", // Indigo Violet
+  "#BE123C", // Crimson
+  "#475569", // Slate
 ] as const;
 
 function toFiniteNumber(v: unknown): number {
@@ -188,37 +188,37 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
     !canSwitchToPie && (activeType === "pie" || activeType === "donut") ? "bar" : activeType;
 
   return (
-    <div className="my-2.5 rounded-2xl border border-[#E6E2D8] bg-[#FAF9F5] p-3.5 shadow-2xs">
+    <div className="my-2.5 rounded-xl border border-[#E2E2DC] bg-[#F8F8F6] p-3.5">
       {/* Header + chart mode switcher */}
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h4 className="text-xs sm:text-sm font-semibold text-[#1F1E1C] leading-snug">{spec.title}</h4>
-          {spec.subtitle && <p className="text-[11px] text-[#6B665E]">{spec.subtitle}</p>}
+          <h4 className="text-xs sm:text-sm font-medium text-[#141413] leading-snug">{spec.title}</h4>
+          {spec.subtitle && <p className="text-[11px] text-[#141413]/60">{spec.subtitle}</p>}
         </div>
 
-        <div className="inline-flex items-center rounded-lg border border-[#DDD7CB] bg-white p-0.5 text-[10px] font-medium">
+        <div className="inline-flex items-center rounded-md border border-[#D8D8D0] bg-white p-0.5 text-[10px] font-medium">
           <button
             type="button"
             onClick={() => setActiveType("bar")}
             title="Bar chart"
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 transition cursor-pointer ${
-              effectiveType === "bar" ? "bg-[#1F1E1C] text-white" : "text-[#57544E] hover:bg-[#F4F2EA]"
+            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 transition duration-150 cursor-pointer ${
+              effectiveType === "bar" ? "bg-[#141413] text-white" : "text-[#141413]/70 hover:bg-[#F1F1EE]"
             }`}
           >
-            <BarChart3 className="h-3 w-3" />
+            <BarChart3 className="size-3" />
             <span>Bar</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveType("area")}
             title="Line / Area chart"
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 transition cursor-pointer ${
+            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 transition duration-150 cursor-pointer ${
               effectiveType === "line" || effectiveType === "area"
-                ? "bg-[#1F1E1C] text-white"
-                : "text-[#57544E] hover:bg-[#F4F2EA]"
+                ? "bg-[#141413] text-white"
+                : "text-[#141413]/70 hover:bg-[#F1F1EE]"
             }`}
           >
-            <TrendingUp className="h-3 w-3" />
+            <TrendingUp className="size-3" />
             <span>Line</span>
           </button>
           {canSwitchToPie && (
@@ -226,13 +226,13 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
               type="button"
               onClick={() => setActiveType("donut")}
               title="Pie / Donut chart"
-              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 transition cursor-pointer ${
+              className={`inline-flex items-center gap-1 rounded px-2 py-0.5 transition duration-150 cursor-pointer ${
                 effectiveType === "pie" || effectiveType === "donut"
-                  ? "bg-[#1F1E1C] text-white"
-                  : "text-[#57544E] hover:bg-[#F4F2EA]"
+                  ? "bg-[#141413] text-white"
+                  : "text-[#141413]/70 hover:bg-[#F1F1EE]"
               }`}
             >
-              <PieIcon className="h-3 w-3" />
+              <PieIcon className="size-3" />
               <span>Pie</span>
             </button>
           )}
@@ -241,10 +241,10 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
 
       {/* Multi-series legend */}
       {spec.series.length > 1 && (effectiveType === "bar" || effectiveType === "line" || effectiveType === "area") && (
-        <div className="mb-2 flex flex-wrap gap-3 text-[11px] text-[#4A463F]">
+        <div className="mb-2 flex flex-wrap gap-3 text-[11px] text-[#141413]/75">
           {spec.series.map((s) => (
             <span key={s.name} className="inline-flex items-center gap-1.5 font-medium">
-              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
               <span>{s.name}</span>
             </span>
           ))}
@@ -282,7 +282,7 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                     key={sl.idx}
                     d={sl.path}
                     fill={sl.color}
-                    stroke="#FAF9F5"
+                    stroke="#F8F8F6"
                     strokeWidth={2}
                     opacity={hoverIdx === null || hoverIdx === sl.idx ? 1 : 0.45}
                     onMouseEnter={() => setHoverIdx(sl.idx)}
@@ -291,13 +291,13 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                   />
                 ) : null,
               )}
-              {effectiveType === "donut" && <circle cx={80} cy={80} r={38} fill="#FAF9F5" />}
+              {effectiveType === "donut" && <circle cx={80} cy={80} r={38} fill="#F8F8F6" />}
               {effectiveType === "donut" && (
                 <>
-                  <text x={80} y={76} textAnchor="middle" className="fill-[#1F1E1C] text-[13px] font-bold">
+                  <text x={80} y={76} textAnchor="middle" className="fill-[#141413] text-[13px] font-medium tabular-nums">
                     {hovered ? formatVal(hovered.value, spec.unit) : formatVal(total, spec.unit)}
                   </text>
-                  <text x={80} y={91} textAnchor="middle" className="fill-[#6B665E] text-[9px] font-medium">
+                  <text x={80} y={91} textAnchor="middle" className="fill-[#141413]/55 text-[9px] font-medium tabular-nums">
                     {hovered ? `${hovered.pct}%` : "Total"}
                   </text>
                 </>
@@ -310,16 +310,16 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                   key={sl.idx}
                   onMouseEnter={() => setHoverIdx(sl.idx)}
                   onMouseLeave={() => setHoverIdx(null)}
-                  className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-xs transition ${
-                    hoverIdx === sl.idx ? "bg-white shadow-2xs" : ""
+                  className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs transition ${
+                    hoverIdx === sl.idx ? "bg-white" : ""
                   }`}
                 >
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: sl.color }} />
-                    <span className="truncate font-medium text-[#1F1E1C]">{sl.label}</span>
+                    <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: sl.color }} />
+                    <span className="truncate font-medium text-[#141413]">{sl.label}</span>
                   </span>
-                  <span className="shrink-0 tabular-nums text-[#57544E]">
-                    <strong className="text-[#1F1E1C]">{formatVal(sl.value, spec.unit)}</strong> ({sl.pct}%)
+                  <span className="shrink-0 tabular-nums text-[#141413]/65">
+                    <strong className="font-medium text-[#141413]">{formatVal(sl.value, spec.unit)}</strong> ({sl.pct}%)
                   </span>
                 </div>
               ))}
@@ -351,8 +351,8 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                 const val = maxVal * t;
                 return (
                   <g key={t}>
-                    <line x1={padLeft} y1={y} x2={w - padRight} y2={y} stroke="#E6E2D8" strokeDasharray="3 3" />
-                    <text x={padLeft - 6} y={y + 3} textAnchor="end" className="fill-[#8A847A] text-[9px] tabular-nums">
+                    <line x1={padLeft} y1={y} x2={w - padRight} y2={y} stroke="#E2E2DC" strokeDasharray="3 3" />
+                    <text x={padLeft - 6} y={y + 3} textAnchor="end" className="fill-[#141413]/45 text-[9px] tabular-nums">
                       {Number.isInteger(val) ? val : val.toFixed(1)}
                     </text>
                   </g>
@@ -387,7 +387,7 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                               y={by}
                               width={barW}
                               height={barH}
-                              rx={4}
+                              rx={3}
                               fill={fill}
                               opacity={hoverIdx === null || hoverIdx === i ? 1 : 0.45}
                             />
@@ -396,7 +396,7 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                                 x={bx + barW / 2}
                                 y={Math.max(10, by - 4)}
                                 textAnchor="middle"
-                                className="fill-[#4A463F] text-[9px] font-semibold tabular-nums"
+                                className="fill-[#141413]/75 text-[9px] font-medium tabular-nums"
                               >
                                 {formatVal(v)}
                               </text>
@@ -409,7 +409,7 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                           x={padLeft + colW * i + colW / 2}
                           y={h - 10}
                           textAnchor="middle"
-                          className="fill-[#57544E] text-[9px] font-medium"
+                          className="fill-[#141413]/65 text-[9px] font-medium"
                         >
                           {label.length > 11 ? `${label.slice(0, 10)}…` : label}
                         </text>
@@ -473,7 +473,7 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                       x={x}
                       y={h - 10}
                       textAnchor="middle"
-                      className="fill-[#57544E] text-[9px] font-medium"
+                      className="fill-[#141413]/65 text-[9px] font-medium"
                     >
                       {label.length > 10 ? `${label.slice(0, 9)}…` : label}
                     </text>
@@ -482,21 +482,21 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
             </svg>
 
             {/* Interactive Hover Readout */}
-            <div className="flex min-h-5 items-center justify-between rounded-lg bg-white/80 px-2.5 py-1 text-[11px] text-[#57544E] border border-[#EDE9DF]">
+            <div className="flex min-h-5 items-center justify-between rounded-lg bg-white px-2.5 py-1 text-[11px] text-[#141413]/70 border border-[#E2E2DC]">
               {hoverIdx !== null ? (
                 <>
-                  <span className="font-semibold text-[#1F1E1C]">{spec.labels[hoverIdx]}</span>
+                  <span className="font-medium text-[#141413]">{spec.labels[hoverIdx]}</span>
                   <span className="flex flex-wrap gap-3 tabular-nums">
                     {spec.series.map((s) => (
                       <span key={s.name}>
                         {spec.series.length > 1 ? `${s.name}: ` : ""}
-                        <strong className="text-[#1F1E1C]">{formatVal(s.values[hoverIdx] ?? 0, spec.unit)}</strong>
+                        <strong className="font-medium text-[#141413]">{formatVal(s.values[hoverIdx] ?? 0, spec.unit)}</strong>
                       </span>
                     ))}
                   </span>
                 </>
               ) : (
-                <span className="text-[#8A847A]">Hover a bar, point, or slice for exact values</span>
+                <span className="text-[#141413]/45">Hover a bar, point, or slice for exact values</span>
               )}
             </div>
           </div>

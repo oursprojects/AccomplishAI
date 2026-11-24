@@ -104,31 +104,31 @@ export function Toaster() {
             key={item.id}
             role={isError ? "alert" : "status"}
             className={cn(
-              "pointer-events-auto flex items-start gap-2.5 rounded-2xl border px-3.5 py-3 shadow-lg backdrop-blur-md transition-all",
+              "pointer-events-auto flex items-start gap-2.5 rounded-xl border px-3.5 py-3 shadow-lg bg-white transition-all duration-150",
               isSuccess
-                ? "border-emerald-200 bg-white/95 text-emerald-950"
+                ? "border-emerald-200 text-emerald-950"
                 : isError
-                  ? "border-red-200 bg-white/95 text-red-900"
-                  : "border-[#E6E2D8] bg-white/95 text-[#1F1E1C]",
+                  ? "border-red-200 text-red-900"
+                  : "border-[#E2E2DC] text-[#141413]",
             )}
           >
             <span className="mt-0.5 shrink-0">
               {isSuccess ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <CheckCircle2 className="size-4 text-emerald-600" />
               ) : isError ? (
-                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertCircle className="size-4 text-red-600" />
               ) : (
-                <Info className="h-4 w-4 text-[#D97757]" />
+                <Info className="size-4 text-[#1D4ED8]" />
               )}
             </span>
 
             <div className="min-w-0 flex-1 space-y-1.5">
-              <p className="text-xs sm:text-sm font-medium leading-snug">{item.message}</p>
+              <p className="text-xs sm:text-sm font-medium leading-snug text-pretty">{item.message}</p>
               {item.action && (
                 <Link
                   href={item.action.href}
                   onClick={() => dismissToast(item.id)}
-                  className="inline-flex items-center rounded-lg bg-[#1F1E1C] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#33312E] transition"
+                  className="inline-flex items-center rounded-md bg-[#141413] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#2A2A27] transition"
                 >
                   {item.action.label}
                 </Link>
@@ -139,9 +139,9 @@ export function Toaster() {
               type="button"
               onClick={() => dismissToast(item.id)}
               aria-label="Dismiss notification"
-              className="rounded-lg p-1 text-[#8A847A] hover:bg-[#F4F2EA] hover:text-[#1F1E1C] cursor-pointer shrink-0"
+              className="rounded-md p-1 text-[#141413]/45 hover:bg-[#F1F1EE] hover:text-[#141413] cursor-pointer shrink-0"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="size-3.5" />
             </button>
           </div>
         );
