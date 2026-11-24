@@ -17,6 +17,7 @@ import {
 import type { QuotaStatus } from "@/lib/admin";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { parseJsonResponse } from "@/lib/client-json";
 import { ChatMarkdown } from "./ChatMarkdown";
 
 interface GlobalChatTurn {
@@ -150,7 +151,7 @@ export function GlobalAssistantDrawer({
           messages: baseHistory.map((m) => ({ role: m.role, content: m.content })),
         }),
       });
-      const json = (await res.json()) as {
+      const json = await parseJsonResponse<{
         reply?: string;
         toolActions?: string[];
         mcpToolsUsed?: string[];
@@ -158,16 +159,16 @@ export function GlobalAssistantDrawer({
         mutated?: boolean;
         retryAfterSeconds?: number;
         error?: string;
-      };
+      }>(res);
 
       if (res.status === 429 && attempt < 1) {
-        const waitSecs = Math.max(2, Math.min(8, Number(json.retryAfterSeconds ?? 4)));
+        const waitSecs = Math.max(2, Math.min(8, Number(json?.retryAfterSeconds ?? 4)));
         await new Promise((r) => setTimeout(r, waitSecs * 1000));
         return submitPrompt(trimmed, attempt + 1);
       }
 
-      if (!res.ok || !json.reply) {
-        throw new Error(json.error ?? "Could not reach Overall AI.");
+      if (!res.ok || !json?.reply) {
+        throw new Error(json?.error ?? `Could not reach Overall AI (HTTP ${res.status}).`);
       }
 
       const assistantTurn: GlobalChatTurn = {

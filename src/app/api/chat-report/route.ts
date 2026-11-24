@@ -12,7 +12,7 @@ import {
 import { groqErrorResponse } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage } from "@/lib/ai/chat-tools";
 import { computeReportStatus } from "@/lib/mcp/accomplish-mcp-server";
-import { openAccomplishMcpSession } from "@/lib/mcp/in-memory-bridge";
+import { openAccomplishMcpSession, type AccomplishMcpSession } from "@/lib/mcp/in-memory-bridge";
 import type { Json } from "@/lib/supabase/database.types";
 import { reportDataStrictSchema, type ReportData, type ReportKey } from "@/lib/report-schema";
 
@@ -84,123 +84,125 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: body.error.issues[0]?.message ?? "Invalid chat request." }, { status: 400 });
   }
 
-  const { quota: quotaBefore, aiSettings } = await getQuotaAndAiSettings(supabase, user.id, user.email);
-  const maxChatMessages = aiSettings.maxChatMessages;
+  let mcpSession: AccomplishMcpSession | null = null;
+  try {
+    const { quota: quotaBefore, aiSettings } = await getQuotaAndAiSettings(supabase, user.id, user.email);
+    const maxChatMessages = aiSettings.maxChatMessages;
 
-  if (body.data.messages.length > maxChatMessages) {
-    return NextResponse.json(
-      {
-        error: `Conversation context limit reached (${maxChatMessages} messages). Click Clear Chat to start a fresh thread — your document fields stay safe.`,
-      },
-      { status: 400 },
-    );
-  }
+    if (body.data.messages.length > maxChatMessages) {
+      return NextResponse.json(
+        {
+          error: `Conversation context limit reached (${maxChatMessages} messages). Click Clear Chat to start a fresh thread — your document fields stay safe.`,
+        },
+        { status: 400 },
+      );
+    }
 
-  if (quotaBefore.isBlocked) {
-    return NextResponse.json(
-      { error: "Your AI prompt access is currently paused by the admin." },
-      { status: 403 },
-    );
-  }
-  if (!quotaBefore.allowed) {
-    return NextResponse.json(
-      {
-        error: `Daily AI prompt limit reached (${quotaBefore.usedToday}/${quotaBefore.dailyLimit} used today). Ask your admin to increase your limit.`,
-        quota: quotaBefore,
-      },
-      { status: 429 },
-    );
-  }
+    if (quotaBefore.isBlocked) {
+      return NextResponse.json(
+        { error: "Your AI prompt access is currently paused by the admin." },
+        { status: 403 },
+      );
+    }
+    if (!quotaBefore.allowed) {
+      return NextResponse.json(
+        {
+          error: `Daily AI prompt limit reached (${quotaBefore.usedToday}/${quotaBefore.dailyLimit} used today). Ask your admin to increase your limit.`,
+          quota: quotaBefore,
+        },
+        { status: 429 },
+      );
+    }
 
-  const burst = await checkBurstRateLimit(supabase, user.id, quotaBefore.isAdmin, aiSettings.globalRpmLimit);
-  if (!burst.allowed) {
-    return NextResponse.json(
-      {
-        error:
-          burst.reason === "global"
-            ? `High concurrent AI traffic (${burst.count}/${burst.limit} shared RPM). Retrying shortly...`
-            : `Too many requests in one minute (${burst.count}/${burst.limit} RPM). Please wait a few seconds before sending again.`,
-        retryAfterSeconds: burst.retryAfterSeconds,
-      },
-      { status: 429, headers: { "Retry-After": String(burst.retryAfterSeconds) } },
-    );
-  }
+    const burst = await checkBurstRateLimit(supabase, user.id, quotaBefore.isAdmin, aiSettings.globalRpmLimit);
+    if (!burst.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            burst.reason === "global"
+              ? `High concurrent AI traffic (${burst.count}/${burst.limit} shared RPM). Retrying shortly...`
+              : `Too many requests in one minute (${burst.count}/${burst.limit} RPM). Please wait a few seconds before sending again.`,
+          retryAfterSeconds: burst.retryAfterSeconds,
+        },
+        { status: 429, headers: { "Retry-After": String(burst.retryAfterSeconds) } },
+      );
+    }
 
-  const [{ data: profile }, { data: recentReports }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date")
-      .eq("id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("reports")
-      .select("id, title, structured_data, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(12),
-  ]);
+    const [{ data: profile }, { data: recentReports }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("reports")
+        .select("id, title, structured_data, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(12),
+    ]);
 
-  const workingData: ReportData = { ...body.data.currentData };
-  if (!workingData.intern_name_last_first && profile?.name_last_first) {
-    workingData.intern_name_last_first = profile.name_last_first.toUpperCase();
-  }
-  if (!workingData.intern_name_first_last && profile?.name_first_last) {
-    workingData.intern_name_first_last = profile.name_first_last.toUpperCase();
-  }
-  if (!workingData.office) {
-    workingData.office = profile?.office || "DNX";
-  }
+    const workingData: ReportData = { ...body.data.currentData };
+    if (!workingData.intern_name_last_first && profile?.name_last_first) {
+      workingData.intern_name_last_first = profile.name_last_first.toUpperCase();
+    }
+    if (!workingData.intern_name_first_last && profile?.name_first_last) {
+      workingData.intern_name_first_last = profile.name_first_last.toUpperCase();
+    }
+    if (!workingData.office) {
+      workingData.office = profile?.office || "DNX";
+    }
 
-  const previousReports = (recentReports ?? [])
-    .filter((r) => !body.data.reportId || r.id !== body.data.reportId)
-    .map((r) => {
-      const sd =
-        r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
-          ? (r.structured_data as Record<string, unknown>)
-          : {};
-      return {
-        id: r.id,
-        title: r.title,
-        date_from: String(sd.date_from ?? ""),
-        date_to: String(sd.date_to ?? ""),
-        hours_this_week: String(sd.hours_this_week ?? ""),
-        total_hours_worked: String(sd.total_hours_worked ?? ""),
-      };
-    });
+    const previousReports = (recentReports ?? [])
+      .filter((r) => !body.data.reportId || r.id !== body.data.reportId)
+      .map((r) => {
+        const sd =
+          r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
+            ? (r.structured_data as Record<string, unknown>)
+            : {};
+        return {
+          id: r.id,
+          title: r.title,
+          date_from: String(sd.date_from ?? ""),
+          date_to: String(sd.date_to ?? ""),
+          hours_this_week: String(sd.hours_this_week ?? ""),
+          total_hours_worked: String(sd.total_hours_worked ?? ""),
+        };
+      });
 
-  const occupiedWeekMondays = new Map<string, string>();
-  for (const prev of previousReports) {
-    const monIso = getReportWeekMondayIso(prev.date_from, prev.date_to);
-    if (monIso) occupiedWeekMondays.set(monIso, prev.title || prev.date_from);
-  }
+    const occupiedWeekMondays = new Map<string, string>();
+    for (const prev of previousReports) {
+      const monIso = getReportWeekMondayIso(prev.date_from, prev.date_to);
+      if (monIso) occupiedWeekMondays.set(monIso, prev.title || prev.date_from);
+    }
 
-  const latestPrev = previousReports[0] ?? null;
-  const prevTotalRaw = latestPrev?.total_hours_worked ?? "";
-  const prevTotalNum = parseHoursNumber(prevTotalRaw) ?? 0;
+    const latestPrev = previousReports[0] ?? null;
+    const prevTotalRaw = latestPrev?.total_hours_worked ?? "";
+    const prevTotalNum = parseHoursNumber(prevTotalRaw) ?? 0;
 
-  const startIso = profile?.internship_start_date ?? null;
-  const holidayMondays = normalizeHolidayMondays(user.user_metadata?.holiday_mondays);
-  const calendarWeeks = buildInternshipWeeks(startIso, 16, holidayMondays);
-  const currentWeekNumber = resolveWeekNumber(startIso, workingData.date_from, holidayMondays);
+    const startIso = profile?.internship_start_date ?? null;
+    const holidayMondays = normalizeHolidayMondays(user.user_metadata?.holiday_mondays);
+    const calendarWeeks = buildInternshipWeeks(startIso, 16, holidayMondays);
+    const currentWeekNumber = resolveWeekNumber(startIso, workingData.date_from, holidayMondays);
 
-  const systemPrompt = `You are **Accomplish AI**, a friendly, helpful assistant dedicated strictly to helping a student intern complete their official 1-page **"2026 Weekly Accomplishment Report"** (.docx). You are connected to the user's Supabase database through AccomplishAI's built-in **MCP tools** (\`list_reports\`, \`get_ojt_hours_summary\`, \`get_report_fields\`, \`set_report_fields\`, \`clear_report_fields\`, \`save_profile_defaults\`).
+    const systemPrompt = `You are **Accomplish AI**, a friendly, helpful assistant dedicated strictly to helping a student intern complete their official 1-page **"2026 Weekly Accomplishment Report"** (.docx). You are connected to the user's Supabase database through AccomplishAI's built-in **MCP tools** (\`list_reports\`, \`get_ojt_hours_summary\`, \`get_report_fields\`, \`set_report_fields\`, \`clear_report_fields\`, \`save_profile_defaults\`).
 
 Today's date: ${new Date().toISOString().slice(0, 10)}
 User profile defaults: ${JSON.stringify({
-    name_last_first: profile?.name_last_first ?? "",
-    name_first_last: profile?.name_first_last ?? "",
-    office: profile?.office || "DNX",
-    default_verifier: profile?.default_verifier ?? "",
-    default_daily_hours: profile?.default_daily_hours ?? 8,
-    internship_start_date: startIso,
-  })}
+      name_last_first: profile?.name_last_first ?? "",
+      name_first_last: profile?.name_first_last ?? "",
+      office: profile?.office || "DNX",
+      default_verifier: profile?.default_verifier ?? "",
+      default_daily_hours: profile?.default_daily_hours ?? 8,
+      internship_start_date: startIso,
+    })}
 Internship Mon–Fri Calendar (Week 1 begins ${startIso ?? "not set yet"}): ${JSON.stringify(
-    calendarWeeks.map((w) => ({
-      week: w.weekNumber,
-      date_from_monday: w.fromText,
-      date_to_friday: w.toText,
-    })),
-  )}
+      calendarWeeks.map((w) => ({
+        week: w.weekNumber,
+        date_from_monday: w.fromText,
+        date_to_friday: w.toText,
+      })),
+    )}
 Current report week number (from calendar): ${currentWeekNumber ?? "Unknown"}
 Previous report summary (for cumulative hours & date continuity): ${JSON.stringify(latestPrev)}
 Current report fields (exact live state): ${JSON.stringify(workingData)}
@@ -230,38 +232,37 @@ CORE BEHAVIOR & STRICT RULES:
    - Format replies in clean Markdown (**bold**, *italic*, and a compact Markdown table **only when fields were actually updated or cleared in this turn**).
    - **NEVER output \`<br>\`, \`<br/>\` or any raw HTML tags.** Separate multiple items inside a table cell with \`; \`.`;
 
-  const recentMessages = body.data.messages.slice(-10);
-  const loopMessages: GroqMessage[] = [
-    { role: "system", content: systemPrompt },
-    ...recentMessages.map((m) => ({ role: m.role, content: m.content })),
-  ];
+    const recentMessages = body.data.messages.slice(-10);
+    const loopMessages: GroqMessage[] = [
+      { role: "system", content: systemPrompt },
+      ...recentMessages.map((m) => ({ role: m.role, content: m.content })),
+    ];
 
-  const updatedKeys = new Set<ReportKey>();
-  const toolActions: string[] = [];
-  let usedModel = "";
-  let didMutateThisTurn = false;
-  let forcedToolRetryUsed = false;
-  let nextToolChoice: "auto" | "required" = "auto";
+    const updatedKeys = new Set<ReportKey>();
+    const toolActions: string[] = [];
+    let usedModel = "";
+    let didMutateThisTurn = false;
+    let forcedToolRetryUsed = false;
+    let nextToolChoice: "auto" | "required" = "auto";
 
-  const mcpSession = await openAccomplishMcpSession({
-    supabase,
-    user,
-    reportId: body.data.reportId,
-    workingData,
-    maxBulletsPerDay: aiSettings.maxBulletsPerDay,
-    startIso,
-    holidayMondays,
-    defaultVerifier: profile?.default_verifier ?? "",
-    prevTotalNum,
-    occupiedWeekMondays,
-    updatedKeys,
-    toolActions,
-    onMutate: () => {
-      didMutateThisTurn = true;
-    },
-  });
+    mcpSession = await openAccomplishMcpSession({
+      supabase,
+      user,
+      reportId: body.data.reportId,
+      workingData,
+      maxBulletsPerDay: aiSettings.maxBulletsPerDay,
+      startIso,
+      holidayMondays,
+      defaultVerifier: profile?.default_verifier ?? "",
+      prevTotalNum,
+      occupiedWeekMondays,
+      updatedKeys,
+      toolActions,
+      onMutate: () => {
+        didMutateThisTurn = true;
+      },
+    });
 
-  try {
     for (let step = 0; step < 5; step++) {
       const { completion, model } = await groqChatWithTools({
         messages: loopMessages,
@@ -397,6 +398,7 @@ CORE BEHAVIOR & STRICT RULES:
       quota: quotaAfter,
     });
   } catch (err) {
+    console.error("[chat-report]", err);
     const mapped = groqErrorResponse(err);
     return NextResponse.json(
       {
@@ -409,6 +411,6 @@ CORE BEHAVIOR & STRICT RULES:
       },
     );
   } finally {
-    await mcpSession.close();
+    await mcpSession?.close();
   }
 }

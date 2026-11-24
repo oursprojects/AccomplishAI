@@ -12,6 +12,7 @@ import {
   Undo2,
 } from "lucide-react";
 import type { QuotaStatus } from "@/lib/admin";
+import { parseJsonResponse } from "@/lib/client-json";
 import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
 import { ReportPenIcon } from "@/components/icons/AccomplishIcons";
 import { Badge } from "@/components/ui/badge";
@@ -123,7 +124,7 @@ export function ReportChat({
           currentData: data,
         }),
       });
-      const json = (await res.json()) as {
+      const json = await parseJsonResponse<{
         reply?: string;
         structuredData?: ReportData;
         updatedKeys?: ReportKey[];
@@ -132,19 +133,19 @@ export function ReportChat({
         quota?: QuotaStatus;
         retryAfterSeconds?: number;
         error?: string;
-      };
-      if (json.quota) onQuotaChange(json.quota);
+      }>(res);
+      if (json?.quota) onQuotaChange(json.quota);
 
       if (res.status === 429 && attempt < 1) {
-        const waitSecs = Math.max(2, Math.min(8, Number(json.retryAfterSeconds ?? 4)));
+        const waitSecs = Math.max(2, Math.min(8, Number(json?.retryAfterSeconds ?? 4)));
         setQueueNotice(`High concurrent traffic — retrying automatically in ${waitSecs}s...`);
         await new Promise((r) => setTimeout(r, waitSecs * 1000));
         setQueueNotice(null);
         return submitHistory(nextHistory, attempt + 1);
       }
 
-      if (!res.ok || !json.reply) {
-        throw new Error(json.error ?? "Could not reach AI assistant.");
+      if (!res.ok || !json?.reply) {
+        throw new Error(json?.error ?? `Could not reach AI assistant (HTTP ${res.status}).`);
       }
 
       if (json.structuredData && JSON.stringify(json.structuredData) !== JSON.stringify(data)) {

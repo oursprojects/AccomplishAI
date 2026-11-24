@@ -272,13 +272,21 @@ export async function checkBurstRateLimit(
     rpc: (fn: string) => Promise<{ data: unknown; error: { message?: string } | null }>;
   };
 
+  const readGlobalRpmRpc = async () => {
+    try {
+      return await rpcInvoker.rpc("get_global_rpm_count");
+    } catch {
+      return { data: null, error: { message: "unavailable" } };
+    }
+  };
+
   const [{ count: userCount }, rpcGlobal, { count: visibleGlobalCount }] = await Promise.all([
     supabase
       .from("prompt_usage_logs")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("created_at", oneMinAgo),
-    rpcInvoker.rpc("get_global_rpm_count").catch(() => ({ data: null, error: { message: "unavailable" } })),
+    readGlobalRpmRpc(),
     supabase
       .from("prompt_usage_logs")
       .select("id", { count: "exact", head: true })
