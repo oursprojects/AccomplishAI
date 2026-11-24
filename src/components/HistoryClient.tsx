@@ -47,6 +47,8 @@ import { DAYS, type ReportData } from "@/lib/report-schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { NumberTicker } from "@/components/magicui/number-ticker";
 import {
   Dialog,
   DialogContent,
@@ -567,15 +569,10 @@ export function HistoryClient({
               <span>OJT Hours Progress</span>
             </span>
             <span className="text-xs font-mono font-semibold text-[#141413]">
-              {ojtStats.completed} / {targetOjtHours} hrs ({ojtStats.pct}%)
+              <NumberTicker value={ojtStats.completed} /> / {targetOjtHours} hrs ({ojtStats.pct}%)
             </span>
           </div>
-          <div className="h-2 w-full rounded-full bg-[#F1F1EE] overflow-hidden">
-            <div
-              className="h-full rounded-full bg-[#1D4ED8] transition-all"
-              style={{ width: `${ojtStats.pct}%` }}
-            />
-          </div>
+          <Progress value={ojtStats.pct} className="h-2" />
           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#5C5C57]">
             <span>
               {ojtStats.remaining === 0

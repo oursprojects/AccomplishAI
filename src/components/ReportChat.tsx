@@ -2,18 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Check,
   Copy,
   Database,
   Eraser,
   Eye,
-  Send,
   Undo2,
 } from "lucide-react";
 import type { QuotaStatus } from "@/lib/admin";
 import { parseJsonResponse } from "@/lib/client-json";
 import { DAYS, type ReportData, type ReportKey } from "@/lib/report-schema";
 import { ReportPenIcon } from "@/components/icons/AccomplishIcons";
+import { AnimatedCheckIcon, AnimatedSendIcon } from "@/components/icons/AnimatedIcons";
+import { AnimatedShinyText } from "@/components/magicui/animated-shiny-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -288,7 +288,7 @@ export function ReportChat({
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {m.toolActions?.map((act, idx) => (
                   <Badge key={idx} variant="success" className="font-medium">
-                    <Check className="size-3" />
+                    <AnimatedCheckIcon className="size-3" />
                     {act}
                   </Badge>
                 ))}
@@ -310,7 +310,7 @@ export function ReportChat({
                     className="inline-flex items-center gap-1 rounded-md border border-[#D8D8D0] bg-white px-2 py-0.5 text-[11px] font-medium text-[#141413]/70 hover:bg-[#F1F1EE] cursor-pointer"
                     title="Copy reply"
                   >
-                    {copiedId === m.id ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                    {copiedId === m.id ? <AnimatedCheckIcon className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
                     <span>{copiedId === m.id ? "Copied" : "Copy"}</span>
                   </button>
                 )}
@@ -331,9 +331,9 @@ export function ReportChat({
 
         {sending && (
           <div className="flex items-start">
-            <div className="inline-flex items-center gap-2 rounded-xl rounded-bl-xs border border-[#E2E2DC] bg-white px-3.5 py-2 text-xs text-[#141413]/65 animate-pulse">
+            <div className="inline-flex items-center gap-2 rounded-xl rounded-bl-xs border border-[#E2E2DC] bg-white px-3.5 py-2 text-xs">
               <ReportPenIcon className="size-3.5 text-[#1D4ED8]" />
-              <span>{queueNotice ?? THINKING_PHRASES[thinkingIdx]}</span>
+              <AnimatedShinyText>{queueNotice ?? THINKING_PHRASES[thinkingIdx]}</AnimatedShinyText>
             </div>
           </div>
         )}
@@ -392,7 +392,7 @@ export function ReportChat({
               disabled={composerDisabled || !input.trim()}
               className="h-8 px-3"
             >
-              <Send className="size-3.5" />
+              <AnimatedSendIcon className="size-3.5" />
               <span>{sending ? "…" : "Send"}</span>
             </Button>
           </div>

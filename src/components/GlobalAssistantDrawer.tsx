@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
-  Check,
   Copy,
   Database,
   Download,
@@ -22,9 +21,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
-  RefreshCw,
   Search,
-  Send,
   Slash,
   Square,
   Trash2,
@@ -33,6 +30,12 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+import {
+  AnimatedCheckIcon,
+  AnimatedRefreshIcon,
+  AnimatedSendIcon,
+} from "@/components/icons/AnimatedIcons";
+import { AnimatedShinyText } from "@/components/magicui/animated-shiny-text";
 import type { QuotaStatus } from "@/lib/admin";
 import { exportChatFile } from "@/lib/chat-file-export";
 import {
@@ -874,7 +877,7 @@ export function GlobalAssistantDrawer({
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {m.toolActions?.map((act, idx) => (
                     <Badge key={idx} variant="success" className="font-medium">
-                      <Check className="size-3" />
+                      <AnimatedCheckIcon className="size-3" />
                       {act}
                     </Badge>
                   ))}
@@ -901,7 +904,11 @@ export function GlobalAssistantDrawer({
                         onClick={() => void handleCopy(m.id, m.content)}
                         className="inline-flex items-center gap-1 rounded-md border border-[#D8D8D0] bg-white px-2 py-0.5 text-[11px] font-medium text-[#141413]/70 hover:bg-[#F1F1EE] cursor-pointer"
                       >
-                        {copiedId === m.id ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                        {copiedId === m.id ? (
+                          <AnimatedCheckIcon className="size-3 text-emerald-600" />
+                        ) : (
+                          <Copy className="size-3" />
+                        )}
                         <span>{copiedId === m.id ? "Copied" : "Copy"}</span>
                       </button>
                       <button
@@ -926,7 +933,7 @@ export function GlobalAssistantDrawer({
                       onClick={() => void handleRegenerate()}
                       className="inline-flex items-center gap-1 rounded-md border border-[#D8D8D0] bg-white px-2 py-0.5 text-[11px] font-medium text-[#141413]/70 hover:bg-[#F1F1EE] cursor-pointer disabled:opacity-50"
                     >
-                      <RefreshCw className="size-3" />
+                      <AnimatedRefreshIcon className="size-3" />
                       <span>Regenerate</span>
                     </button>
                   )}
@@ -938,9 +945,9 @@ export function GlobalAssistantDrawer({
 
           {sending && (
             <div className="flex items-start">
-              <div className="inline-flex items-center gap-2 rounded-xl rounded-bl-xs border border-[#E2E2DC] bg-white px-3.5 py-2 text-xs text-[#141413]/65 animate-pulse">
+              <div className="inline-flex items-center gap-2 rounded-xl rounded-bl-xs border border-[#E2E2DC] bg-white px-3.5 py-2 text-xs text-[#141413]/65">
                 <Loader2 className="size-3.5 animate-spin text-[#1D4ED8]" />
-                <span>{THINKING_PHRASES[thinkingIdx]}</span>
+                <AnimatedShinyText className="text-xs font-medium">{THINKING_PHRASES[thinkingIdx]}</AnimatedShinyText>
               </div>
             </div>
           )}
@@ -955,7 +962,7 @@ export function GlobalAssistantDrawer({
                 onClick={() => void runChatTurn(messages)}
                 className="inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-0.5 text-[11px] font-medium text-red-700 hover:bg-red-100 shrink-0 cursor-pointer"
               >
-                <RefreshCw className="size-3" />
+                <AnimatedRefreshIcon className="size-3" />
                 <span>Retry</span>
               </button>
             )}
@@ -1102,7 +1109,7 @@ export function GlobalAssistantDrawer({
                   disabled={blocked || (!input.trim() && attachments.length === 0)}
                   className="h-8 px-3"
                 >
-                  <Send className="size-3.5" />
+                  <AnimatedSendIcon className="size-3.5" />
                   <span>Ask</span>
                 </Button>
               )}

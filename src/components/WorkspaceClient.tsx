@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  Check,
   ClipboardPaste,
   Edit3,
   Eye,
@@ -21,8 +20,11 @@ import type { Profile } from "@/lib/supabase/database.types";
 import type { TemplateReview } from "@/lib/templates/pipeline";
 import type { QuotaStatus } from "@/lib/admin";
 import { AccomplishCheckIcon } from "@/components/icons/AccomplishIcons";
+import { AnimatedCheckIcon } from "@/components/icons/AnimatedIcons";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -444,15 +446,15 @@ export function WorkspaceClient({
             </Button>
           )}
           <Button type="button" size="sm" onClick={handleSave} disabled={workspaceBusy || !hasChanges}>
-            {hasChanges ? <Save className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+            {hasChanges ? <Save className="h-3.5 w-3.5" /> : <AnimatedCheckIcon className="h-3.5 w-3.5" />}
             <span>{saving ? "Saving..." : !hasChanges ? "Saved" : "Save"}</span>
           </Button>
         </div>
       </div>
 
       {review.template.status === "pending_review" && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#1D4ED8]/30 bg-[#EFF4FF] px-4 py-2.5 text-xs sm:text-sm text-[#141413]">
-          <span className="inline-flex items-center gap-2">
+        <Alert variant="accent" className="flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-2.5">
+          <span className="inline-flex items-center gap-2 text-xs sm:text-sm">
             <AccomplishCheckIcon className="h-4 w-4 text-[#1E40AF] shrink-0" />
             <span>
               Auto-detected <strong>{review.fields.length} fields</strong> from{" "}
@@ -460,58 +462,48 @@ export function WorkspaceClient({
             </span>
           </span>
           <div className="flex items-center gap-3 shrink-0">
-            <Link href="/template" className="font-medium underline underline-offset-4 text-[#1E40AF]">
+            <Link href="/template" className="text-xs sm:text-sm font-medium underline underline-offset-4 text-[#1E40AF]">
               Review Fields
             </Link>
             <Button type="button" size="sm" variant="accent" disabled={confirming} onClick={handleQuickConfirm}>
               {confirming ? "Saving..." : "Looks Good"}
             </Button>
           </div>
-        </div>
+        </Alert>
       )}
 
       {profileMissingName && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-2.5 text-xs sm:text-sm text-amber-900">
-          <span>Tip: Set your default intern name &amp; verifier in Profile so new reports pre-fill automatically.</span>
-          <Link href="/profile" className="font-semibold underline underline-offset-4">
+        <Alert variant="warning" className="flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-2.5">
+          <AlertDescription className="text-xs sm:text-sm text-amber-900 opacity-100">
+            Tip: Set your default intern name &amp; verifier in Profile so new reports pre-fill automatically.
+          </AlertDescription>
+          <Link href="/profile" className="text-xs sm:text-sm font-semibold underline underline-offset-4 text-amber-950">
             Open Profile
           </Link>
-        </div>
+        </Alert>
       )}
 
       {/* Mobile & tablet tab bar — Live Preview is front and center alongside Chat & Edit */}
-      <div className="lg:hidden sticky top-[53px] z-20 grid grid-cols-3 gap-1 rounded-2xl border border-[#E2E2DC] bg-white/95 backdrop-blur p-1 shadow-xs">
-        <button
-          type="button"
-          onClick={() => setTab("preview")}
-          className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-            tab === "preview" ? "bg-[#141413] text-white shadow-2xs" : "text-[#52524E] hover:bg-[#F1F1EE]"
-          }`}
-        >
-          <Eye className="h-3.5 w-3.5" />
-          <span>Document</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("chat")}
-          className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-            tab === "chat" ? "bg-[#141413] text-white shadow-2xs" : "text-[#52524E] hover:bg-[#F1F1EE]"
-          }`}
-        >
-          <MessageSquareText className="h-3.5 w-3.5" />
-          <span>AI Chat</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("edit")}
-          className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-            tab === "edit" ? "bg-[#141413] text-white shadow-2xs" : "text-[#52524E] hover:bg-[#F1F1EE]"
-          }`}
-        >
-          <Edit3 className="h-3.5 w-3.5" />
-          <span>Edit Fields</span>
-        </button>
-      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as WorkspaceTab)}
+        className="lg:hidden sticky top-[53px] z-20"
+      >
+        <TabsList className="grid w-full grid-cols-3 gap-1 rounded-2xl bg-white/95 backdrop-blur p-1 shadow-xs h-auto">
+          <TabsTrigger value="preview" className="min-h-[40px] rounded-xl py-2 font-semibold">
+            <Eye className="h-3.5 w-3.5" />
+            <span>Document</span>
+          </TabsTrigger>
+          <TabsTrigger value="chat" className="min-h-[40px] rounded-xl py-2 font-semibold">
+            <MessageSquareText className="h-3.5 w-3.5" />
+            <span>AI Chat</span>
+          </TabsTrigger>
+          <TabsTrigger value="edit" className="min-h-[40px] rounded-xl py-2 font-semibold">
+            <Edit3 className="h-3.5 w-3.5" />
+            <span>Edit Fields</span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Main Focus Column: Live 1-Page DOCX Preview (first on desktop left/center or right? Let's place prominent lg:col-span-7 on the left/main area OR responsive order-1 / lg:order-2!) */}
@@ -531,28 +523,22 @@ export function WorkspaceClient({
 
         {/* Interactive Chat + Manual Edit Column */}
         <div className="lg:col-span-5 lg:order-1 space-y-3.5">
-          <div className="hidden lg:grid grid-cols-2 rounded-2xl border border-[#E2E2DC] bg-white p-1 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setDesktopLeftMode("chat")}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-                desktopLeftMode === "chat" ? "bg-[#141413] text-white" : "text-[#52524E] hover:bg-[#F1F1EE]"
-              }`}
-            >
-              <MessageSquareText className="h-3.5 w-3.5" />
-              <span>AI Assistant</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDesktopLeftMode("edit")}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold transition cursor-pointer ${
-                desktopLeftMode === "edit" ? "bg-[#141413] text-white" : "text-[#52524E] hover:bg-[#F1F1EE]"
-              }`}
-            >
-              <Edit3 className="h-3.5 w-3.5" />
-              <span>Manual Edit</span>
-            </button>
-          </div>
+          <Tabs
+            value={desktopLeftMode}
+            onValueChange={(value) => setDesktopLeftMode(value as "chat" | "edit")}
+            className="hidden lg:block"
+          >
+            <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-2xs h-auto">
+              <TabsTrigger value="chat" className="gap-2 rounded-xl py-2 font-semibold">
+                <MessageSquareText className="h-3.5 w-3.5" />
+                <span>AI Assistant</span>
+              </TabsTrigger>
+              <TabsTrigger value="edit" className="gap-2 rounded-xl py-2 font-semibold">
+                <Edit3 className="h-3.5 w-3.5" />
+                <span>Manual Edit</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <div
             className={`${tab === "chat" ? "block" : "hidden"} ${

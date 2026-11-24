@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileSpreadsheet, FileText, FileType2, Loader2 } from "lucide-react";
+import { FileSpreadsheet, FileText, FileType2, Loader2 } from "lucide-react";
+import { AnimatedDownloadIcon } from "@/components/icons/AnimatedIcons";
 import { exportChatFile, type ChatFileSpec, type ExportFileFormat } from "@/lib/chat-file-export";
 
 const FORMAT_META: Record<
@@ -96,7 +97,7 @@ export function ChatFileExport({ spec }: { spec: ChatFileSpec }) {
           {downloadingFormat === spec.format ? (
             <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <Download className="size-3.5" />
+            <AnimatedDownloadIcon className="size-3.5" />
           )}
           <span>{`Download ${primary.ext.toUpperCase()}`}</span>
         </button>

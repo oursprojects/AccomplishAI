@@ -12,13 +12,17 @@ import {
   ExternalLink,
   FileCheck2,
   FilePlus2,
-  FileText,
   FolderKanban,
   Gauge,
   Loader2,
   Target,
   UserRound,
 } from "lucide-react";
+import { AnimatedFileTextIcon } from "@/components/icons/AnimatedIcons";
+import { BlurFade } from "@/components/magicui/blur-fade";
+import { NumberTicker } from "@/components/magicui/number-ticker";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import type { QuotaStatus } from "@/lib/admin";
 import {
   buildInternshipWeeks,
@@ -242,16 +246,16 @@ export function DashboardClient({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <Link
-            href="/"
-            aria-disabled={isBusy}
-            className={`inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#D8D8D0] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#141413] hover:bg-[#F1F1EE] transition ${
-              isBusy ? "pointer-events-none opacity-50" : ""
-            }`}
+          <Button
+            asChild
+            variant="outline"
+            className={isBusy ? "pointer-events-none opacity-50" : undefined}
           >
-            <FolderKanban className="h-4 w-4 text-[#1D4ED8]" />
-            <span>My Reports</span>
-          </Link>
+            <Link href="/" aria-disabled={isBusy}>
+              <FolderKanban className="h-4 w-4 text-[#1D4ED8]" />
+              <span>My Reports</span>
+            </Link>
+          </Button>
           <Button
             type="button"
             variant="accent"
@@ -285,136 +289,142 @@ export function DashboardClient({
       {(needsProfileSetup || templateStatus !== "confirmed") && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {needsProfileSetup && (
-            <Card className="p-3.5 bg-amber-50/80 border-amber-200 flex items-center justify-between gap-3">
+            <Alert variant="warning" className="items-center justify-between gap-3 p-3.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <UserRound className="h-4 w-4 text-amber-700 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-amber-950">Complete Intern Profile</p>
-                  <p className="text-[11px] text-amber-800 truncate">
+                  <AlertTitle className="text-xs font-semibold text-amber-950">
+                    Complete Intern Profile
+                  </AlertTitle>
+                  <AlertDescription className="text-[11px] text-amber-800 truncate opacity-100">
                     Save your full name &amp; verifier to auto-fill every week.
-                  </p>
+                  </AlertDescription>
                 </div>
               </div>
-              <Link
-                href="/profile"
-                className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-amber-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-800 transition"
-              >
-                <span>Setup</span>
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </Card>
+              <Button asChild size="sm" className="shrink-0 bg-amber-900 text-white hover:bg-amber-800">
+                <Link href="/profile">
+                  <span>Setup</span>
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            </Alert>
           )}
 
           {templateStatus !== "confirmed" && (
-            <Card className="p-3.5 bg-[#EFF4FF] border-[#C7D7FE] flex items-center justify-between gap-3">
+            <Alert variant="accent" className="items-center justify-between gap-3 p-3.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <FileCheck2 className="h-4 w-4 text-[#1E40AF] shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-[#141413]">
+                  <AlertTitle className="text-xs font-semibold text-[#141413]">
                     {templateStatus === "pending_review" ? "Confirm Word Template" : "Scan Word Template"}
-                  </p>
-                  <p className="text-[11px] text-[#52524E] truncate">
+                  </AlertTitle>
+                  <AlertDescription className="text-[11px] text-[#52524E] truncate opacity-100">
                     {templateName ?? "2026-Weekly-Accomplishment-Report.docx"}
-                  </p>
+                  </AlertDescription>
                 </div>
               </div>
-              <Link
-                href="/template"
-                className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-[#1D4ED8] px-2.5 py-1.5 text-xs font-medium text-white hover:bg-[#1E40AF] transition"
-              >
-                <span>Review</span>
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </Card>
+              <Button asChild size="sm" variant="accent" className="shrink-0">
+                <Link href="/template">
+                  <span>Review</span>
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            </Alert>
           )}
         </div>
       )}
 
       {/* 4 KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
-            <span>OJT Hours Completed</span>
-            <Target className="size-4 text-[#1D4ED8]" />
-          </div>
-          <p className="text-2xl font-light tracking-tight text-[#141413] tabular-nums">
-            {stats.completedHours}{" "}
-            <span className="text-xs font-normal text-[#5C5C57]">/ {stats.target} hrs</span>
-          </p>
-          <div className="h-1.5 w-full rounded-full bg-[#F1F1EE] overflow-hidden">
-            <div className="h-full rounded-full bg-[#1D4ED8] transition-all" style={{ width: `${stats.ojtPct}%` }} />
-          </div>
-          <p className="text-[11px] text-[#5C5C57] tabular-nums">
-            {stats.remainingHours === 0
-              ? "Target OJT hours completed!"
-              : `${stats.ojtPct}% · ${stats.remainingHours} hrs left (~${stats.estWeeksLeft} wk${stats.estWeeksLeft === 1 ? "" : "s"})`}
-          </p>
-        </Card>
+        <BlurFade delay={0.02}>
+          <Card className="p-4 space-y-2 h-full">
+            <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
+              <span>OJT Hours Completed</span>
+              <Target className="size-4 text-[#1D4ED8]" />
+            </div>
+            <p className="text-2xl font-light tracking-tight text-[#141413] tabular-nums">
+              <NumberTicker value={stats.completedHours} />{" "}
+              <span className="text-xs font-normal text-[#5C5C57]">/ {stats.target} hrs</span>
+            </p>
+            <Progress value={stats.ojtPct} className="h-1.5" />
+            <p className="text-[11px] text-[#5C5C57] tabular-nums">
+              {stats.remainingHours === 0
+                ? "Target OJT hours completed!"
+                : `${stats.ojtPct}% · ${stats.remainingHours} hrs left (~${stats.estWeeksLeft} wk${stats.estWeeksLeft === 1 ? "" : "s"})`}
+            </p>
+          </Card>
+        </BlurFade>
 
-        <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
-            <span>Saved Reports</span>
-            <FileText className="size-4 text-[#1D4ED8]" />
-          </div>
-          <p className="text-2xl font-light tracking-tight text-[#141413] tabular-nums">
-            {reports.length}
-            {quota.maxReports !== null && (
-              <span className="text-xs font-normal text-[#5C5C57]"> / {quota.maxReports}</span>
+        <BlurFade delay={0.06}>
+          <Card className="p-4 space-y-2 h-full">
+            <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
+              <span>Saved Reports</span>
+              <AnimatedFileTextIcon className="size-4 text-[#1D4ED8]" />
+            </div>
+            <p className="text-2xl font-light tracking-tight text-[#141413] tabular-nums">
+              <NumberTicker value={reports.length} />
+              {quota.maxReports !== null && (
+                <span className="text-xs font-normal text-[#5C5C57]"> / {quota.maxReports}</span>
+              )}
+            </p>
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <Badge variant="success" className="text-[10px]">
+                {stats.readyCount} Ready
+              </Badge>
+              <Badge variant="warning" className="text-[10px]">
+                {stats.draftCount} Draft
+              </Badge>
+            </div>
+          </Card>
+        </BlurFade>
+
+        <BlurFade delay={0.1}>
+          <Card className="p-4 space-y-2 h-full">
+            <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
+              <span>AI Prompts Today</span>
+              <Gauge className="size-4 text-[#1D4ED8]" />
+            </div>
+            <p className="text-2xl font-light tracking-tight text-[#141413] tabular-nums">
+              {quota.isAdmin ? "Unlimited" : <NumberTicker value={quota.remaining} />}
+              {!quota.isAdmin && (
+                <span className="text-xs font-normal text-[#5C5C57]"> / {quota.dailyLimit}</span>
+              )}
+            </p>
+            <p className="text-[11px] text-[#5C5C57]">
+              {quota.isBlocked
+                ? "AI access paused by admin"
+                : quota.isAdmin
+                  ? "Admin unlimited access"
+                  : `${quota.usedToday} used today · resets 12 AM Manila`}
+            </p>
+          </Card>
+        </BlurFade>
+
+        <BlurFade delay={0.14}>
+          <Card className="p-4 space-y-2 h-full">
+            <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
+              <span>Next Report Week</span>
+              <CalendarDays className="size-4 text-[#1D4ED8]" />
+            </div>
+            {nextWeekPreview ? (
+              <>
+                <p className="text-xl font-light tracking-tight text-[#141413] tabular-nums">
+                  Week {nextWeekPreview.weekNumber}
+                </p>
+                <p className="text-[11px] text-[#5C5C57]">
+                  {nextWeekPreview.fromText} – {nextWeekPreview.toText}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-base font-medium text-[#141413]">No Start Date Yet</p>
+                <Link href="/profile" className="inline-block text-[11px] font-medium text-[#1E40AF] hover:underline">
+                  Set Week 1 date in Profile →
+                </Link>
+              </>
             )}
-          </p>
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <Badge variant="success" className="text-[10px]">
-              {stats.readyCount} Ready
-            </Badge>
-            <Badge variant="warning" className="text-[10px]">
-              {stats.draftCount} Draft
-            </Badge>
-          </div>
-        </Card>
-
-        <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
-            <span>AI Prompts Today</span>
-            <Gauge className="size-4 text-[#1D4ED8]" />
-          </div>
-          <p className="text-2xl font-light tracking-tight text-[#141413] tabular-nums">
-            {quota.isAdmin ? "Unlimited" : quota.remaining}
-            {!quota.isAdmin && (
-              <span className="text-xs font-normal text-[#5C5C57]"> / {quota.dailyLimit}</span>
-            )}
-          </p>
-          <p className="text-[11px] text-[#5C5C57]">
-            {quota.isBlocked
-              ? "AI access paused by admin"
-              : quota.isAdmin
-                ? "Admin unlimited access"
-                : `${quota.usedToday} used today · resets 12 AM Manila`}
-          </p>
-        </Card>
-
-        <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
-            <span>Next Report Week</span>
-            <CalendarDays className="size-4 text-[#1D4ED8]" />
-          </div>
-          {nextWeekPreview ? (
-            <>
-              <p className="text-xl font-light tracking-tight text-[#141413] tabular-nums">
-                Week {nextWeekPreview.weekNumber}
-              </p>
-              <p className="text-[11px] text-[#5C5C57]">
-                {nextWeekPreview.fromText} – {nextWeekPreview.toText}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-base font-medium text-[#141413]">No Start Date Yet</p>
-              <Link href="/profile" className="inline-block text-[11px] font-medium text-[#1E40AF] hover:underline">
-                Set Week 1 date in Profile →
-              </Link>
-            </>
-          )}
-        </Card>
+          </Card>
+        </BlurFade>
       </div>
 
       {/* Middle grid: Hours Bar Chart + Schedule Overview */}

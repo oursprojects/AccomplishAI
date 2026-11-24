@@ -6,23 +6,25 @@ import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Clock,
-  FileCheck2,
   FilePlus2,
-  FolderKanban,
-  LayoutDashboard,
   Loader2,
   LogOut,
   Menu,
-  MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
-  ShieldCheck,
-  UserRound,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { QuotaStatus } from "@/lib/admin";
 import { QuotaGaugeIcon } from "@/components/icons/AccomplishIcons";
+import {
+  AnimatedDashboardIcon,
+  AnimatedFileTextIcon,
+  AnimatedMessageCircleIcon,
+  AnimatedShieldIcon,
+  AnimatedUserIcon,
+} from "@/components/icons/AnimatedIcons";
+import { BorderBeam } from "@/components/magicui/border-beam";
 import { GlobalAssistantDrawer } from "@/components/GlobalAssistantDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,20 +36,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/toast";
 
 interface NavItem {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; active?: boolean }>;
   matchPrefix?: string;
 }
 
 const BASE_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/", label: "My Reports", icon: FolderKanban, matchPrefix: "/reports" },
-  { href: "/template", label: "Template", icon: FileCheck2 },
-  { href: "/profile", label: "Profile", icon: UserRound },
+  { href: "/dashboard", label: "Dashboard", icon: AnimatedDashboardIcon },
+  { href: "/", label: "My Reports", icon: AnimatedFileTextIcon, matchPrefix: "/reports" },
+  { href: "/template", label: "Template", icon: AnimatedFileTextIcon },
+  { href: "/profile", label: "Profile", icon: AnimatedUserIcon },
 ];
 
 function formatClockSnapshot(compact: boolean): string {
@@ -174,7 +178,7 @@ export function AppShell({
   const router = useRouter();
   const isAdmin = quota?.isAdmin ?? false;
   const navItems: NavItem[] = isAdmin
-    ? [...BASE_NAV, { href: "/admin", label: "Admin", icon: ShieldCheck }]
+    ? [...BASE_NAV, { href: "/admin", label: "Admin", icon: AnimatedShieldIcon }]
     : BASE_NAV;
 
   const [collapsed, setCollapsed] = useState(false);
@@ -381,7 +385,7 @@ export function AppShell({
                           : "text-[#141413]/70 hover:bg-[#E7E7E2]/70 hover:text-[#141413]"
                       }`}
                     >
-                      <Icon className={`size-4 ${active ? "text-[#1D4ED8]" : "text-[#141413]/45"}`} />
+                      <Icon active={active} className={`size-4 ${active ? "text-[#1D4ED8]" : "text-[#141413]/45"}`} />
                       <span>{item.label}</span>
                       <NavPendingSpinner />
                     </Link>
@@ -495,7 +499,7 @@ export function AppShell({
                       : "text-[#141413]/70 hover:bg-[#E7E7E2]/70 hover:text-[#141413]"
                   }`}
                 >
-                  <Icon className={`size-4 shrink-0 ${active ? "text-[#1D4ED8]" : "text-[#141413]/45"}`} />
+                  <Icon active={active} className={`size-4 shrink-0 ${active ? "text-[#1D4ED8]" : "text-[#141413]/45"}`} />
                   {!collapsed && <span className="truncate">{item.label}</span>}
                   {!collapsed && <NavPendingSpinner />}
                 </Link>
@@ -504,7 +508,8 @@ export function AppShell({
           </nav>
         </div>
 
-        <div className="border-t border-[#E2E2DC] pt-3 space-y-2">
+        <div className="pt-2 space-y-2">
+          <Separator />
           {!collapsed && (
             <div className="rounded-lg bg-white border border-[#E2E2DC] px-3 py-2">
               <div className="flex items-center justify-between gap-1.5">
@@ -567,19 +572,24 @@ export function AppShell({
 
       {/* Persistent Floating AI Chat Bubble across all workspace pages */}
       {!globalAiOpen && (
-        <button
-          type="button"
-          onClick={() => setGlobalAiOpen(true)}
-          title="Open Overall Accomplish AI (Ctrl+K)"
-          aria-label="Open Overall Accomplish AI chat bubble"
-          className="fixed bottom-[max(1.125rem,env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 inline-flex items-center justify-center gap-2 rounded-full bg-[#1D4ED8] text-white size-12 sm:w-auto sm:h-11 sm:px-4 shadow-lg ring-1 ring-black/10 hover:bg-[#1E40AF] active:scale-[0.98] transition duration-150 cursor-pointer"
-        >
-          <MessageCircle className="size-4.5" />
-          <span className="hidden sm:inline text-xs font-medium">Overall AI</span>
-          <kbd className="hidden lg:inline-flex items-center rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] font-medium text-white">
-            Ctrl K
-          </kbd>
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => setGlobalAiOpen(true)}
+              aria-label="Open Overall Accomplish AI chat bubble"
+              className="fixed bottom-[max(1.125rem,env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 inline-flex items-center justify-center gap-2 overflow-hidden rounded-full bg-[#1D4ED8] text-white size-12 sm:w-auto sm:h-11 sm:px-4 shadow-lg ring-1 ring-black/10 hover:bg-[#1E40AF] active:scale-[0.98] transition duration-150 cursor-pointer"
+            >
+              <BorderBeam duration={4.5} colorFrom="#FFFFFF" colorTo="#93C5FD" />
+              <AnimatedMessageCircleIcon className="size-4.5 relative z-10" />
+              <span className="hidden sm:inline text-xs font-medium relative z-10">Overall AI</span>
+              <kbd className="hidden lg:inline-flex items-center rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] font-medium text-white relative z-10">
+                Ctrl K
+              </kbd>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left">Open Overall AI (Ctrl+K)</TooltipContent>
+        </Tooltip>
       )}
 
       <GlobalAssistantDrawer

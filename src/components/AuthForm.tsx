@@ -8,15 +8,18 @@ import {
   CalendarCheck2,
   Eye,
   EyeOff,
-  FileText,
   Lock,
   Mail,
-  ShieldCheck,
 } from "lucide-react";
 import { ReportPenIcon } from "@/components/icons/AccomplishIcons";
+import { AnimatedFileTextIcon, AnimatedShieldIcon } from "@/components/icons/AnimatedIcons";
+import { BlurFade } from "@/components/magicui/blur-fade";
+import { DotPattern } from "@/components/magicui/dot-pattern";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 export function AuthForm() {
   const router = useRouter();
@@ -103,8 +106,9 @@ export function AuthForm() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col justify-between bg-[#F8F8F6] text-[#141413] px-4 py-6 sm:px-8 sm:py-10 overflow-x-hidden">
-      <div className="mx-auto w-full max-w-5xl flex items-center justify-between border-b border-[#E2E2DC] pb-4">
+    <div className="relative min-h-dvh flex flex-col justify-between bg-[#F8F8F6] text-[#141413] px-4 py-6 sm:px-8 sm:py-10 overflow-x-hidden">
+      <DotPattern className="opacity-45" />
+      <div className="relative z-10 mx-auto w-full max-w-5xl flex items-center justify-between pb-4">
         <div className="flex items-center gap-2.5">
           <Image
             src="/logo.png"
@@ -119,127 +123,134 @@ export function AuthForm() {
         <span className="text-xs text-[#141413]/55">Weekly Accomplishment Report System</span>
       </div>
 
-      <div className="swiss-frame mx-auto w-full max-w-5xl border border-[#E2E2DC] bg-white/60 my-8 grid grid-cols-1 lg:grid-cols-12">
-        <span className="swiss-corner swiss-corner-tl" aria-hidden="true" />
-        <span className="swiss-corner swiss-corner-tr" aria-hidden="true" />
-        <span className="swiss-corner swiss-corner-bl" aria-hidden="true" />
-        <span className="swiss-corner swiss-corner-br" aria-hidden="true" />
+      <BlurFade className="relative z-10 mx-auto w-full max-w-5xl my-8">
+        <div className="swiss-frame border border-[#E2E2DC] bg-white/85 grid grid-cols-1 lg:grid-cols-12">
+          <span className="swiss-corner swiss-corner-tl" aria-hidden="true" />
+          <span className="swiss-corner swiss-corner-tr" aria-hidden="true" />
+          <span className="swiss-corner swiss-corner-bl" aria-hidden="true" />
+          <span className="swiss-corner swiss-corner-br" aria-hidden="true" />
 
-        {/* Editorial Overview */}
-        <div className="lg:col-span-7 p-6 sm:p-10 lg:border-r border-b lg:border-b-0 border-[#E2E2DC] flex flex-col justify-between gap-8">
-          <div className="space-y-4">
-            <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-light tracking-tight text-[#141413] text-balance leading-[1.12]">
-              Build official weekly internship reports with precision.
-            </h1>
-            <p className="text-sm sm:text-base text-[#141413]/70 text-pretty leading-relaxed max-w-[60ch]">
-              Convert rough daily voice or text notes in English or Tagalog into formatted, print-ready{" "}
-              <span className="font-medium text-[#141413]">8.5&quot; × 11&quot;</span> Word reports, inspect cumulative
-              OJT hours, and export clean PDFs and Excel summaries.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-[#E2E2DC] pt-6 gap-6">
-            <div className="space-y-1.5">
-              <FileText className="size-4 text-[#1D4ED8]" />
-              <p className="text-xs font-medium text-[#141413]">Live .docx Preview</p>
-              <p className="text-xs text-[#141413]/60 text-pretty leading-relaxed">
-                1-page layout preview with editable headings and verified signatories.
+          {/* Editorial Overview */}
+          <div className="lg:col-span-7 p-6 sm:p-10 lg:border-r border-b lg:border-b-0 border-[#E2E2DC] flex flex-col justify-between gap-8">
+            <div className="space-y-4">
+              <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-light tracking-tight text-[#141413] text-balance leading-[1.12]">
+                Build official weekly internship reports with precision.
+              </h1>
+              <p className="text-sm sm:text-base text-[#141413]/70 text-pretty leading-relaxed max-w-[60ch]">
+                Convert rough daily voice or text notes in English or Tagalog into formatted, print-ready{" "}
+                <span className="font-medium text-[#141413]">8.5&quot; × 11&quot;</span> Word reports, inspect
+                cumulative OJT hours, and export clean PDFs and Excel summaries.
               </p>
             </div>
-            <div className="space-y-1.5">
-              <ReportPenIcon className="size-4 text-[#1D4ED8]" />
-              <p className="text-xs font-medium text-[#141413]">Report &amp; Workspace AI</p>
-              <p className="text-xs text-[#141413]/60 text-pretty leading-relaxed">
-                Structures daily logs into formal past-tense tasks, charts, and diagrams.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <CalendarCheck2 className="size-4 text-[#1D4ED8]" />
-              <p className="text-xs font-medium text-[#141413]">Holiday-Aware Schedule</p>
-              <p className="text-xs text-[#141413]/60 text-pretty leading-relaxed">
-                Tracks required OJT hours and shifts active weeks around holiday breaks.
-              </p>
-            </div>
-          </div>
-        </div>
 
-        {/* Sign-in Column */}
-        <div className="lg:col-span-5 p-6 sm:p-10 bg-white flex flex-col justify-center space-y-6">
-          <div className="space-y-1.5">
-            <h2 className="text-xl font-medium tracking-tight text-[#141413] text-balance">Sign in to workspace</h2>
-            <p className="text-xs sm:text-sm text-[#141413]/60 text-pretty">
-              Enter your assigned intern or admin credentials to continue.
-            </p>
-          </div>
-
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-xs font-medium text-[#141413]/70 mb-1.5">
-                Email address
-              </label>
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#141413]/35" />
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="intern@company.com"
-                  className="pl-9 h-10 bg-white"
-                />
+            <div className="space-y-6">
+              <Separator />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="space-y-1.5">
+                  <AnimatedFileTextIcon className="size-4 text-[#1D4ED8]" />
+                  <p className="text-xs font-medium text-[#141413]">Live .docx Preview</p>
+                  <p className="text-xs text-[#141413]/60 text-pretty leading-relaxed">
+                    1-page layout preview with editable headings and verified signatories.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <ReportPenIcon className="size-4 text-[#1D4ED8]" />
+                  <p className="text-xs font-medium text-[#141413]">Report &amp; Workspace AI</p>
+                  <p className="text-xs text-[#141413]/60 text-pretty leading-relaxed">
+                    Structures daily logs into formal past-tense tasks, charts, and diagrams.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <CalendarCheck2 className="size-4 text-[#1D4ED8]" />
+                  <p className="text-xs font-medium text-[#141413]">Holiday-Aware Schedule</p>
+                  <p className="text-xs text-[#141413]/60 text-pretty leading-relaxed">
+                    Tracks required OJT hours and shifts active weeks around holiday breaks.
+                  </p>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div>
-              <label htmlFor="password" className="block text-xs font-medium text-[#141413]/70 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#141413]/35" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  minLength={6}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="pl-9 pr-10 h-10 bg-white"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#141413]/40 hover:text-[#141413] cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
+          {/* Sign-in Column */}
+          <div className="lg:col-span-5 p-6 sm:p-10 bg-white flex flex-col justify-center space-y-6">
+            <div className="space-y-1.5">
+              <h2 className="text-xl font-medium tracking-tight text-[#141413] text-balance">Sign in to workspace</h2>
+              <p className="text-xs sm:text-sm text-[#141413]/60 text-pretty">
+                Enter your assigned intern or admin credentials to continue.
+              </p>
             </div>
 
-            <Button type="submit" variant="accent" size="lg" disabled={loading} className="w-full">
-              <span>{loading ? "Signing in…" : "Sign in to workspace"}</span>
-              <ArrowRight className="size-4" />
-            </Button>
-          </form>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-          <div className="rounded-lg bg-[#F1F1EE] border border-[#E2E2DC] px-3.5 py-2.5 flex items-center gap-2.5 text-xs text-[#141413]/70">
-            <ShieldCheck className="size-4 text-[#1D4ED8] shrink-0" />
-            <span className="text-pretty">Accounts are provisioned by your team administrator.</span>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-xs font-medium text-[#141413]/70 mb-1.5">
+                  Email address
+                </label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#141413]/35" />
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="intern@company.com"
+                    className="pl-9 h-10 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-xs font-medium text-[#141413]/70 mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#141413]/35" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="pl-9 pr-10 h-10 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#141413]/40 hover:text-[#141413] cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button type="submit" variant="accent" size="lg" disabled={loading} className="w-full">
+                <span>{loading ? "Signing in…" : "Sign in to workspace"}</span>
+                <ArrowRight className="size-4" />
+              </Button>
+            </form>
+
+            <Alert className="bg-[#F1F1EE]">
+              <AnimatedShieldIcon className="size-4 text-[#1D4ED8] shrink-0" />
+              <AlertDescription className="text-[#141413]/75">
+                Accounts are provisioned by your team administrator.
+              </AlertDescription>
+            </Alert>
           </div>
         </div>
-      </div>
+      </BlurFade>
 
-      <footer className="mx-auto w-full max-w-5xl border-t border-[#E2E2DC] pt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-[#141413]/55">
+      <footer className="relative z-10 mx-auto w-full max-w-5xl border-t border-[#E2E2DC] pt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-[#141413]/55">
         <span>
           Created by <span className="font-medium text-[#141413]">Mike Ryno Santiago</span> — DNX Intern
         </span>
