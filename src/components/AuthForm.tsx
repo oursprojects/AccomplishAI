@@ -7,15 +7,17 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
+  FileCheck2,
   Loader2,
   Lock,
   Mail,
 } from "lucide-react";
-import { AnimatedShieldIcon } from "@/components/icons/AnimatedIcons";
+import { AnimatedCheckIcon, AnimatedShieldIcon } from "@/components/icons/AnimatedIcons";
 import { BlurFade } from "@/components/magicui/blur-fade";
 import { BorderBeam } from "@/components/magicui/border-beam";
 import { DotPattern } from "@/components/magicui/dot-pattern";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,51 +108,145 @@ export function AuthForm() {
   }
 
   return (
-    <div className="relative min-h-dvh flex flex-col justify-between bg-[#F8F8F6] text-[#141413] px-4 py-6 sm:px-8 sm:py-10 overflow-x-hidden">
+    <div className="relative min-h-dvh w-full flex flex-col justify-between bg-[#F8F8F6] text-[#141413] px-4 py-2.5 sm:px-6 sm:py-4 overflow-x-hidden">
       <DotPattern className="opacity-45" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-x-0 top-0 h-56 bg-gradient-to-b from-[#EFF4FF]/70 to-transparent"
+      />
 
-      <header className="relative z-10 mx-auto w-full max-w-5xl flex items-center justify-between gap-4 pb-4">
+      <header className="relative z-10 mx-auto w-full max-w-4xl flex items-center justify-between gap-3 py-0.5 shrink-0">
         <div className="flex items-center gap-2.5">
           <Image
             src="/logo.png"
             alt="Accomplish AI"
-            width={36}
-            height={36}
-            className="size-9 object-contain rounded-lg"
+            width={32}
+            height={32}
+            className="size-8 object-contain rounded-lg"
             priority
           />
-          <span className="text-sm font-medium tracking-tight text-[#141413]">Accomplish AI</span>
+          <span className="text-sm font-semibold tracking-tight text-[#141413]">Accomplish AI</span>
         </div>
-        <span className="text-xs text-[#52524E]">Weekly Accomplishment Report System</span>
+        <Badge variant="outline" className="font-mono text-[10px] tracking-wide text-[#52524E] bg-white/80">
+          OJT REPORT WORKSPACE
+        </Badge>
       </header>
 
-      <main className="relative z-10 mx-auto w-full max-w-md my-8">
-        <BlurFade>
-          <div className="swiss-frame relative rounded-xl border border-[#E2E2DC] bg-white p-6 sm:p-8 shadow-xs">
-            <BorderBeam duration={9} />
+      <main className="relative z-10 flex-1 flex items-center justify-center py-1.5 sm:py-2">
+        <BlurFade className="w-full max-w-[420px] lg:max-w-4xl">
+          <div className="swiss-frame relative rounded-2xl border border-[#E2E2DC] bg-white shadow-sm grid grid-cols-1 lg:grid-cols-12">
+            <BorderBeam duration={10} />
             <span className="swiss-corner swiss-corner-tl" aria-hidden="true" />
             <span className="swiss-corner swiss-corner-tr" aria-hidden="true" />
             <span className="swiss-corner swiss-corner-bl" aria-hidden="true" />
             <span className="swiss-corner swiss-corner-br" aria-hidden="true" />
 
-            <div className="space-y-6">
-              <div className="space-y-1.5">
-                <h1 className="text-2xl font-light tracking-tight text-[#141413] text-balance">
+            {/* Architectural Document Specimen Column (desktop only so mobile & short screens never scroll) */}
+            <div className="hidden lg:flex lg:col-span-6 relative overflow-hidden rounded-l-2xl border-r border-[#E2E2DC] bg-[#F1F1EE] p-6 flex-col justify-between">
+              <Image
+                src="/bg-accomplish.webp"
+                alt=""
+                fill
+                sizes="(min-width: 1024px) 440px, 0px"
+                className="object-cover opacity-35 mix-blend-multiply pointer-events-none"
+                priority
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/75 via-[#EFF4FF]/55 to-[#F1F1EE]/85"
+              />
+
+              <div className="relative z-10 flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#C7D7FE] bg-white/90 px-2.5 py-1 text-[11px] font-medium text-[#1E40AF]">
+                  <span className="size-1.5 rounded-full bg-[#1D4ED8]" />
+                  <span>Workspace Portal</span>
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-wider text-[#52524E]">
+                  8.5&quot; × 11&quot;
+                </span>
+              </div>
+
+              {/* Miniature architectural report sheet */}
+              <div className="relative z-10 my-4 rounded-xl border border-[#D8D8D0] bg-white/95 p-4 shadow-sm backdrop-blur-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-[#E2E2DC] pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-7 items-center justify-center rounded-md bg-[#EFF4FF] border border-[#C7D7FE] text-[#1D4ED8]">
+                      <FileCheck2 className="size-3.5" />
+                    </span>
+                    <div>
+                      <p className="text-[11px] font-semibold tracking-tight text-[#141413]">
+                        Weekly Accomplishment Sheet
+                      </p>
+                      <p className="font-mono text-[10px] text-[#52524E]">MON – FRI · VERIFIED</p>
+                    </div>
+                  </div>
+                  <Badge variant="success" className="text-[10px] px-2 py-0.5">
+                    <AnimatedCheckIcon className="size-3" />
+                    <span>Ready</span>
+                  </Badge>
+                </div>
+
+                {/* Day-row wireframe bars */}
+                <div className="space-y-2">
+                  {[
+                    { day: "MON", w: "w-4/5", hrs: "8h" },
+                    { day: "TUE", w: "w-11/12", hrs: "8h" },
+                    { day: "WED", w: "w-3/4", hrs: "8h" },
+                    { day: "THU", w: "w-5/6", hrs: "8h" },
+                    { day: "FRI", w: "w-4/5", hrs: "8h" },
+                  ].map((row) => (
+                    <div key={row.day} className="flex items-center gap-2.5">
+                      <span className="w-7 font-mono text-[10px] font-medium text-[#52524E]">{row.day}</span>
+                      <div className="flex-1 h-2 rounded-full bg-[#F1F1EE] overflow-hidden">
+                        <div className={`h-full rounded-full bg-[#1D4ED8]/80 ${row.w}`} />
+                      </div>
+                      <span className="w-6 text-right font-mono text-[10px] text-[#141413] tabular-nums">
+                        {row.hrs}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between border-t border-[#E2E2DC] pt-2.5 text-[10px] font-mono text-[#52524E]">
+                  <span>EXPORT: DOCX · PDF · XLSX</span>
+                  <span className="font-semibold text-[#1D4ED8]">40.0 HRS</span>
+                </div>
+              </div>
+
+              <div className="relative z-10 flex items-center justify-between text-[11px] text-[#52524E]">
+                <span>Encrypted Supabase Session</span>
+                <span className="font-mono text-[10px]">MANILA · UTC+8</span>
+              </div>
+            </div>
+
+            {/* Sign-in Form Column */}
+            <div className="lg:col-span-6 p-5 sm:p-6 lg:p-7 flex flex-col justify-center space-y-4">
+              {/* Compact mobile accent banner */}
+              <div className="flex lg:hidden items-center justify-between rounded-lg border border-[#C7D7FE] bg-[#EFF4FF]/70 px-3 py-1.5 text-[11px] font-medium text-[#1E40AF]">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-[#1D4ED8]" />
+                  <span>Workspace Portal</span>
+                </span>
+                <span className="font-mono text-[10px]">DOCX · PDF · XLSX</span>
+              </div>
+
+              <div className="space-y-1">
+                <h1 className="text-xl sm:text-2xl font-light tracking-tight text-[#141413] text-balance">
                   Sign in to workspace
                 </h1>
-                <p className="text-sm text-[#52524E] text-pretty leading-relaxed">
-                  Enter your assigned intern or admin credentials to continue.
+                <p className="text-xs sm:text-sm text-[#52524E] text-pretty">
+                  Enter your assigned intern or admin credentials.
                 </p>
               </div>
 
               {error && (
-                <Alert variant="destructive" role="alert">
+                <Alert variant="destructive" role="alert" className="py-2.5">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-1.5">
+              <form onSubmit={handleSubmit} className="space-y-3.5">
+                <div className="space-y-1">
                   <label htmlFor="email" className="block text-xs font-medium text-[#141413]">
                     Email address
                   </label>
@@ -165,12 +261,12 @@ export function AuthForm() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="intern@company.com"
-                      className="pl-9 h-11 bg-white"
+                      className="pl-9 h-11 bg-[#F8F8F6] focus:bg-white"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label htmlFor="password" className="block text-xs font-medium text-[#141413]">
                     Password
                   </label>
@@ -186,7 +282,7 @@ export function AuthForm() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className="pl-9 pr-12 h-11 bg-white"
+                      className="pl-9 pr-12 h-11 bg-[#F8F8F6] focus:bg-white"
                     />
                     <button
                       type="button"
@@ -216,22 +312,20 @@ export function AuthForm() {
 
               <Separator />
 
-              <Alert className="bg-[#F8F8F6] border-[#E2E2DC]">
+              <div className="flex items-center gap-2 text-xs text-[#52524E]">
                 <AnimatedShieldIcon className="size-4 text-[#1D4ED8] shrink-0" />
-                <AlertDescription className="text-[#52524E] opacity-100">
-                  Accounts are provisioned by your team administrator.
-                </AlertDescription>
-              </Alert>
+                <span>Accounts are provisioned by your team administrator.</span>
+              </div>
             </div>
           </div>
         </BlurFade>
       </main>
 
-      <footer className="relative z-10 mx-auto w-full max-w-5xl border-t border-[#E2E2DC] pt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-[#52524E]">
+      <footer className="relative z-10 mx-auto w-full max-w-4xl border-t border-[#E2E2DC] pt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] sm:text-xs text-[#52524E] shrink-0">
         <span>
           Created by <span className="font-medium text-[#141413]">Mike Ryno Santiago</span> — DNX Intern
         </span>
-        <span className="font-mono text-[11px]">Accomplish AI · 2026</span>
+        <span className="font-mono text-[10px] sm:text-[11px]">Accomplish AI · 2026</span>
       </footer>
     </div>
   );
