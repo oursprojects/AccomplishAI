@@ -191,11 +191,12 @@ export function WorkspaceClient({
   }
 
   async function persistReportPatch(nextTitle: string, nextData: ReportData, nextMsgs?: ChatTurn[]) {
-    const serialized = nextMsgs?.map(({ id, role, content, toolActions }) => ({
+    const serialized = nextMsgs?.map(({ id, role, content, toolActions, mcpToolsUsed }) => ({
       id,
       role,
       content,
       ...(toolActions ? { toolActions } : {}),
+      ...(mcpToolsUsed ? { mcpToolsUsed } : {}),
     }));
     await fetch(`/api/reports/${initialReport.id}`, {
       method: "PATCH",
@@ -262,11 +263,12 @@ export function WorkspaceClient({
         .map((m) => m.content)
         .join("\n");
       const rawNotes = userNotes || initialReport.raw_notes || "";
-      const serializedMsgs = messages.map(({ id, role, content, toolActions }) => ({
+      const serializedMsgs = messages.map(({ id, role, content, toolActions, mcpToolsUsed }) => ({
         id,
         role,
         content,
         ...(toolActions ? { toolActions } : {}),
+        ...(mcpToolsUsed ? { mcpToolsUsed } : {}),
       }));
 
       const res = await fetch(`/api/reports/${initialReport.id}`, {

@@ -5,25 +5,16 @@ import { checkBurstRateLimit, getQuotaAndAiSettings, getUserQuotaStatus } from "
 import {
   buildInternshipWeeks,
   getReportWeekMondayIso,
-  normalizeDateToLongFormat,
   normalizeHolidayMondays,
   parseHoursNumber,
-  resolveWeekCategory,
   resolveWeekNumber,
 } from "@/lib/internship-calendar";
-import { sanitizeAccomplishmentLines } from "@/lib/report-task-format";
 import { groqErrorResponse } from "@/lib/ai/groq";
-import { groqChatWithTools, type GroqMessage, type GroqTool } from "@/lib/ai/chat-tools";
+import { groqChatWithTools, type GroqMessage } from "@/lib/ai/chat-tools";
+import { computeReportStatus } from "@/lib/mcp/accomplish-mcp-server";
+import { openAccomplishMcpSession } from "@/lib/mcp/in-memory-bridge";
 import type { Json } from "@/lib/supabase/database.types";
-import {
-  DAYS,
-  isReportKey,
-  REPORT_FIELD_META,
-  REPORT_KEYS,
-  reportDataStrictSchema,
-  type ReportData,
-  type ReportKey,
-} from "@/lib/report-schema";
+import { reportDataStrictSchema, type ReportData, type ReportKey } from "@/lib/report-schema";
 
 const requestSchema = z.object({
   reportId: z.string().uuid().nullable().optional(),
@@ -39,150 +30,18 @@ const requestSchema = z.object({
   currentData: reportDataStrictSchema,
 });
 
-const INLINE_MARKDOWN = /[*_`]/g;
-
-function cleanFieldValue(key: ReportKey, raw: unknown, maxDayBullets: number): string {
-  if (raw === null || raw === undefined) return "";
-  const str = (Array.isArray(raw) ? raw.map(String).join("\n") : String(raw))
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(INLINE_MARKDOWN, "");
-  if (REPORT_FIELD_META[key].kind === "list") {
-    const isReflection = key === "new_trainings" || key === "problems_encountered" || key === "solutions_done";
-    const maxLines = isReflection ? 2 : maxDayBullets;
-    return sanitizeAccomplishmentLines(str, maxLines, !isReflection);
-  }
-  const trimmed = str.trim().slice(0, 120);
-  if (key === "date_from" || key === "date_to") {
-    return normalizeDateToLongFormat(trimmed);
-  }
-  if (key === "intern_name_last_first" || key === "intern_name_first_last" || key.endsWith("_verified_by")) {
-    return trimmed.toUpperCase();
-  }
-  return trimmed;
-}
-
-function computeStatus(data: ReportData) {
-  const missingEssential: Array<{ key: string; label: string }> = [];
-  const missingDetails: Array<{ key: string; label: string }> = [];
-
-  if (!data.intern_name_last_first.trim()) {
-    missingEssential.push({ key: "intern_name_last_first", label: "Intern Name (LASTNAME, FIRSTNAME MI.)" });
-  }
-  if (!data.intern_name_first_last.trim()) {
-    missingEssential.push({ key: "intern_name_first_last", label: "Signature Name (FIRSTNAME MI. LASTNAME)" });
-  }
-  if (!data.office.trim()) {
-    missingEssential.push({ key: "office", label: "Office / Department" });
-  }
-  if (!data.date_from.trim()) {
-    missingEssential.push({ key: "date_from", label: "Week Start Date (From)" });
-  }
-  if (!data.date_to.trim()) {
-    missingEssential.push({ key: "date_to", label: "Week End Date (To)" });
-  }
-
-  const anyDayFilled = DAYS.some((d) => data[`${d}_accomplishments`].trim().length > 0);
-  if (!anyDayFilled) {
-    missingEssential.push({ key: "mon_accomplishments", label: "Daily Accomplishments (Mon–Fri)" });
-  }
-
-  if (!data.hours_this_week.trim()) {
-    missingEssential.push({ key: "hours_this_week", label: "Hours Worked This Week" });
-  }
-  if (!data.total_hours_worked.trim()) {
-    missingDetails.push({ key: "total_hours_worked", label: "Total Hours Worked (previous + this week)" });
-  }
-
-  return {
-    isComplete: missingEssential.length === 0,
-    missingEssential,
-    missingDetails,
-  };
-}
-
-const TOOLS: GroqTool[] = [
-  {
-    type: "function",
-    function: {
-      name: "set_report_fields",
-      description:
-        "Create or update one or more fields on the Weekly Accomplishment Report. Pass ONLY the fields being set or updated with non-empty values. Use exact 'Month Day, Year' format (e.g. 'November 9, 2026') for date_from and date_to, and ALL CAPS for names.",
-      parameters: {
-        type: "object",
-        properties: Object.fromEntries(
-          REPORT_KEYS.map((k) => [
-            k,
-            {
-              type: "string",
-              description:
-                REPORT_FIELD_META[k].kind === "list"
-                  ? `${REPORT_FIELD_META[k].description}. Strictly accomplished tasks only (no arrival/departure times), past-tense formal lines separated by \\n, max 12 words per line, NO bullet characters.`
-                  : REPORT_FIELD_META[k].description,
-            },
-          ]),
-        ),
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "clear_report_fields",
-      description:
-        "Delete/clear one or more report fields to empty string, or clear all fields when clear_all is true. Checks whether each requested field actually contains content first.",
-      parameters: {
-        type: "object",
-        properties: {
-          fields: {
-            type: "array",
-            items: { type: "string", enum: [...REPORT_KEYS] },
-            description: "List of field keys to clear.",
-          },
-          clear_all: {
-            type: "boolean",
-            description: "Set true ONLY if the user explicitly asks to clear/wipe the entire report.",
-          },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "save_profile_defaults",
-      description:
-        "Save the intern's recurring name, office, verifier, or internship_start_date (YYYY-MM-DD) when they introduce themselves or mention when their internship began.",
-      parameters: {
-        type: "object",
-        properties: {
-          name_last_first: { type: "string", description: "ALL CAPS format: LASTNAME, FIRSTNAME MI." },
-          name_first_last: { type: "string", description: "ALL CAPS format: FIRSTNAME MI. LASTNAME" },
-          office: { type: "string" },
-          default_verifier: { type: "string", description: "ALL CAPS verifier name" },
-          internship_start_date: {
-            type: "string",
-            description: "ISO date YYYY-MM-DD of when Week 1 began (e.g. 2026-11-09).",
-          },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_report_fields",
-      description: "Read all current report field values and check which fields are filled or already empty.",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-];
-
 async function persistConversation(
   supabase: Awaited<ReturnType<typeof getUser>>["supabase"],
   userId: string,
   reportId: string | null | undefined,
   workingData: ReportData,
-  nextHistory: Array<{ id: string; role: "user" | "assistant"; content: string; toolActions?: string[] }>,
+  nextHistory: Array<{
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    toolActions?: string[];
+    mcpToolsUsed?: string[];
+  }>,
 ) {
   if (reportId) {
     await supabase
@@ -226,7 +85,6 @@ export async function POST(request: Request) {
   }
 
   const { quota: quotaBefore, aiSettings } = await getQuotaAndAiSettings(supabase, user.id, user.email);
-
   const maxChatMessages = aiSettings.maxChatMessages;
 
   if (body.data.messages.length > maxChatMessages) {
@@ -325,7 +183,7 @@ export async function POST(request: Request) {
   const calendarWeeks = buildInternshipWeeks(startIso, 16, holidayMondays);
   const currentWeekNumber = resolveWeekNumber(startIso, workingData.date_from, holidayMondays);
 
-  const systemPrompt = `You are **Accomplish AI**, a friendly, helpful assistant dedicated strictly to helping a student intern complete their official 1-page **"2026 Weekly Accomplishment Report"** (.docx).
+  const systemPrompt = `You are **Accomplish AI**, a friendly, helpful assistant dedicated strictly to helping a student intern complete their official 1-page **"2026 Weekly Accomplishment Report"** (.docx). You are connected to the user's Supabase database through AccomplishAI's built-in **MCP tools** (\`list_reports\`, \`get_ojt_hours_summary\`, \`get_report_fields\`, \`set_report_fields\`, \`clear_report_fields\`, \`save_profile_defaults\`).
 
 Today's date: ${new Date().toISOString().slice(0, 10)}
 User profile defaults: ${JSON.stringify({
@@ -352,13 +210,13 @@ CORE BEHAVIOR & STRICT RULES:
    - Dates (\`date_from\`, \`date_to\`) MUST ALWAYS be formatted as **Month Day, Year** (e.g. **November 9, 2026** and **November 13, 2026**) — NEVER numeric like \`11-09-2026\` or \`2026-11-09\`.
    - All person names (\`intern_name_last_first\`, \`intern_name_first_last\`, and \`mon_verified_by\`–\`fri_verified_by\`) MUST be **ALL CAPITAL LETTERS** (e.g. \`SANTIAGO, MIKE RYNO\`, \`MIKE RYNO SANTIAGO\`).
 2. **Calendar-Aware Week Dates (Monday to Friday):**
-   - Every Weekly Accomplishment Report strictly covers **Monday (\`date_from\`) to Friday (\`date_to\`)**.
-   - Use \`Internship Mon–Fri Calendar\` above when resolving "1st week", "Week 2", "this week", etc.
+   - Use \`Internship Mon–Fri Calendar\` above when resolving "1st week", "Week 2", "this week", etc., or call \`list_reports\` / \`get_ojt_hours_summary\` via MCP whenever the user asks about other weeks or overall OJT hours.
    - If the user mentions when their internship began (e.g. *"we started November 9"*), call \`save_profile_defaults\` with \`internship_start_date: "YYYY-MM-DD"\` AND set \`date_from\`/\`date_to\` using that week's Monday–Friday.
 3. **Cumulative Total Hours Worked (\`total_hours_worked\`):**
    - \`total_hours_worked\` = \`${prevTotalNum} + hours_this_week\`. Always compute and update \`total_hours_worked\` whenever \`hours_this_week\` is known or calculated!
-4. **Always Execute Real CRUD Tools:**
+4. **Always Execute Real MCP Tools:**
    - Whenever the user asks to **add, fill, translate, edit, update, replace, remove, delete, or clear** anything on the report, **ALWAYS call \`set_report_fields\` or \`clear_report_fields\`** BEFORE replying.
+   - Whenever the user asks about past weeks' reports or total OJT progress, call \`list_reports\` or \`get_ojt_hours_summary\` so answers come straight from Supabase.
 5. **Strictly Past-Tense & Task-Focused Only:**
    - Every item in \`mon_accomplishments\`–\`fri_accomplishments\` MUST begin with an English **past-tense** action verb (e.g., *Attended, Assisted, Built, Configured, Created, Debugged, Designed, Developed, Implemented, Integrated, Merged, Prepared, Published, Redesigned, Refined, Reviewed, Tested, Updated*) and describe **ONLY accomplished work tasks**.
    - **NEVER** use present tense or \`-ing\` verbs. **NEVER** include arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*, *"Dismissed at 4:30 PM"*), lunch breaks, or boarding-house/commute notes.
@@ -385,11 +243,29 @@ CORE BEHAVIOR & STRICT RULES:
   let forcedToolRetryUsed = false;
   let nextToolChoice: "auto" | "required" = "auto";
 
+  const mcpSession = await openAccomplishMcpSession({
+    supabase,
+    user,
+    reportId: body.data.reportId,
+    workingData,
+    maxBulletsPerDay: aiSettings.maxBulletsPerDay,
+    startIso,
+    holidayMondays,
+    defaultVerifier: profile?.default_verifier ?? "",
+    prevTotalNum,
+    occupiedWeekMondays,
+    updatedKeys,
+    toolActions,
+    onMutate: () => {
+      didMutateThisTurn = true;
+    },
+  });
+
   try {
     for (let step = 0; step < 5; step++) {
       const { completion, model } = await groqChatWithTools({
         messages: loopMessages,
-        tools: TOOLS,
+        tools: mcpSession.groqTools,
         toolChoice: nextToolChoice,
         temperature: 0.2,
         maxTokens: 1500,
@@ -422,7 +298,7 @@ CORE BEHAVIOR & STRICT RULES:
             ? `All set — ${toolActions.join(", ").toLowerCase()} in your live report preview.`
             : "Everything on your report looks good as-is.";
         const reply = (draftReply || defaultReply).replace(/<br\s*\/?>/gi, "; ");
-        const status = computeStatus(workingData);
+        const status = computeReportStatus(workingData);
 
         const nextHistory = [
           ...body.data.messages.map((m, idx) => ({ id: `h-${idx}`, role: m.role, content: m.content })),
@@ -431,6 +307,7 @@ CORE BEHAVIOR & STRICT RULES:
             role: "assistant" as const,
             content: reply,
             ...(toolActions.length ? { toolActions } : {}),
+            ...(mcpSession.mcpToolsUsed.length ? { mcpToolsUsed: mcpSession.mcpToolsUsed } : {}),
           },
         ].slice(-maxChatMessages);
 
@@ -449,6 +326,7 @@ CORE BEHAVIOR & STRICT RULES:
           structuredData: workingData,
           updatedKeys: Array.from(updatedKeys),
           toolActions,
+          mcpToolsUsed: mcpSession.mcpToolsUsed,
           ...status,
           model: usedModel,
           quota: quotaAfter,
@@ -462,7 +340,6 @@ CORE BEHAVIOR & STRICT RULES:
       });
 
       for (const tc of toolCalls) {
-        const name = tc.function.name;
         let args: Record<string, unknown> = {};
         try {
           args = JSON.parse(tc.function.arguments || "{}") as Record<string, unknown>;
@@ -470,128 +347,16 @@ CORE BEHAVIOR & STRICT RULES:
           args = {};
         }
 
-        let toolResult: unknown = {};
-
-        if (name === "set_report_fields" || name === "update_report_fields") {
-          const changed: string[] = [];
-          let blockedDateConflict: string | null = null;
-
-          // Enforce 1 report per Mon–Fri week before applying date changes
-          const proposedFrom = "date_from" in args ? cleanFieldValue("date_from", args.date_from, aiSettings.maxBulletsPerDay) : workingData.date_from;
-          const proposedTo = "date_to" in args ? cleanFieldValue("date_to", args.date_to, aiSettings.maxBulletsPerDay) : workingData.date_to;
-          const proposedMonIso =
-            "date_from" in args || "date_to" in args ? getReportWeekMondayIso(proposedFrom, proposedTo) : null;
-          const allowDateUpdate = !proposedMonIso || !occupiedWeekMondays.has(proposedMonIso);
-          if (!allowDateUpdate && proposedMonIso) {
-            const cat = resolveWeekCategory({ dateFrom: proposedFrom, dateTo: proposedTo, startDateIso: startIso });
-            blockedDateConflict = `Only 1 report per week is allowed, and another report already covers ${cat.label}.`;
-          }
-
-          for (const key of REPORT_KEYS) {
-            if ((key === "date_from" || key === "date_to") && !allowDateUpdate) continue;
-            if (key in args && args[key] !== undefined && args[key] !== null) {
-              const cleaned = cleanFieldValue(key, args[key], aiSettings.maxBulletsPerDay);
-              if (cleaned !== "" && cleaned !== workingData[key]) {
-                workingData[key] = cleaned;
-                updatedKeys.add(key);
-                changed.push(key);
-                didMutateThisTurn = true;
-              }
-            }
-          }
-
-          if (changed.includes("hours_this_week") && !changed.includes("total_hours_worked")) {
-            const weekHoursNum = parseHoursNumber(workingData.hours_this_week);
-            if (weekHoursNum !== null) {
-              const autoTotal = String(prevTotalNum + weekHoursNum);
-              if (autoTotal !== workingData.total_hours_worked) {
-                workingData.total_hours_worked = autoTotal;
-                updatedKeys.add("total_hours_worked");
-                changed.push("total_hours_worked");
-              }
-            }
-          }
-
-          if (profile?.default_verifier) {
-            const upperVerifier = profile.default_verifier.toUpperCase();
-            for (const d of DAYS) {
-              if (workingData[`${d}_accomplishments`].trim() && !workingData[`${d}_verified_by`].trim()) {
-                workingData[`${d}_verified_by`] = upperVerifier;
-                updatedKeys.add(`${d}_verified_by`);
-              }
-            }
-          }
-
-          if (changed.length > 0) {
-            toolActions.push(`Updated ${changed.length} field${changed.length === 1 ? "" : "s"}`);
-          }
-          toolResult = {
-            updated: changed,
-            ...(blockedDateConflict ? { blocked_date_conflict: blockedDateConflict } : {}),
-            status: computeStatus(workingData),
-          };
-        } else if (name === "clear_report_fields") {
-          const cleared: string[] = [];
-          const alreadyEmpty: string[] = [];
-          const targets: ReportKey[] = args.clear_all === true
-            ? [...REPORT_KEYS]
-            : Array.isArray(args.fields)
-              ? args.fields.filter(isReportKey)
-              : [];
-
-          for (const key of targets) {
-            if (workingData[key].trim() !== "") {
-              workingData[key] = "";
-              updatedKeys.add(key);
-              cleared.push(key);
-              didMutateThisTurn = true;
-            } else {
-              alreadyEmpty.push(key);
-            }
-          }
-
-          if (cleared.length > 0) {
-            toolActions.push(`Cleared ${cleared.length} field${cleared.length === 1 ? "" : "s"}`);
-          }
-          toolResult = { cleared, already_empty: alreadyEmpty, status: computeStatus(workingData) };
-        } else if (name === "save_profile_defaults") {
-          const patch: Record<string, string> = {};
-          if (typeof args.name_last_first === "string" && args.name_last_first.trim()) {
-            patch.name_last_first = args.name_last_first.trim().toUpperCase().slice(0, 120);
-          }
-          if (typeof args.name_first_last === "string" && args.name_first_last.trim()) {
-            patch.name_first_last = args.name_first_last.trim().toUpperCase().slice(0, 120);
-          }
-          if (typeof args.office === "string" && args.office.trim()) {
-            patch.office = args.office.trim().slice(0, 80);
-          }
-          if (typeof args.default_verifier === "string" && args.default_verifier.trim()) {
-            patch.default_verifier = args.default_verifier.trim().toUpperCase().slice(0, 120);
-          }
-          if (
-            typeof args.internship_start_date === "string" &&
-            /^\d{4}-\d{2}-\d{2}$/.test(args.internship_start_date.trim())
-          ) {
-            patch.internship_start_date = args.internship_start_date.trim();
-          }
-          if (Object.keys(patch).length > 0) {
-            await supabase.from("profiles").upsert({ id: user.id, ...patch }, { onConflict: "id" });
-            toolActions.push("Saved profile defaults");
-          }
-          toolResult = { saved: Object.keys(patch) };
-        } else if (name === "get_report_fields" || name === "get_report_status") {
-          toolResult = { ...computeStatus(workingData), current_data: workingData };
-        }
-
+        const toolContent = await mcpSession.callTool(tc.function.name, args);
         loopMessages.push({
           role: "tool",
           tool_call_id: tc.id,
-          content: JSON.stringify(toolResult),
+          content: toolContent,
         });
       }
     }
 
-    const status = computeStatus(workingData);
+    const status = computeReportStatus(workingData);
     const missingHints = status.missingEssential.slice(0, 2).map((m) => m.label);
     const fallbackReply =
       toolActions.length > 0
@@ -607,6 +372,7 @@ CORE BEHAVIOR & STRICT RULES:
         role: "assistant" as const,
         content: fallbackReply,
         ...(toolActions.length ? { toolActions } : {}),
+        ...(mcpSession.mcpToolsUsed.length ? { mcpToolsUsed: mcpSession.mcpToolsUsed } : {}),
       },
     ].slice(-maxChatMessages);
 
@@ -625,6 +391,7 @@ CORE BEHAVIOR & STRICT RULES:
       structuredData: workingData,
       updatedKeys: Array.from(updatedKeys),
       toolActions,
+      mcpToolsUsed: mcpSession.mcpToolsUsed,
       ...status,
       model: usedModel || aiSettings.activeTextModel,
       quota: quotaAfter,
@@ -632,11 +399,16 @@ CORE BEHAVIOR & STRICT RULES:
   } catch (err) {
     const mapped = groqErrorResponse(err);
     return NextResponse.json(
-      { error: mapped.message, ...(mapped.retryAfterSeconds ? { retryAfterSeconds: mapped.retryAfterSeconds } : {}) },
+      {
+        error: mapped.message,
+        ...(mapped.retryAfterSeconds ? { retryAfterSeconds: mapped.retryAfterSeconds } : {}),
+      },
       {
         status: mapped.status,
         ...(mapped.retryAfterSeconds ? { headers: { "Retry-After": String(mapped.retryAfterSeconds) } } : {}),
       },
     );
+  } finally {
+    await mcpSession.close();
   }
 }

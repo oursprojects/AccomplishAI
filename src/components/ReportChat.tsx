@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Check,
   Copy,
+  Database,
   Eraser,
   Eye,
   Send,
@@ -23,6 +24,7 @@ export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
   toolActions?: string[];
+  mcpToolsUsed?: string[];
   updatedKeys?: ReportKey[];
 }
 
@@ -126,6 +128,7 @@ export function ReportChat({
         structuredData?: ReportData;
         updatedKeys?: ReportKey[];
         toolActions?: string[];
+        mcpToolsUsed?: string[];
         quota?: QuotaStatus;
         retryAfterSeconds?: number;
         error?: string;
@@ -154,6 +157,7 @@ export function ReportChat({
         role: "assistant",
         content: json.reply,
         toolActions: json.toolActions,
+        mcpToolsUsed: json.mcpToolsUsed,
         updatedKeys: json.updatedKeys,
       };
       onMessagesChange([...nextHistory, assistantTurn]);
@@ -214,6 +218,14 @@ export function ReportChat({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
+          <Badge
+            variant="outline"
+            title="AI reads & updates your Supabase database via AccomplishAI's built-in MCP server (/api/mcp)"
+            className="gap-1 text-[10px]"
+          >
+            <Database className="h-3 w-3 text-[#D97757]" />
+            <span>MCP · Supabase</span>
+          </Badge>
           <Badge
             variant={contextAtLimit ? "destructive" : contextNearLimit ? "warning" : "outline"}
             title="Messages in this report's chat context (configurable by Admin)."
@@ -276,6 +288,17 @@ export function ReportChat({
                   <Badge key={idx} variant="success" className="font-medium">
                     <Check className="h-3 w-3" />
                     {act}
+                  </Badge>
+                ))}
+                {m.mcpToolsUsed?.map((toolName) => (
+                  <Badge
+                    key={toolName}
+                    variant="outline"
+                    className="font-mono text-[10px] gap-1"
+                    title="Executed over AccomplishAI's Supabase-backed MCP server"
+                  >
+                    <Database className="h-2.5 w-2.5 text-[#D97757]" />
+                    <span>{`MCP: ${toolName}`}</span>
                   </Badge>
                 ))}
                 {m.id !== "welcome" && m.id !== "welcome-existing" && m.id !== "cleared-chat" && (

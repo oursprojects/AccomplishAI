@@ -28,6 +28,9 @@ function parseChatTurns(rawChat: unknown): ChatTurn[] {
           toolActions: Array.isArray(rec.toolActions)
             ? rec.toolActions.filter((a): a is string => typeof a === "string")
             : undefined,
+          mcpToolsUsed: Array.isArray(rec.mcpToolsUsed)
+            ? rec.mcpToolsUsed.filter((t): t is string => typeof t === "string")
+            : undefined,
         },
       ];
     }
