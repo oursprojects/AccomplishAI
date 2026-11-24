@@ -13,6 +13,7 @@ import {
   Loader2,
   LogOut,
   Menu,
+  MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
@@ -194,6 +195,17 @@ export function AppShell({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileOpen]);
+
+  useEffect(() => {
+    const onShortcut = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setGlobalAiOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", onShortcut);
+    return () => window.removeEventListener("keydown", onShortcut);
+  }, []);
 
   function isNavActive(item: NavItem): boolean {
     if (pathname === item.href) return true;
@@ -574,10 +586,30 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-5 pb-[max(5rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
+
+      {/* Persistent Floating AI Chat Bubble across all workspace pages */}
+      {!globalAiOpen && (
+        <button
+          type="button"
+          onClick={() => setGlobalAiOpen(true)}
+          title="Open Overall Accomplish AI (Ctrl+K)"
+          aria-label="Open Overall Accomplish AI chat bubble"
+          className="group fixed bottom-[max(1.125rem,env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 inline-flex items-center gap-2 rounded-full bg-[#D97757] text-white h-12 w-12 sm:w-auto sm:h-12 sm:px-4 justify-center shadow-[0_10px_28px_-6px_rgba(31,30,28,0.35)] ring-1 ring-black/10 hover:bg-[#C86343] hover:scale-[1.03] active:scale-[0.98] transition-all cursor-pointer"
+        >
+          <span className="relative flex items-center justify-center">
+            <MessageCircle className="h-5 w-5" />
+            <Sparkles className="h-2.5 w-2.5 absolute -top-1 -right-1 text-[#FFF3CD]" />
+          </span>
+          <span className="hidden sm:inline text-xs font-semibold tracking-tight">Overall AI</span>
+          <kbd className="hidden lg:inline-flex items-center rounded-md bg-white/18 px-1.5 py-0.5 font-mono text-[10px] font-medium text-white/95">
+            Ctrl K
+          </kbd>
+        </button>
+      )}
 
       <GlobalAssistantDrawer
         open={globalAiOpen}
