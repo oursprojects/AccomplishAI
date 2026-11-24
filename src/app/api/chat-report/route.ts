@@ -26,7 +26,7 @@ const requestSchema = z.object({
       }),
     )
     .min(1)
-    .max(100),
+    .max(1000),
   currentData: reportDataStrictSchema,
 });
 
@@ -69,9 +69,10 @@ async function persistConversation(
 function looksLikeUnappliedMutation(reply: string): boolean {
   return (
     /\|[^|\n]+\|[^|\n]+\|/.test(reply) ||
-    /\b(i(?:'ve| have)?\s+(?:updated|added|filled|applied|cleared|removed|deleted|set|edited|saved)|report field(?:s)? updated)\b/i.test(
+    /\b(?:i(?:'ve| have)?\s+)?(?:updated|added|filled|recorded|applied|cleared|removed|deleted|set|edited|saved|replaced|changed|modified|populated)\b[\s\S]{0,60}\b(?:field|report|accomplishment|date|hour|training|problem|solution|mon|tue|wed|thu|fri|verifier|office|preview)\b/i.test(
       reply,
-    )
+    ) ||
+    /\b(?:report field(?:s)?|live preview|accomplishments?)\s+(?:updated|cleared|saved|recorded)\b/i.test(reply)
   );
 }
 
@@ -87,16 +88,7 @@ export async function POST(request: Request) {
   let mcpSession: AccomplishMcpSession | null = null;
   try {
     const { quota: quotaBefore, aiSettings } = await getQuotaAndAiSettings(supabase, user.id, user.email);
-    const maxChatMessages = aiSettings.maxChatMessages;
-
-    if (body.data.messages.length > maxChatMessages) {
-      return NextResponse.json(
-        {
-          error: `Conversation context limit reached (${maxChatMessages} messages). Click Clear Chat to start a fresh thread — your document fields stay safe.`,
-        },
-        { status: 400 },
-      );
-    }
+    const contextWindowSize = Math.max(16, aiSettings.maxChatMessages);
 
     if (quotaBefore.isBlocked) {
       return NextResponse.json(
@@ -234,7 +226,7 @@ CORE BEHAVIOR & STRICT RULES:
    - If the user asks to export or generate a downloadable \`.docx\`, \`.pdf\`, or \`.xlsx\` file from chat, output a fenced \`\`\`file JSON block (\`{ "format": "docx" | "pdf" | "xlsx", "filename": "...", "title": "...", "sections": [...], "table": { "headers": [...], "rows": [...] } }\`).
    - **NEVER output \`<br>\`, \`<br/>\` or any raw HTML tags.** Separate multiple items inside a table cell with \`; \`.`;
 
-    const recentMessages = body.data.messages.slice(-10);
+    const recentMessages = body.data.messages.slice(-contextWindowSize);
     const loopMessages: GroqMessage[] = [
       { role: "system", content: systemPrompt },
       ...recentMessages.map((m) => ({ role: m.role, content: m.content })),
@@ -265,10 +257,14 @@ CORE BEHAVIOR & STRICT RULES:
       },
     });
 
+    const reportTools = mcpSession.groqTools.filter(
+      (t) => !("function" in t && t.function?.name === "create_weekly_report"),
+    );
+
     for (let step = 0; step < 5; step++) {
       const { completion, model } = await groqChatWithTools({
         messages: loopMessages,
-        tools: mcpSession.groqTools,
+        tools: reportTools,
         toolChoice: nextToolChoice,
         temperature: 0.2,
         maxTokens: 1500,
@@ -312,7 +308,7 @@ CORE BEHAVIOR & STRICT RULES:
             ...(toolActions.length ? { toolActions } : {}),
             ...(mcpSession.mcpToolsUsed.length ? { mcpToolsUsed: mcpSession.mcpToolsUsed } : {}),
           },
-        ].slice(-maxChatMessages);
+        ].slice(-200);
 
         await Promise.all([
           supabase.from("prompt_usage_logs").insert({
@@ -377,7 +373,7 @@ CORE BEHAVIOR & STRICT RULES:
         ...(toolActions.length ? { toolActions } : {}),
         ...(mcpSession.mcpToolsUsed.length ? { mcpToolsUsed: mcpSession.mcpToolsUsed } : {}),
       },
-    ].slice(-maxChatMessages);
+    ].slice(-200);
 
     await Promise.all([
       supabase.from("prompt_usage_logs").insert({

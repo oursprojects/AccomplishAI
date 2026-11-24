@@ -12,8 +12,8 @@ import {
   Lock,
   Mail,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
+import { AccomplishCheckIcon, ReportPenIcon } from "@/components/icons/AccomplishIcons";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -122,7 +122,7 @@ export function AuthForm() {
         {/* System Overview / Purpose Showcase */}
         <div className="lg:col-span-6 space-y-5 text-center lg:text-left">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#F0D5C9] bg-[#FDF3EF]/90 px-3 py-1 text-xs font-semibold text-[#C86343] shadow-2xs">
-            <Sparkles className="h-3.5 w-3.5" />
+            <AccomplishCheckIcon className="h-3.5 w-3.5" />
             <span>Weekly Accomplishment Report System</span>
           </div>
 
@@ -147,7 +147,7 @@ export function AuthForm() {
               </p>
             </div>
             <div className="rounded-2xl border border-[#E6E2D8] bg-white/85 backdrop-blur-sm p-3.5 shadow-2xs">
-              <Sparkles className="h-4 w-4 text-[#D97757] mb-1.5" />
+              <ReportPenIcon className="h-4 w-4 text-[#D97757] mb-1.5" />
               <p className="text-xs font-semibold text-[#1F1E1C]">AI Task Assistant</p>
               <p className="mt-0.5 text-[11px] text-[#6B665E] leading-snug">
                 Converts raw daily logs into clear, formal past-tense accomplishments.

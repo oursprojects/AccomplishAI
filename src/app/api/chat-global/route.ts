@@ -24,7 +24,7 @@ const requestSchema = z.object({
       }),
     )
     .min(1)
-    .max(40),
+    .max(1000),
   attachments: z
     .array(
       z.object({
@@ -49,16 +49,7 @@ export async function POST(request: Request) {
   let mcpSession: AccomplishMcpSession | null = null;
   try {
     const { quota: quotaBefore, aiSettings } = await getQuotaAndAiSettings(supabase, user.id, user.email);
-    const maxChatMessages = aiSettings.maxChatMessages;
-
-    if (body.data.messages.length > maxChatMessages) {
-      return NextResponse.json(
-        {
-          error: `Global assistant conversation limit reached (${maxChatMessages} messages). Click Clear Chat to start fresh.`,
-        },
-        { status: 400 },
-      );
-    }
+    const contextWindowSize = Math.max(16, aiSettings.maxChatMessages);
 
     if (quotaBefore.isBlocked) {
       return NextResponse.json(
@@ -212,7 +203,7 @@ CAPABILITIES & BEHAVIOR:
    Use \`"format": "docx" | "pdf" | "xlsx"\`. Include \`sections\` for prose/letters/reports, \`table\` or \`sheets\` for spreadsheets/tabular data, and ensure numbers in numeric columns are JSON numbers. Keep \`file\` JSON strictly valid (no comments or trailing commas).
 6. **Rich ChatGPT Formatting:** Use clean Markdown headings, crisp bullets, tables, blockquotes, and fenced code blocks with language tags (\`\`\`ts, \`\`\`sql, \`\`\`python, etc.). When writing or updating AccomplishAI report fields, follow past-tense formal wording, ALL CAPS names, and \`Month Day, Year\` dates.`;
 
-    const recentMessages = body.data.messages.slice(-16);
+    const recentMessages = body.data.messages.slice(-contextWindowSize);
     const attachmentContext =
       body.data.attachments.length > 0
         ? `\n\n[ATTACHED FILES FROM USER]\n${body.data.attachments

@@ -115,11 +115,27 @@ function jsonContent(payload: unknown) {
   };
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizeUuidArg(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  return UUID_REGEX.test(trimmed) ? trimmed : undefined;
+}
+
+const lenientOptionalFieldValue = z.union([
+  z.string(),
+  z.number(),
+  z.array(z.union([z.string(), z.number()])),
+  z.null(),
+]);
+
+const lenientOptionalReportId = z.union([z.string(), z.null()]).optional();
+
 const setReportFieldShape = Object.fromEntries(
   REPORT_KEYS.map((k) => [
     k,
-    z
-      .string()
+    lenientOptionalFieldValue
       .optional()
       .describe(
         REPORT_FIELD_META[k].kind === "list"
@@ -127,7 +143,7 @@ const setReportFieldShape = Object.fromEntries(
           : REPORT_FIELD_META[k].description,
       ),
   ]),
-) as Record<ReportKey, z.ZodOptional<z.ZodString>>;
+) as Record<ReportKey, z.ZodOptional<typeof lenientOptionalFieldValue>>;
 
 /**
  * Builds an AccomplishAI MCP Server backed by the signed-in user's RLS-scoped Supabase client.
@@ -329,23 +345,22 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       description:
         "Read all field values and missing sections for the currently open report OR any saved report by report_id.",
       inputSchema: {
-        report_id: z
-          .string()
-          .uuid()
-          .optional()
-          .describe("Report UUID to inspect (omit only inside an active single-report chat session)."),
+        report_id: lenientOptionalReportId.describe(
+          "Report UUID to inspect (omit when calling inside an active single-report chat session).",
+        ),
       },
     },
     async ({ report_id }) => {
       await audit("get_report_fields");
-      if (ctx.workingData && (!report_id || report_id === ctx.reportId)) {
+      const normalizedReportId = normalizeUuidArg(report_id);
+      if (ctx.workingData && (!normalizedReportId || normalizedReportId === ctx.reportId)) {
         return jsonContent({
           ...computeReportStatus(ctx.workingData),
           current_data: ctx.workingData,
         });
       }
 
-      const targetId = report_id ?? ctx.reportId;
+      const targetId = normalizedReportId ?? ctx.reportId;
       if (!targetId) {
         return jsonContent({ error: "Provide report_id to read a specific report (call list_reports first to get IDs)." });
       }
@@ -377,17 +392,17 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
         "Update one or more fields on a Weekly Accomplishment Report. Pass ONLY fields being set with non-empty values. Use exact 'Month Day, Year' format for date_from/date_to and ALL CAPS for names.",
       inputSchema: {
         ...setReportFieldShape,
-        report_id: z
-          .string()
-          .uuid()
-          .optional()
-          .describe("Target report UUID (required when calling from the global assistant or /api/mcp)."),
+        report_id: lenientOptionalReportId.describe(
+          "Target report UUID (omit inside a single-report editor chat).",
+        ),
       },
     },
     async (args) => {
       await audit("set_report_fields");
-      const targetId = args.report_id ?? ctx.reportId ?? null;
-      let targetData = ctx.workingData && (!args.report_id || args.report_id === ctx.reportId) ? ctx.workingData : undefined;
+      const normalizedReportId = normalizeUuidArg(args.report_id);
+      const targetId = normalizedReportId ?? ctx.reportId ?? null;
+      let targetData =
+        ctx.workingData && (!normalizedReportId || normalizedReportId === ctx.reportId) ? ctx.workingData : undefined;
       let persistDirectly = false;
 
       if (!targetData) {
@@ -529,15 +544,20 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       description:
         "Clear one or more report fields to empty string, or clear all fields when clear_all is true. Checks current values first.",
       inputSchema: {
-        fields: z.array(z.enum(REPORT_KEYS)).optional().describe("List of field keys to clear."),
-        clear_all: z.boolean().optional().describe("Set true ONLY if the user explicitly asks to clear the whole report."),
-        report_id: z.string().uuid().optional(),
+        fields: z.union([z.array(z.string()), z.null()]).optional().describe("List of field keys to clear."),
+        clear_all: z
+          .union([z.boolean(), z.null()])
+          .optional()
+          .describe("Set true ONLY if the user explicitly asks to clear the whole report."),
+        report_id: lenientOptionalReportId,
       },
     },
     async ({ fields, clear_all, report_id }) => {
       await audit("clear_report_fields");
-      const targetId = report_id ?? ctx.reportId ?? null;
-      let targetData = ctx.workingData && (!report_id || report_id === ctx.reportId) ? ctx.workingData : undefined;
+      const normalizedReportId = normalizeUuidArg(report_id);
+      const targetId = normalizedReportId ?? ctx.reportId ?? null;
+      let targetData =
+        ctx.workingData && (!normalizedReportId || normalizedReportId === ctx.reportId) ? ctx.workingData : undefined;
       let persistDirectly = false;
 
       if (!targetData) {

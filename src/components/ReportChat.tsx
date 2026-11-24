@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  AlertTriangle,
   Check,
   Copy,
   Database,
@@ -109,9 +108,8 @@ export function ReportChat({
   const missing = getMissingSummary(data);
   const quotaBlocked = !quota.allowed;
   const contextCount = messages.length;
-  const contextAtLimit = contextCount >= maxChatMessages;
-  const contextNearLimit = !contextAtLimit && contextCount >= Math.max(2, maxChatMessages - 4);
-  const composerDisabled = sending || quotaBlocked || contextAtLimit;
+  const composerDisabled = sending || quotaBlocked;
+  void maxChatMessages;
 
   async function submitHistory(nextHistory: ChatTurn[], attempt = 0): Promise<void> {
     try {
@@ -228,10 +226,10 @@ export function ReportChat({
             <span>MCP · Supabase</span>
           </Badge>
           <Badge
-            variant={contextAtLimit ? "destructive" : contextNearLimit ? "warning" : "outline"}
-            title="Messages in this report's chat context (configurable by Admin)."
+            variant="outline"
+            title="Unlimited conversation history with automatic sliding context window."
           >
-            {contextCount}/{maxChatMessages} ctx
+            {contextCount} msg{contextCount === 1 ? "" : "s"} · ∞
           </Badge>
 
           {canUndo && (
@@ -338,22 +336,6 @@ export function ReportChat({
         )}
       </div>
 
-      {/* Context limit warning banner */}
-      {contextAtLimit && (
-        <div className="mx-3.5 my-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-700 shrink-0" />
-            <span>
-              Chat context limit reached ({maxChatMessages} messages). Clear the chat to continue — your report fields
-              stay untouched.
-            </span>
-          </span>
-          <Button type="button" size="sm" onClick={onClearChat} className="bg-amber-900 hover:bg-amber-800">
-            Clear Chat
-          </Button>
-        </div>
-      )}
-
       {error && (
         <div className="mx-3.5 mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-center justify-between gap-2">
           <span>{error}</span>
@@ -385,11 +367,7 @@ export function ReportChat({
               }
             }}
             disabled={composerDisabled}
-            placeholder={
-              contextAtLimit
-                ? "Click 'Clear Chat' above to continue..."
-                : "Share your accomplishments or edits... (Enter to send)"
-            }
+            placeholder="Share your accomplishments or edits... (Enter to send)"
             className="flex-1 bg-transparent py-1 text-sm text-[#1F1E1C] placeholder:text-[#8A847A] outline-none resize-none max-h-28 disabled:opacity-60"
           />
 

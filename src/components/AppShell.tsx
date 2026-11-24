@@ -17,7 +17,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
-  Sparkles,
   UserRound,
   X,
 } from "lucide-react";
@@ -309,18 +308,6 @@ export function AppShell({
           <AllowancePill quota={quota} />
           <Button
             type="button"
-            variant="accent"
-            size="sm"
-            onClick={() => setGlobalAiOpen(true)}
-            title="Ask Overall Accomplish AI"
-            aria-label="Ask Overall Accomplish AI"
-            className="rounded-xl px-2.5"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            <span className="text-xs">AI</span>
-          </Button>
-          <Button
-            type="button"
             variant="outline"
             size="icon"
             disabled={signingOut}
@@ -573,16 +560,6 @@ export function AppShell({
           <div className="flex items-center gap-2.5">
             <HeaderClock />
             <AllowancePill quota={quota} />
-            <Button
-              type="button"
-              size="sm"
-              variant="accent"
-              onClick={() => setGlobalAiOpen(true)}
-              title="Ask Overall Accomplish AI across all reports, OJT hours, profile & holidays"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>Ask Overall AI</span>
-            </Button>
           </div>
         </header>
 
@@ -600,10 +577,7 @@ export function AppShell({
           aria-label="Open Overall Accomplish AI chat bubble"
           className="group fixed bottom-[max(1.125rem,env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 inline-flex items-center gap-2 rounded-full bg-[#D97757] text-white h-12 w-12 sm:w-auto sm:h-12 sm:px-4 justify-center shadow-[0_10px_28px_-6px_rgba(31,30,28,0.35)] ring-1 ring-black/10 hover:bg-[#C86343] hover:scale-[1.03] active:scale-[0.98] transition-all cursor-pointer"
         >
-          <span className="relative flex items-center justify-center">
-            <MessageCircle className="h-5 w-5" />
-            <Sparkles className="h-2.5 w-2.5 absolute -top-1 -right-1 text-[#FFF3CD]" />
-          </span>
+          <MessageCircle className="h-5 w-5" />
           <span className="hidden sm:inline text-xs font-semibold tracking-tight">Overall AI</span>
           <kbd className="hidden lg:inline-flex items-center rounded-md bg-white/18 px-1.5 py-0.5 font-mono text-[10px] font-medium text-white/95">
             Ctrl K

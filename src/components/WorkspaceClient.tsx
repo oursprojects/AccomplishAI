@@ -121,6 +121,23 @@ export function WorkspaceClient({
   const currentSnapshot = useMemo(() => formSnapshotOf(title, data), [title, data]);
   const hasChanges = currentSnapshot !== savedSnapshot;
 
+  // Keep live preview synced when server props refresh (e.g. edited via Overall AI) while user has no unsaved edits
+  const serverSnapshot = useMemo(
+    () => formSnapshotOf(initialReport.title ?? "", initialSeeded),
+    [initialReport.title, initialSeeded],
+  );
+  useEffect(() => {
+    if (serverSnapshot === savedSnapshot) return;
+    if (currentSnapshot !== savedSnapshot) return;
+    const id = window.requestAnimationFrame(() => {
+      savedStateRef.current = { title: initialReport.title ?? "", data: initialSeeded };
+      setSavedSnapshot(serverSnapshot);
+      setTitle(initialReport.title ?? "");
+      setData(initialSeeded);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [serverSnapshot, savedSnapshot, currentSnapshot, initialReport.title, initialSeeded]);
+
   const [tab, setTab] = useState<WorkspaceTab>("preview");
   const [desktopLeftMode, setDesktopLeftMode] = useState<"chat" | "edit">("chat");
 

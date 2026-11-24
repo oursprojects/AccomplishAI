@@ -17,6 +17,7 @@ import {
   History,
   Loader2,
   Maximize2,
+  MessageSquareText,
   Minimize2,
   Paperclip,
   Pencil,
@@ -25,7 +26,6 @@ import {
   Search,
   Send,
   Slash,
-  Sparkles,
   Square,
   Trash2,
   TrendingUp,
@@ -220,7 +220,7 @@ export function GlobalAssistantDrawer({
           ...t,
           title: nextTitle,
           updatedAt: new Date().toISOString(),
-          messages: nextMsgs.slice(-30),
+          messages: nextMsgs.slice(-200),
         };
       });
     });
@@ -333,7 +333,7 @@ export function GlobalAssistantDrawer({
         signal: controller.signal,
         body: JSON.stringify({
           currentPath: pathname,
-          messages: historyToSend.map((m) => ({ role: m.role, content: m.content })),
+          messages: historyToSend.slice(-24).map((m) => ({ role: m.role, content: m.content })),
           attachments: attachedFiles.map((a) => ({ name: a.name, textContent: a.textContent })),
         }),
       });
@@ -601,7 +601,7 @@ export function GlobalAssistantDrawer({
         <div className="flex items-center justify-between gap-2 border-b border-[#E6E2D8] bg-white px-4 py-3 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#D97757] text-white shadow-2xs shrink-0">
-              <Sparkles className="h-4 w-4" />
+              <MessageSquareText className="h-4 w-4" />
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
