@@ -223,7 +223,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       }
 
       const completedHours = Math.max(maxTotal, sumWeekly);
-      const holidayMondays = normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
+      const holidayMondays = ctx.holidayMondays ?? normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
 
       return jsonContent({
         completedHours,
@@ -271,7 +271,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
           .limit(50),
       ]);
 
-      const holidayMondays = normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
+      const holidayMondays = ctx.holidayMondays ?? normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
       const parsedReports = (rows ?? []).map((r) => {
         const sd = reportDataSchema.parse(r.structured_data ?? {});
         return {
@@ -621,7 +621,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
           .maybeSingle(),
       ]);
 
-      const holidayMondays = normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
+      const holidayMondays = ctx.holidayMondays ?? normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
       const existingWithWeek = (existingRows ?? []).map((r) => {
         const obj =
           r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
@@ -735,6 +735,8 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       const { error } = await ctx.supabase.auth.updateUser({ data: { holiday_mondays: updated } });
       if (error) return jsonContent({ error: error.message });
 
+      ctx.holidayMondays = updated;
+      ctx.user.user_metadata = { ...(ctx.user.user_metadata ?? {}), holiday_mondays: updated };
       ctx.toolActions?.push("Updated holiday schedule");
       ctx.onGlobalMutate?.({ mutated: true });
 

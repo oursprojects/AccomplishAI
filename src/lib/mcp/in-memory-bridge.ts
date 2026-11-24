@@ -37,14 +37,18 @@ export async function openAccomplishMcpSession(
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 
   const { tools } = await client.listTools();
-  const groqTools: GroqTool[] = tools.map((t) => ({
-    type: "function",
-    function: {
-      name: t.name,
-      description: t.description ?? t.title ?? t.name,
-      parameters: t.inputSchema as Record<string, unknown>,
-    },
-  }));
+  const groqTools: GroqTool[] = tools.map((t) => {
+    const rawSchema = (t.inputSchema ?? { type: "object", properties: {} }) as Record<string, unknown>;
+    const cleanSchema = Object.fromEntries(Object.entries(rawSchema).filter(([k]) => k !== "$schema"));
+    return {
+      type: "function",
+      function: {
+        name: t.name,
+        description: t.description ?? t.title ?? t.name,
+        parameters: cleanSchema,
+      },
+    };
+  });
 
   const mcpToolsUsed: string[] = [];
 
