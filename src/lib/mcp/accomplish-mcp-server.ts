@@ -45,6 +45,7 @@ export interface AccomplishMcpSessionState {
   occupiedWeekMondays?: Map<string, string>;
   updatedKeys?: Set<ReportKey>;
   toolActions?: string[];
+  onToolCall?: (toolName: string) => void | Promise<void>;
   onMutate?: () => void;
   onGlobalMutate?: (info: { createdReportId?: string; mutated?: boolean }) => void;
 }
@@ -138,6 +139,12 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
     version: "1.1.0",
   });
 
+  async function audit(toolName: string) {
+    if (ctx.onToolCall) {
+      await ctx.onToolCall(toolName);
+    }
+  }
+
   // Tool 1: List saved reports from Supabase (previous & current weeks)
   server.registerTool(
     "list_reports",
@@ -150,6 +157,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       },
     },
     async ({ limit }) => {
+      await audit("list_reports");
       const { data, error } = await ctx.supabase
         .from("reports")
         .select("id, title, structured_data, created_at, updated_at")
@@ -192,6 +200,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       inputSchema: {},
     },
     async () => {
+      await audit("get_ojt_hours_summary");
       const [{ data: profile }, { data: rows }] = await Promise.all([
         ctx.supabase
           .from("profiles")
@@ -249,6 +258,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       inputSchema: {},
     },
     async () => {
+      await audit("get_workspace_overview");
       const [{ data: profile }, { data: tpl }, { data: rows }] = await Promise.all([
         ctx.supabase
           .from("profiles")
@@ -327,6 +337,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       },
     },
     async ({ report_id }) => {
+      await audit("get_report_fields");
       if (ctx.workingData && (!report_id || report_id === ctx.reportId)) {
         return jsonContent({
           ...computeReportStatus(ctx.workingData),
@@ -374,6 +385,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       },
     },
     async (args) => {
+      await audit("set_report_fields");
       const targetId = args.report_id ?? ctx.reportId ?? null;
       let targetData = ctx.workingData && (!args.report_id || args.report_id === ctx.reportId) ? ctx.workingData : undefined;
       let persistDirectly = false;
@@ -523,6 +535,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       },
     },
     async ({ fields, clear_all, report_id }) => {
+      await audit("clear_report_fields");
       const targetId = report_id ?? ctx.reportId ?? null;
       let targetData = ctx.workingData && (!report_id || report_id === ctx.reportId) ? ctx.workingData : undefined;
       let persistDirectly = false;
@@ -591,6 +604,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       },
     },
     async ({ title, date_from, date_to }) => {
+      await audit("create_weekly_report");
       const quota = await getUserQuotaStatus(ctx.supabase, ctx.user.id, ctx.user.email);
       if (!quota.canCreateReport) {
         return jsonContent({
@@ -712,15 +726,18 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       inputSchema: {
         add_dates: z
           .array(z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/))
+          .max(20)
           .optional()
           .describe("Dates (YYYY-MM-DD) whose weeks should be marked as Holiday / Break."),
         remove_dates: z
           .array(z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/))
+          .max(20)
           .optional()
           .describe("Dates (YYYY-MM-DD) whose weeks should be unmarked from Holiday / Break."),
       },
     },
     async ({ add_dates, remove_dates }) => {
+      await audit("update_holiday_weeks");
       const current = new Set(normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays));
       for (const raw of add_dates ?? []) {
         const dt = parseIsoDate(raw);
@@ -731,7 +748,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
         if (dt) current.delete(toIsoDate(getMondayOfWeek(dt)));
       }
 
-      const updated = Array.from(current).sort();
+      const updated = Array.from(current).sort().slice(0, 52);
       const { error } = await ctx.supabase.auth.updateUser({ data: { holiday_mondays: updated } });
       if (error) return jsonContent({ error: error.message });
 
@@ -757,10 +774,10 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       description:
         "Save the intern's recurring name, office, verifier, default_daily_hours, target_ojt_hours, or internship_start_date (YYYY-MM-DD) in Supabase `profiles`.",
       inputSchema: {
-        name_last_first: z.string().optional().describe("ALL CAPS format: LASTNAME, FIRSTNAME MI."),
-        name_first_last: z.string().optional().describe("ALL CAPS format: FIRSTNAME MI. LASTNAME"),
-        office: z.string().optional(),
-        default_verifier: z.string().optional().describe("ALL CAPS verifier name"),
+        name_last_first: z.string().max(120).optional().describe("ALL CAPS format: LASTNAME, FIRSTNAME MI."),
+        name_first_last: z.string().max(120).optional().describe("ALL CAPS format: FIRSTNAME MI. LASTNAME"),
+        office: z.string().max(80).optional(),
+        default_verifier: z.string().max(120).optional().describe("ALL CAPS verifier name"),
         default_daily_hours: z.number().min(0).max(24).optional(),
         target_ojt_hours: z.number().int().min(40).max(5000).optional(),
         internship_start_date: z
@@ -771,6 +788,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       },
     },
     async (args) => {
+      await audit("save_profile_defaults");
       const patch: Record<string, string | number> = {};
       if (args.name_last_first?.trim()) {
         patch.name_last_first = args.name_last_first.trim().toUpperCase().slice(0, 120);

@@ -14,7 +14,8 @@ const draftSchema = z.object({
         id: z.string().max(100),
         role: z.enum(["user", "assistant"]),
         content: z.string().max(8000),
-        toolActions: z.array(z.string().max(120)).optional(),
+        toolActions: z.array(z.string().max(120)).max(20).optional(),
+        mcpToolsUsed: z.array(z.string().max(80)).max(20).optional(),
       }),
     )
     .max(60),

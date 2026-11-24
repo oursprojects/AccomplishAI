@@ -95,6 +95,13 @@ async function handleMcpRequest(request: Request) {
   const server = createAccomplishMcpServer({
     supabase: auth.supabase,
     user: auth.user,
+    onToolCall: async (toolName) => {
+      await auth.supabase.from("prompt_usage_logs").insert({
+        user_id: auth.user.id,
+        kind: "mcp_http",
+        model: toolName.slice(0, 80),
+      });
+    },
   });
 
   const transport = new WebStandardStreamableHTTPServerTransport({

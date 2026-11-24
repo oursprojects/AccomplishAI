@@ -51,6 +51,13 @@ export function isAdminEmail(email?: string | null): boolean {
   return typeof email === "string" && email.trim().toLowerCase() === ADMIN_EMAIL;
 }
 
+/** Verifies admin privileges require BOTH matching email and a confirmed Supabase email address. */
+export function isAdminUser(
+  user?: { email?: string | null; email_confirmed_at?: string | null } | null,
+): boolean {
+  return Boolean(user?.email_confirmed_at) && isAdminEmail(user?.email);
+}
+
 /** Midnight of the current calendar day in Asia/Manila (UTC+08:00), as an ISO timestamp. */
 export function getManilaDayStartIso(now = new Date()): string {
   const manilaMs = now.getTime() + 8 * 60 * 60 * 1000;
@@ -261,12 +268,17 @@ export async function checkBurstRateLimit(
 }> {
   const oneMinAgo = new Date(Date.now() - 60_000).toISOString();
   const limit = isAdmin ? 20 : 8;
-  const [{ count: userCount }, { count: visibleGlobalCount }] = await Promise.all([
+  const rpcInvoker = supabase as unknown as {
+    rpc: (fn: string) => Promise<{ data: unknown; error: { message?: string } | null }>;
+  };
+
+  const [{ count: userCount }, rpcGlobal, { count: visibleGlobalCount }] = await Promise.all([
     supabase
       .from("prompt_usage_logs")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("created_at", oneMinAgo),
+    rpcInvoker.rpc("get_global_rpm_count").catch(() => ({ data: null, error: { message: "unavailable" } })),
     supabase
       .from("prompt_usage_logs")
       .select("id", { count: "exact", head: true })
@@ -276,7 +288,8 @@ export async function checkBurstRateLimit(
   if (used >= limit) {
     return { allowed: false, reason: "user", count: used, limit, retryAfterSeconds: 6 };
   }
-  const globalUsed = visibleGlobalCount ?? 0;
+  const globalUsed =
+    !rpcGlobal.error && typeof rpcGlobal.data === "number" ? rpcGlobal.data : (visibleGlobalCount ?? 0);
   if (globalUsed >= globalRpmLimit) {
     return { allowed: false, reason: "global", count: globalUsed, limit: globalRpmLimit, retryAfterSeconds: 5 };
   }

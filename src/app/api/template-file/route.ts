@@ -50,6 +50,7 @@ export async function GET(request: Request) {
       "Content-Type": DOCX_MIME,
       "Content-Disposition": `inline; filename="${safeName}"`,
       "Cache-Control": version ? "private, max-age=86400, immutable" : "no-store, private",
+      "Vary": "Cookie",
       "X-Content-Type-Options": "nosniff",
     },
   });

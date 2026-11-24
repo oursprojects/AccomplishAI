@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getUser } from "@/lib/supabase/server";
-import { ALLOWED_TEXT_MODELS, getUserQuotaStatus, isAdminEmail, loadAdminDashboardData } from "@/lib/admin";
+import { ALLOWED_TEXT_MODELS, getUserQuotaStatus, isAdminUser, loadAdminDashboardData } from "@/lib/admin";
 import { getGroqPoolSnapshot } from "@/lib/ai/rate-limiter";
 import { AppShell } from "@/components/AppShell";
 import { AdminClient } from "@/components/AdminClient";
@@ -12,7 +12,7 @@ async function AdminContent() {
   await connection();
   const { supabase, user } = await getUser();
   if (!user) redirect("/login");
-  if (!isAdminEmail(user.email)) redirect("/");
+  if (!isAdminUser(user)) redirect("/");
 
   const [dashboard, quota] = await Promise.all([
     loadAdminDashboardData(supabase),

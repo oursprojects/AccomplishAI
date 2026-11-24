@@ -7,7 +7,7 @@ import {
   ALLOWED_STT_MODELS,
   ALLOWED_TEXT_MODELS,
   getManilaDayStartIso,
-  isAdminEmail,
+  isAdminUser,
   loadAdminDashboardData,
 } from "@/lib/admin";
 import { getGroqPoolSnapshot } from "@/lib/ai/rate-limiter";
@@ -70,7 +70,7 @@ const patchSchema = z.discriminatedUnion("action", [
 export async function GET() {
   const { supabase, user } = await getUser();
   if (!user) return jsonError(401, "Unauthorized");
-  if (!isAdminEmail(user.email)) return jsonError(403, "Forbidden");
+  if (!isAdminUser(user)) return jsonError(403, "Forbidden");
 
   try {
     const data = await loadAdminDashboardData(supabase);
@@ -86,7 +86,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const { supabase, user } = await getUser();
   if (!user) return jsonError(401, "Unauthorized");
-  if (!isAdminEmail(user.email)) return jsonError(403, "Forbidden");
+  if (!isAdminUser(user)) return jsonError(403, "Forbidden");
 
   const body = await parseJsonBody(request, createMemberSchema, "Invalid account details.");
   if (body.response) return body.response;
@@ -241,7 +241,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const { supabase, user } = await getUser();
   if (!user) return jsonError(401, "Unauthorized");
-  if (!isAdminEmail(user.email)) return jsonError(403, "Forbidden");
+  if (!isAdminUser(user)) return jsonError(403, "Forbidden");
 
   const bodyParsed = await parseJsonBody(request, patchSchema, "Invalid payload.");
   if (bodyParsed.response) return bodyParsed.response;
