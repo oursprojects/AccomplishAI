@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Mic, Square } from "lucide-react";
+import { parseJsonResponse } from "@/lib/client-json";
 
 interface VoiceRecorderProps {
   onTranscript: (text: string) => void;
@@ -71,9 +72,9 @@ export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorder
           const form = new FormData();
           form.append("audio", new File([blob], `voice-note.${ext}`, { type }));
           const res = await fetch("/api/transcribe", { method: "POST", body: form });
-          const json = (await res.json()) as { text?: string; error?: string };
-          if (!res.ok) throw new Error(json.error ?? "Transcription failed.");
-          if (json.text) onTranscript(json.text);
+          const json = await parseJsonResponse<{ text?: string; error?: string }>(res);
+          if (!res.ok) throw new Error(json?.error ?? `Transcription failed (HTTP ${res.status}).`);
+          if (json?.text) onTranscript(json.text);
         } catch (err) {
           setError(err instanceof Error ? err.message : "Could not transcribe audio.");
         } finally {
