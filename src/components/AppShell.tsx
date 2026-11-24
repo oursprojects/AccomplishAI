@@ -16,12 +16,14 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
+  Sparkles,
   UserRound,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { QuotaStatus } from "@/lib/admin";
 import { QuotaGaugeIcon } from "@/components/icons/AccomplishIcons";
+import { GlobalAssistantDrawer } from "@/components/GlobalAssistantDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -177,6 +179,7 @@ export function AppShell({
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [globalAiOpen, setGlobalAiOpen] = useState(false);
   const [signOutModalOpen, setSignOutModalOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [creatingReport, setCreatingReport] = useState(false);
@@ -292,6 +295,17 @@ export function AppShell({
             <HeaderClock compact />
           </div>
           <AllowancePill quota={quota} />
+          <Button
+            type="button"
+            variant="accent"
+            size="icon"
+            onClick={() => setGlobalAiOpen(true)}
+            title="Ask Overall Accomplish AI"
+            aria-label="Ask Overall Accomplish AI"
+            className="rounded-xl"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -545,6 +559,16 @@ export function AppShell({
           <div className="flex items-center gap-2.5">
             <HeaderClock />
             <AllowancePill quota={quota} />
+            <Button
+              type="button"
+              size="sm"
+              variant="accent"
+              onClick={() => setGlobalAiOpen(true)}
+              title="Ask Overall Accomplish AI across all reports, OJT hours, profile & holidays"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Ask Overall AI</span>
+            </Button>
           </div>
         </header>
 
@@ -552,6 +576,26 @@ export function AppShell({
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
+
+      {/* Floating quick launcher on non-report pages so Overall AI is always one tap away */}
+      {!pathname.startsWith("/reports/") && !globalAiOpen && (
+        <button
+          type="button"
+          onClick={() => setGlobalAiOpen(true)}
+          className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full bg-[#1F1E1C] px-4 py-2.5 text-xs font-semibold text-white shadow-lg border border-white/15 hover:bg-[#34322E] transition cursor-pointer"
+          title="Ask Overall Accomplish AI"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-[#D97757]" />
+          <span>Ask Overall AI</span>
+        </button>
+      )}
+
+      <GlobalAssistantDrawer
+        open={globalAiOpen}
+        onOpenChange={setGlobalAiOpen}
+        userEmail={userEmail}
+        quota={quota}
+      />
 
       {/* Sign Out Confirmation Modal */}
       <Dialog

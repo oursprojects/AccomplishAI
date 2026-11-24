@@ -10,7 +10,6 @@ import { DAYS, REPORT_FIELD_META, REPORT_KEYS, reportDataSchema, type ReportData
 const requestSchema = z.object({
   rawNotes: z.string().trim().min(1, "Please enter or record some notes first.").max(8000),
   templateId: z.string().uuid().optional(),
-  existingData: z.record(z.string(), z.string()).optional(),
 });
 
 export async function POST(request: Request) {

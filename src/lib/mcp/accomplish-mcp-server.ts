@@ -2,12 +2,19 @@ import "server-only";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { getUserQuotaStatus } from "@/lib/admin";
 import {
+  addDays,
+  formatLongDate,
+  getMondayOfWeek,
   getReportWeekMondayIso,
+  inferNextWeekRange,
   normalizeDateToLongFormat,
   normalizeHolidayMondays,
   parseHoursNumber,
+  parseIsoDate,
   resolveWeekCategory,
+  toIsoDate,
 } from "@/lib/internship-calendar";
 import { sanitizeAccomplishmentLines } from "@/lib/report-task-format";
 import {
@@ -39,6 +46,7 @@ export interface AccomplishMcpSessionState {
   updatedKeys?: Set<ReportKey>;
   toolActions?: string[];
   onMutate?: () => void;
+  onGlobalMutate?: (info: { createdReportId?: string; mutated?: boolean }) => void;
 }
 
 export function cleanReportFieldValue(key: ReportKey, raw: unknown, maxDayBullets = 3): string {
@@ -122,12 +130,12 @@ const setReportFieldShape = Object.fromEntries(
 
 /**
  * Builds an AccomplishAI MCP Server backed by the signed-in user's RLS-scoped Supabase client.
- * Exposes read & write tools for reports, OJT cumulative hours, and profile defaults.
+ * Exposes read & write tools across reports, OJT hours, profile defaults, templates, and holiday schedules.
  */
 export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpServer {
   const server = new McpServer({
     name: "accomplish-ai-supabase-mcp",
-    version: "1.0.0",
+    version: "1.1.0",
   });
 
   // Tool 1: List saved reports from Supabase (previous & current weeks)
@@ -136,9 +144,9 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
     {
       title: "List Saved Reports",
       description:
-        "Query Supabase `reports` for this intern to inspect previous weeks' dates, hours_this_week, and total_hours_worked.",
+        "Query Supabase `reports` for this intern to inspect all weeks' titles, dates, hours_this_week, total_hours_worked, and readiness status.",
       inputSchema: {
-        limit: z.number().int().min(1).max(50).optional().describe("Maximum recent reports to fetch (default 12)."),
+        limit: z.number().int().min(1).max(50).optional().describe("Maximum recent reports to fetch (default 20)."),
       },
     },
     async ({ limit }) => {
@@ -147,12 +155,14 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
         .select("id, title, structured_data, created_at, updated_at")
         .eq("user_id", ctx.user.id)
         .order("created_at", { ascending: false })
-        .limit(limit ?? 12);
+        .limit(limit ?? 20);
 
       if (error) return jsonContent({ error: error.message });
 
       const reports = (data ?? []).map((r) => {
         const parsed = reportDataSchema.parse(r.structured_data ?? {});
+        const status = computeReportStatus(parsed);
+        const loggedDays = DAYS.filter((d) => parsed[`${d}_accomplishments`].trim().length > 0);
         return {
           id: r.id,
           title: r.title,
@@ -160,6 +170,9 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
           date_to: parsed.date_to,
           hours_this_week: parsed.hours_this_week,
           total_hours_worked: parsed.total_hours_worked,
+          logged_days: loggedDays,
+          is_complete: status.isComplete,
+          missing_essential: status.missingEssential.map((m) => m.label),
           created_at: r.created_at,
           updated_at: r.updated_at,
         };
@@ -226,18 +239,91 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
     },
   );
 
-  // Tool 3: Read current report fields & completion status
+  // Tool 3: Full workspace overview (profile + template + next open week + holidays + reports summary)
+  server.registerTool(
+    "get_workspace_overview",
+    {
+      title: "Get Workspace Overview",
+      description:
+        "Inspect the entire AccomplishAI workspace in Supabase: profile defaults, active Word template status, holiday weeks, next suggested week, and reports summary.",
+      inputSchema: {},
+    },
+    async () => {
+      const [{ data: profile }, { data: tpl }, { data: rows }] = await Promise.all([
+        ctx.supabase
+          .from("profiles")
+          .select(
+            "name_last_first, name_first_last, office, default_verifier, default_daily_hours, internship_start_date, target_ojt_hours",
+          )
+          .eq("id", ctx.user.id)
+          .maybeSingle(),
+        ctx.supabase
+          .from("templates")
+          .select("id, name, status, schema, updated_at")
+          .eq("user_id", ctx.user.id)
+          .eq("is_active", true)
+          .maybeSingle(),
+        ctx.supabase
+          .from("reports")
+          .select("id, title, structured_data, created_at")
+          .eq("user_id", ctx.user.id)
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
+
+      const holidayMondays = normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
+      const parsedReports = (rows ?? []).map((r) => {
+        const sd = reportDataSchema.parse(r.structured_data ?? {});
+        return {
+          id: r.id,
+          title: r.title,
+          date_from: sd.date_from,
+          date_to: sd.date_to,
+          hours_this_week: sd.hours_this_week,
+          total_hours_worked: sd.total_hours_worked,
+          is_complete: computeReportStatus(sd).isComplete,
+        };
+      });
+
+      const nextWeek = inferNextWeekRange({
+        startIso: profile?.internship_start_date ?? null,
+        holidayMondays,
+        existingReports: parsedReports,
+      });
+
+      return jsonContent({
+        email: ctx.user.email ?? "",
+        profile: profile ?? null,
+        holidayMondays,
+        nextSuggestedWeek: nextWeek,
+        activeTemplate: tpl
+          ? {
+              id: tpl.id,
+              name: tpl.name,
+              status: tpl.status,
+              mappedFieldsCount: Array.isArray(tpl.schema) ? tpl.schema.length : 0,
+              updatedAt: tpl.updated_at,
+            }
+          : null,
+        reportsCount: parsedReports.length,
+        reports: parsedReports,
+      });
+    },
+  );
+
+  // Tool 4: Read current or specific report fields & completion status
   server.registerTool(
     "get_report_fields",
     {
       title: "Get Report Fields",
-      description: "Read all current report field values and check which sections are filled or missing.",
+      description:
+        "Read all field values and missing sections for the currently open report OR any saved report by report_id.",
       inputSchema: {
         report_id: z
           .string()
           .uuid()
           .optional()
-          .describe("Optional report ID (needed only when calling outside an active chat report session)."),
+          .describe("Report UUID to inspect (omit only inside an active single-report chat session)."),
       },
     },
     async ({ report_id }) => {
@@ -250,7 +336,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
 
       const targetId = report_id ?? ctx.reportId;
       if (!targetId) {
-        return jsonContent({ error: "Provide report_id to read a report outside an active workspace session." });
+        return jsonContent({ error: "Provide report_id to read a specific report (call list_reports first to get IDs)." });
       }
 
       const { data: row, error } = await ctx.supabase
@@ -271,30 +357,30 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
     },
   );
 
-  // Tool 4: Set or update report fields (with Supabase duplicate-week & cumulative hours logic)
+  // Tool 5: Set or update report fields (with Supabase duplicate-week & cumulative hours logic)
   server.registerTool(
     "set_report_fields",
     {
       title: "Update Report Fields",
       description:
-        "Create or update one or more fields on the Weekly Accomplishment Report. Pass ONLY fields being set with non-empty values. Use exact 'Month Day, Year' format for date_from/date_to and ALL CAPS for names.",
+        "Update one or more fields on a Weekly Accomplishment Report. Pass ONLY fields being set with non-empty values. Use exact 'Month Day, Year' format for date_from/date_to and ALL CAPS for names.",
       inputSchema: {
         ...setReportFieldShape,
         report_id: z
           .string()
           .uuid()
           .optional()
-          .describe("Optional report ID when calling via /api/mcp outside an active chat turn."),
+          .describe("Target report UUID (required when calling from the global assistant or /api/mcp)."),
       },
     },
     async (args) => {
       const targetId = args.report_id ?? ctx.reportId ?? null;
-      let targetData = ctx.workingData;
+      let targetData = ctx.workingData && (!args.report_id || args.report_id === ctx.reportId) ? ctx.workingData : undefined;
       let persistDirectly = false;
 
       if (!targetData) {
         if (!targetId) {
-          return jsonContent({ error: "No active report_id provided." });
+          return jsonContent({ error: "Provide report_id (or create a report first) before updating fields." });
         }
         const { data: existing, error } = await ctx.supabase
           .from("reports")
@@ -411,9 +497,11 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
           .update({ structured_data: targetData as unknown as Json })
           .eq("id", targetId)
           .eq("user_id", ctx.user.id);
+        ctx.onGlobalMutate?.({ mutated: true });
       }
 
       return jsonContent({
+        report_id: targetId,
         updated: changed,
         ...(blockedDateConflict ? { blocked_date_conflict: blockedDateConflict } : {}),
         status: computeReportStatus(targetData),
@@ -421,7 +509,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
     },
   );
 
-  // Tool 5: Clear report fields
+  // Tool 6: Clear report fields
   server.registerTool(
     "clear_report_fields",
     {
@@ -436,7 +524,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
     },
     async ({ fields, clear_all, report_id }) => {
       const targetId = report_id ?? ctx.reportId ?? null;
-      let targetData = ctx.workingData;
+      let targetData = ctx.workingData && (!report_id || report_id === ctx.reportId) ? ctx.workingData : undefined;
       let persistDirectly = false;
 
       if (!targetData) {
@@ -478,6 +566,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
           .update({ structured_data: targetData as unknown as Json })
           .eq("id", targetId)
           .eq("user_id", ctx.user.id);
+        ctx.onGlobalMutate?.({ mutated: true });
       }
 
       return jsonContent({
@@ -488,18 +577,190 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
     },
   );
 
-  // Tool 6: Save recurring profile defaults into Supabase `profiles`
+  // Tool 7: Create a brand-new Weekly Accomplishment Report in Supabase
+  server.registerTool(
+    "create_weekly_report",
+    {
+      title: "Create Weekly Report",
+      description:
+        "Create a new Weekly Accomplishment Report in Supabase `reports` for the next open non-holiday week (or custom date_from / date_to) seeded with profile defaults.",
+      inputSchema: {
+        title: z.string().trim().max(120).optional().describe("Optional report title (e.g. 'Week 4')."),
+        date_from: z.string().trim().max(40).optional().describe("Optional start date (Month Day, Year)."),
+        date_to: z.string().trim().max(40).optional().describe("Optional end date (Month Day, Year)."),
+      },
+    },
+    async ({ title, date_from, date_to }) => {
+      const quota = await getUserQuotaStatus(ctx.supabase, ctx.user.id, ctx.user.email);
+      if (!quota.canCreateReport) {
+        return jsonContent({
+          error:
+            quota.maxReports !== null
+              ? `Saved report limit reached (${quota.reportsCount}/${quota.maxReports}).`
+              : "Your account is currently paused by the administrator.",
+        });
+      }
+
+      const [{ data: profile }, { data: existingRows }, { data: tpl }] = await Promise.all([
+        ctx.supabase
+          .from("profiles")
+          .select("name_last_first, name_first_last, office, internship_start_date")
+          .eq("id", ctx.user.id)
+          .maybeSingle(),
+        ctx.supabase
+          .from("reports")
+          .select("id, title, structured_data")
+          .eq("user_id", ctx.user.id)
+          .order("created_at", { ascending: false })
+          .limit(100),
+        ctx.supabase
+          .from("templates")
+          .select("id")
+          .eq("user_id", ctx.user.id)
+          .eq("is_active", true)
+          .maybeSingle(),
+      ]);
+
+      const holidayMondays = normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
+      const existingWithWeek = (existingRows ?? []).map((r) => {
+        const obj =
+          r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
+            ? (r.structured_data as Record<string, unknown>)
+            : {};
+        const from = typeof obj.date_from === "string" ? obj.date_from : "";
+        const to = typeof obj.date_to === "string" ? obj.date_to : "";
+        return {
+          id: r.id,
+          title: r.title,
+          date_from: from,
+          date_to: to,
+          mondayIso: getReportWeekMondayIso(from, to),
+        };
+      });
+
+      const seeded = emptyReport();
+      seeded.intern_name_last_first = (profile?.name_last_first ?? "").toUpperCase();
+      seeded.intern_name_first_last = (profile?.name_first_last ?? "").toUpperCase();
+      seeded.office = profile?.office || "DNX";
+
+      let finalTitle = title?.trim() ?? "";
+      if (date_from && date_to) {
+        seeded.date_from = normalizeDateToLongFormat(date_from);
+        seeded.date_to = normalizeDateToLongFormat(date_to);
+      } else {
+        const nextWeek = inferNextWeekRange({
+          startIso: profile?.internship_start_date ?? null,
+          existingReports: existingWithWeek,
+          holidayMondays,
+        });
+        if (nextWeek) {
+          seeded.date_from = nextWeek.fromText;
+          seeded.date_to = nextWeek.toText;
+          if (!finalTitle) finalTitle = `Week ${nextWeek.weekNumber}`;
+        }
+      }
+
+      const targetMonIso = getReportWeekMondayIso(seeded.date_from, seeded.date_to);
+      if (targetMonIso) {
+        const conflict = existingWithWeek.find((r) => r.mondayIso === targetMonIso);
+        if (conflict) {
+          return jsonContent({
+            error: `A report already exists for that week ("${conflict.title || conflict.date_from}").`,
+            existingReportId: conflict.id,
+            url: `/reports/${conflict.id}`,
+          });
+        }
+      }
+
+      const { data: created, error } = await ctx.supabase
+        .from("reports")
+        .insert({
+          user_id: ctx.user.id,
+          template_id: tpl?.id ?? null,
+          title: finalTitle,
+          raw_notes: "",
+          structured_data: seeded as unknown as Json,
+          chat_messages: [] as unknown as Json,
+        })
+        .select("id, title, structured_data")
+        .single();
+
+      if (error || !created) {
+        return jsonContent({ error: error?.message ?? "Could not create weekly report." });
+      }
+
+      ctx.toolActions?.push(`Created report ${finalTitle || created.id.slice(0, 8)}`);
+      ctx.onGlobalMutate?.({ createdReportId: created.id, mutated: true });
+
+      return jsonContent({
+        reportId: created.id,
+        title: created.title,
+        date_from: seeded.date_from,
+        date_to: seeded.date_to,
+        url: `/reports/${created.id}`,
+      });
+    },
+  );
+
+  // Tool 8: Mark or unmark Holiday / Break weeks in calendar schedule
+  server.registerTool(
+    "update_holiday_weeks",
+    {
+      title: "Update Holiday / Break Weeks",
+      description:
+        "Add or remove holiday/break weeks (any date inside a week converts to that week's Monday ISO YYYY-MM-DD) so active internship Week numbers skip holiday weeks cleanly.",
+      inputSchema: {
+        add_dates: z
+          .array(z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/))
+          .optional()
+          .describe("Dates (YYYY-MM-DD) whose weeks should be marked as Holiday / Break."),
+        remove_dates: z
+          .array(z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/))
+          .optional()
+          .describe("Dates (YYYY-MM-DD) whose weeks should be unmarked from Holiday / Break."),
+      },
+    },
+    async ({ add_dates, remove_dates }) => {
+      const current = new Set(normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays));
+      for (const raw of add_dates ?? []) {
+        const dt = parseIsoDate(raw);
+        if (dt) current.add(toIsoDate(getMondayOfWeek(dt)));
+      }
+      for (const raw of remove_dates ?? []) {
+        const dt = parseIsoDate(raw);
+        if (dt) current.delete(toIsoDate(getMondayOfWeek(dt)));
+      }
+
+      const updated = Array.from(current).sort();
+      const { error } = await ctx.supabase.auth.updateUser({ data: { holiday_mondays: updated } });
+      if (error) return jsonContent({ error: error.message });
+
+      ctx.toolActions?.push("Updated holiday schedule");
+      ctx.onGlobalMutate?.({ mutated: true });
+
+      return jsonContent({
+        holidayMondays: updated.map((iso) => {
+          const mon = parseIsoDate(iso);
+          return mon ? `${formatLongDate(mon)} – ${formatLongDate(addDays(mon, 4))} (${iso})` : iso;
+        }),
+      });
+    },
+  );
+
+  // Tool 9: Save recurring profile defaults into Supabase `profiles`
   server.registerTool(
     "save_profile_defaults",
     {
       title: "Save Profile Defaults",
       description:
-        "Save the intern's recurring name, office, verifier, or internship_start_date (YYYY-MM-DD) in Supabase `profiles`.",
+        "Save the intern's recurring name, office, verifier, default_daily_hours, target_ojt_hours, or internship_start_date (YYYY-MM-DD) in Supabase `profiles`.",
       inputSchema: {
         name_last_first: z.string().optional().describe("ALL CAPS format: LASTNAME, FIRSTNAME MI."),
         name_first_last: z.string().optional().describe("ALL CAPS format: FIRSTNAME MI. LASTNAME"),
         office: z.string().optional(),
         default_verifier: z.string().optional().describe("ALL CAPS verifier name"),
+        default_daily_hours: z.number().min(0).max(24).optional(),
+        target_ojt_hours: z.number().int().min(40).max(5000).optional(),
         internship_start_date: z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -508,7 +769,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       },
     },
     async (args) => {
-      const patch: Record<string, string> = {};
+      const patch: Record<string, string | number> = {};
       if (args.name_last_first?.trim()) {
         patch.name_last_first = args.name_last_first.trim().toUpperCase().slice(0, 120);
       }
@@ -521,6 +782,12 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       if (args.default_verifier?.trim()) {
         patch.default_verifier = args.default_verifier.trim().toUpperCase().slice(0, 120);
       }
+      if (typeof args.default_daily_hours === "number") {
+        patch.default_daily_hours = args.default_daily_hours;
+      }
+      if (typeof args.target_ojt_hours === "number") {
+        patch.target_ojt_hours = args.target_ojt_hours;
+      }
       if (args.internship_start_date?.trim()) {
         patch.internship_start_date = args.internship_start_date.trim();
       }
@@ -529,6 +796,7 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
         const { error } = await ctx.supabase.from("profiles").upsert({ id: ctx.user.id, ...patch }, { onConflict: "id" });
         if (error) return jsonContent({ error: error.message });
         ctx.toolActions?.push("Saved profile defaults");
+        ctx.onGlobalMutate?.({ mutated: true });
       }
 
       return jsonContent({ saved: Object.keys(patch) });
