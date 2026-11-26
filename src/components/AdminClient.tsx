@@ -11,7 +11,6 @@ import {
   EyeOff,
   FileStack,
   Gauge,
-  Mic,
   PauseCircle,
   PlayCircle,
   RotateCcw,
@@ -23,11 +22,9 @@ import {
   Zap,
 } from "lucide-react";
 import {
-  ALLOWED_STT_MODELS,
   ALLOWED_TEXT_MODELS,
   type AdminMember,
   type AiRuntimeSettings,
-  type AllowedSttModel,
   type AllowedTextModel,
   type ApiUsageMonitor,
 } from "@/lib/admin";
@@ -82,7 +79,6 @@ export function AdminClient({
     initialAiSettings.defaultMaxReports === null ? "" : String(initialAiSettings.defaultMaxReports),
   );
   const [activeTextModel, setActiveTextModel] = useState<AllowedTextModel>(initialAiSettings.activeTextModel);
-  const [activeSttModel, setActiveSttModel] = useState<AllowedSttModel>(initialAiSettings.activeSttModel);
   const [maxBulletsPerDay, setMaxBulletsPerDay] = useState(initialAiSettings.maxBulletsPerDay);
   const [maxChatMessages, setMaxChatMessages] = useState(initialAiSettings.maxChatMessages);
   const [globalRpmLimit, setGlobalRpmLimit] = useState(initialAiSettings.globalRpmLimit);
@@ -117,7 +113,6 @@ export function AdminClient({
 
   const aiControlsChanged =
     activeTextModel !== aiSettings.activeTextModel ||
-    activeSttModel !== aiSettings.activeSttModel ||
     maxBulletsPerDay !== aiSettings.maxBulletsPerDay ||
     maxChatMessages !== aiSettings.maxChatMessages ||
     globalRpmLimit !== aiSettings.globalRpmLimit;
@@ -140,7 +135,6 @@ export function AdminClient({
       json.aiSettings.defaultMaxReports === null ? "" : String(json.aiSettings.defaultMaxReports),
     );
     setActiveTextModel(json.aiSettings.activeTextModel);
-    setActiveSttModel(json.aiSettings.activeSttModel);
     setMaxBulletsPerDay(json.aiSettings.maxBulletsPerDay);
     setMaxChatMessages(json.aiSettings.maxChatMessages);
     setGlobalRpmLimit(json.aiSettings.globalRpmLimit);
@@ -274,7 +268,6 @@ export function AdminClient({
         body: JSON.stringify({
           action: "update_ai_settings",
           activeTextModel,
-          activeSttModel,
           maxBulletsPerDay,
           maxChatMessages,
           globalRpmLimit,
@@ -296,7 +289,7 @@ export function AdminClient({
         usageMonitor: json.usageMonitor,
         poolStatus: json.poolStatus,
       });
-      toast.success(`AI settings updated: ${json.aiSettings.activeTextModel} & ${json.aiSettings.activeSttModel}.`);
+      toast.success(`AI settings updated: ${json.aiSettings.activeTextModel}.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not update AI controls.");
     } finally {
@@ -446,8 +439,7 @@ export function AdminClient({
             <Cpu className="w-4 h-4 text-emerald-700" />
           </div>
           <p className="mt-1 text-xs font-mono font-semibold text-emerald-700 truncate">{aiSettings.activeTextModel}</p>
-          <p className="text-[11px] font-mono text-[#5C5C57] truncate mt-0.5">STT: {aiSettings.activeSttModel}</p>
-          <p className="text-[11px] text-[#7A7A73] mt-1">{usageMonitor.requestsLast7Days} calls last 7 days</p>
+          <p className="text-[11px] text-[#52524E] mt-1">{usageMonitor.requestsLast7Days} calls last 7 days</p>
         </Card>
       </div>
 
@@ -567,10 +559,10 @@ export function AdminClient({
                 Switch active Groq models cleanly for future releases or traffic spikes, with automatic fallback.
               </p>
             </div>
-            <Badge>GPT-OSS 120B + Whisper v3 Turbo</Badge>
+            <Badge>GPT-OSS 120B Pool</Badge>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label htmlFor="admin-text-model" className="block text-xs font-medium text-[#3D3D39] mb-1">
                 Primary Chat / Report Model
@@ -589,28 +581,6 @@ export function AdminClient({
               </select>
               <p className="mt-1 text-[11px] text-[#52524E]">
                 {ALLOWED_TEXT_MODELS.find((m) => m.id === activeTextModel)?.notes}
-              </p>
-            </div>
-
-            <div>
-              <label htmlFor="admin-stt-model" className="block text-xs font-medium text-[#3D3D39] mb-1 flex items-center gap-1">
-                <Mic className="w-3.5 h-3.5 text-[#1D4ED8]" />
-                Voice Transcription (STT) Model
-              </label>
-              <select
-                id="admin-stt-model"
-                value={activeSttModel}
-                onChange={(e) => setActiveSttModel(e.target.value as AllowedSttModel)}
-                className="w-full rounded-xl border border-[#D8D8D0] bg-[#F8F8F6] px-3 py-2 text-xs font-medium text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/35 focus:border-[#1D4ED8] cursor-pointer"
-              >
-                {ALLOWED_STT_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-[11px] text-[#52524E]">
-                {ALLOWED_STT_MODELS.find((m) => m.id === activeSttModel)?.notes}
               </p>
             </div>
 

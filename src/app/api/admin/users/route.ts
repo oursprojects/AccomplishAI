@@ -49,7 +49,7 @@ const patchSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("update_ai_settings"),
     activeTextModel: z.enum(textModelIds),
-    activeSttModel: z.enum(sttModelIds),
+    activeSttModel: z.enum(sttModelIds).optional(),
     maxBulletsPerDay: z.coerce.number().int().min(1).max(5),
     maxChatMessages: z.coerce.number().int().min(4).max(60),
     globalRpmLimit: z.coerce.number().int().min(10).max(300),
@@ -267,7 +267,7 @@ export async function PATCH(request: Request) {
           {
             id: 1,
             active_text_model: body.activeTextModel,
-            active_stt_model: body.activeSttModel,
+            ...(body.activeSttModel ? { active_stt_model: body.activeSttModel } : {}),
             max_bullets_per_day: body.maxBulletsPerDay,
             max_chat_messages: body.maxChatMessages,
             global_rpm_limit: body.globalRpmLimit,

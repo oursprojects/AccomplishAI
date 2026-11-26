@@ -27,8 +27,6 @@ import {
   Square,
   Trash2,
   TrendingUp,
-  Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
 import {
@@ -49,7 +47,6 @@ import { parseJsonResponse } from "@/lib/client-json";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChatMarkdown } from "./ChatMarkdown";
-import { VoiceRecorder } from "./VoiceRecorder";
 
 interface ChatAttachmentMeta {
   name: string;
@@ -157,15 +154,6 @@ function makeEmptyThread(): SavedThread {
   };
 }
 
-function stripForSpeech(md: string): string {
-  return md
-    .replace(/```[\s\S]*?```/g, " Code or chart omitted. ")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[#*_`>|]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 interface GlobalAssistantDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -199,7 +187,6 @@ export function GlobalAssistantDrawer({
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
 
@@ -311,20 +298,6 @@ export function GlobalAssistantDrawer({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onOpenChange, exportMenuOpen, historyOpen]);
 
-  useEffect(() => {
-    if (!open && typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-  }, [open]);
-
-  useEffect(() => {
-    return () => {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
-
   async function runChatTurn(
     historyToSend: GlobalChatTurn[],
     attachedFiles: AttachedChatFile[] = [],
@@ -423,6 +396,10 @@ export function GlobalAssistantDrawer({
     const baseHistory = [...messages, userTurn];
     updateActiveMessages(() => baseHistory, finalText);
     setInput("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.overflowY = "hidden";
+    }
     setAttachments([]);
     await runChatTurn(baseHistory, attachedNow);
   }
@@ -539,26 +516,6 @@ export function GlobalAssistantDrawer({
       },
       fmt,
     );
-  }
-
-  function toggleSpeak(id: string, content: string) {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      setError("Text-to-speech is not supported in this browser.");
-      return;
-    }
-    if (speakingId === id) {
-      window.speechSynthesis.cancel();
-      setSpeakingId(null);
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const clean = stripForSpeech(content);
-    if (!clean) return;
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.onend = () => setSpeakingId((cur) => (cur === id ? null : cur));
-    utt.onerror = () => setSpeakingId((cur) => (cur === id ? null : cur));
-    setSpeakingId(id);
-    window.speechSynthesis.speak(utt);
   }
 
   async function handleCopy(id: string, text: string) {
@@ -927,19 +884,6 @@ export function GlobalAssistantDrawer({
                         )}
                         <span>{copiedId === m.id ? "Copied" : "Copy"}</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleSpeak(m.id, m.content)}
-                        title={speakingId === m.id ? "Stop reading aloud" : "Read aloud"}
-                        className="inline-flex items-center gap-1 rounded-md border border-[#D8D8D0] bg-white px-2 py-0.5 text-[11px] font-medium text-[#141413]/70 hover:bg-[#F1F1EE] cursor-pointer"
-                      >
-                        {speakingId === m.id ? (
-                          <VolumeX className="size-3 text-[#1D4ED8]" />
-                        ) : (
-                          <Volume2 className="size-3" />
-                        )}
-                        <span>{speakingId === m.id ? "Stop" : "Listen"}</span>
-                      </button>
                     </>
                   )}
                   {mIdx === lastAssistantIdx && !sending && (
@@ -1068,9 +1012,16 @@ export function GlobalAssistantDrawer({
           <div className="flex items-end gap-2 rounded-lg border border-[#D8D8D0] bg-[#F8F8F6] px-2.5 py-1.5 focus-within:border-[#1D4ED8] focus-within:bg-white transition duration-150">
             <textarea
               ref={textareaRef}
-              rows={2}
+              rows={1}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                const el = e.currentTarget;
+                el.style.height = "auto";
+                const nextH = Math.min(el.scrollHeight, 144);
+                el.style.height = `${nextH}px`;
+                el.style.overflowY = el.scrollHeight > 144 ? "auto" : "hidden";
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
@@ -1081,9 +1032,9 @@ export function GlobalAssistantDrawer({
               placeholder={
                 blocked
                   ? "Daily prompt limit reached."
-                  : "Ask anything, type / for commands, or drop .docx/.csv/.txt…"
+                  : "Ask anything, type / for commands, or drop files…"
               }
-              className="flex-1 bg-transparent py-1 text-base sm:text-sm text-[#141413] placeholder:text-[#5C5C57]/75 outline-none resize-none max-h-36 disabled:opacity-60"
+              className="flex-1 bg-transparent py-1.5 text-base sm:text-sm leading-snug text-[#141413] placeholder:text-[#5C5C57]/75 outline-none resize-none overflow-hidden max-h-36 disabled:opacity-60"
             />
             <div className="flex items-center gap-1 shrink-0 pb-0.5">
               <button
@@ -1109,11 +1060,6 @@ export function GlobalAssistantDrawer({
               >
                 <Slash className="size-3.5" />
               </button>
-              <VoiceRecorder
-                compact
-                disabled={sending || blocked}
-                onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
-              />
               {sending ? (
                 <Button type="button" size="sm" variant="destructive" onClick={handleStop} className="h-9 sm:h-8 px-3">
                   <Square className="size-3 fill-current" />

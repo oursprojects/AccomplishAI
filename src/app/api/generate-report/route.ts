@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const systemPrompt = `You convert a student intern's raw typed or spoken notes into a concise JSON object for a 1-page university "Weekly Accomplishment Report" (Monday to Friday).
+  const systemPrompt = `You convert a student intern's raw weekly notes into a concise JSON object for a 1-page university "Weekly Accomplishment Report" (Monday to Friday).
 
 Return a single JSON object with ALL of these string keys (no nested objects/arrays):
 ${REPORT_KEYS.map((k) => `- "${k}": ${REPORT_FIELD_META[k].description}`).join("\n")}

@@ -20,7 +20,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChatMarkdown } from "./ChatMarkdown";
-import { VoiceRecorder } from "./VoiceRecorder";
 
 export interface ChatTurn {
   id: string;
@@ -85,6 +84,7 @@ export function ReportChat({
   const [error, setError] = useState<string | null>(null);
   const [failedRetryPayload, setFailedRetryPayload] = useState<ChatTurn[] | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -233,7 +233,13 @@ export function ReportChat({
     const userTurn: ChatTurn = { id: `u-${crypto.randomUUID()}`, role: "user", content: text };
     const nextHistory = [...messages, userTurn];
     onMessagesChange(nextHistory);
-    if (!overrideText) setInput("");
+    if (!overrideText) {
+      setInput("");
+      if (inputRef.current) {
+        inputRef.current.style.height = "auto";
+        inputRef.current.style.overflowY = "hidden";
+      }
+    }
     setSending(true);
     try {
       await submitHistory(nextHistory, 0);
@@ -255,7 +261,7 @@ export function ReportChat({
   }
 
   return (
-    <Card className="overflow-hidden flex flex-col lg:h-[calc(100dvh-13.25rem)] lg:min-h-[460px]">
+    <Card className="overflow-hidden flex flex-col">
       {/* Header */}
       <div className="border-b border-[#E2E2DC] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 bg-[#F1F1EE]">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -324,7 +330,7 @@ export function ReportChat({
         role="log"
         aria-live="polite"
         aria-label="Accomplish AI conversation"
-        className="flex-1 min-h-[260px] max-h-[54dvh] lg:max-h-none overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 bg-[#F8F8F6]"
+        className="flex-1 min-h-[260px] max-h-[54dvh] overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 bg-[#F8F8F6]"
       >
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
@@ -429,9 +435,17 @@ export function ReportChat({
 
         <div className="flex items-end gap-2 rounded-lg border border-[#D8D8D0] bg-[#F8F8F6] px-2.5 py-1.5 focus-within:border-[#1D4ED8] focus-within:bg-white transition duration-150">
           <textarea
-            rows={2}
+            ref={inputRef}
+            rows={1}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              const nextH = Math.min(el.scrollHeight, 120);
+              el.style.height = `${nextH}px`;
+              el.style.overflowY = el.scrollHeight > 120 ? "auto" : "hidden";
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
@@ -439,16 +453,11 @@ export function ReportChat({
               }
             }}
             disabled={composerDisabled}
-            placeholder="Share notes in English or Tagalog… (Enter to send)"
-            className="flex-1 bg-transparent py-1 text-base sm:text-sm text-[#141413] placeholder:text-[#5C5C57]/75 outline-none resize-none max-h-28 disabled:opacity-60"
+            placeholder="Ask AI or paste weekly notes…"
+            className="flex-1 bg-transparent py-1.5 text-base sm:text-sm leading-snug text-[#141413] placeholder:text-[#5C5C57]/75 outline-none resize-none overflow-hidden max-h-[120px] disabled:opacity-60"
           />
 
           <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
-            <VoiceRecorder
-              compact
-              disabled={composerDisabled}
-              onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
-            />
             <Button
               type="button"
               size="sm"
