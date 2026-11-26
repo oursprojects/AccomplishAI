@@ -767,7 +767,7 @@ export function HistoryClient({
               aria-label="Sort reports"
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="h-8 rounded-lg border border-[#D8D8D0] bg-white px-2.5 text-xs font-medium text-[#141413] outline-none"
+              className="h-9 sm:h-8 rounded-lg border border-[#D8D8D0] bg-white px-2.5 text-xs font-medium text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 focus:border-[#1D4ED8] cursor-pointer"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>

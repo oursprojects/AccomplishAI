@@ -273,25 +273,29 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
                   <div key={group.title} className="space-y-2.5">
                     <div>
                       <h4 className="text-xs font-semibold uppercase tracking-wide text-[#52524E]">{group.title}</h4>
-                      <p className="text-[11px] text-[#7A7A73]">{group.description}</p>
+                      <p className="text-[11px] text-[#52524E]">{group.description}</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                       {group.fields.map((f) => (
                         <div key={f.key} className={f.multiline ? "sm:col-span-2 lg:col-span-3" : ""}>
-                          <label className="block text-[11px] font-medium text-[#3D3D39] mb-1">{f.label}</label>
+                          <label htmlFor={`template-text-${f.key}`} className="block text-[11px] font-medium text-[#3D3D39] mb-1">
+                            {f.label}
+                          </label>
                           {f.multiline ? (
                             <textarea
+                              id={`template-text-${f.key}`}
                               rows={2}
                               value={customTexts[f.key]}
                               onChange={(e) => updateText(f.key, e.target.value)}
-                              className="w-full rounded-lg border border-[#D8D8D0] bg-white px-2.5 py-1.5 text-xs text-[#141413] outline-none focus:border-[#1D4ED8]"
+                              className="w-full rounded-lg border border-[#D8D8D0] bg-white px-2.5 py-1.5 text-sm sm:text-xs text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/35 focus:border-[#1D4ED8]"
                             />
                           ) : (
                             <input
+                              id={`template-text-${f.key}`}
                               type="text"
                               value={customTexts[f.key]}
                               onChange={(e) => updateText(f.key, e.target.value)}
-                              className="w-full rounded-lg border border-[#D8D8D0] bg-white px-2.5 py-1.5 text-xs text-[#141413] outline-none focus:border-[#1D4ED8]"
+                              className="w-full rounded-lg border border-[#D8D8D0] bg-white px-2.5 py-1.5 text-sm sm:text-xs text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/35 focus:border-[#1D4ED8]"
                             />
                           )}
                         </div>
@@ -340,19 +344,25 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
                 </div>
 
                 <div className="sm:col-span-4">
-                  <label className="sr-only">Field Label</label>
+                  <label htmlFor={`field-label-${row.candidateId}`} className="sr-only">
+                    Field Label
+                  </label>
                   <input
+                    id={`field-label-${row.candidateId}`}
                     type="text"
                     value={row.label}
                     onChange={(e) => updateRow(idx, { label: e.target.value })}
                     placeholder="Display label"
-                    className="w-full rounded-lg border border-[#D8D8D0] bg-white px-2.5 py-1.5 text-xs text-[#141413] outline-none focus:border-[#1D4ED8]"
+                    className="w-full rounded-lg border border-[#D8D8D0] bg-white px-2.5 py-1.5 text-sm sm:text-xs text-[#141413] placeholder:text-[#5C5C57]/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/35 focus:border-[#1D4ED8]"
                   />
                 </div>
 
                 <div className="sm:col-span-4">
-                  <label className="sr-only">Schema Key</label>
+                  <label htmlFor={`field-key-${row.candidateId}`} className="sr-only">
+                    Schema Key
+                  </label>
                   <select
+                    id={`field-key-${row.candidateId}`}
                     value={row.key}
                     onChange={(e) => {
                       const nextKey = e.target.value as ReportKey | "";
@@ -361,7 +371,7 @@ export function TemplateScannerCard({ initialReview, onConfirmed }: TemplateScan
                         label: nextKey ? REPORT_FIELD_META[nextKey].label : row.label,
                       });
                     }}
-                    className="w-full rounded-lg border border-[#D8D8D0] bg-white px-2.5 py-1.5 text-xs font-mono text-[#141413] outline-none focus:border-[#1D4ED8]"
+                    className="w-full rounded-lg border border-[#D8D8D0] bg-white px-2.5 py-1.5 text-sm sm:text-xs font-mono text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/35 focus:border-[#1D4ED8] cursor-pointer"
                   >
                     <option value="">-- Skip / Do not tag --</option>
                     {REPORT_KEYS.map((k) => (

@@ -575,11 +575,13 @@ export function GlobalAssistantDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div
+        aria-hidden="true"
         className="fixed inset-0 bg-[#141413]/40"
         onClick={() => onOpenChange(false)}
       />
       <aside
         role="dialog"
+        aria-modal="true"
         aria-label="Overall Accomplish AI Assistant"
         onDragOver={(e) => {
           e.preventDefault();
@@ -591,9 +593,8 @@ export function GlobalAssistantDrawer({
           setDraggingFile(false);
           void handleFilesSelected(e.dataTransfer.files);
         }}
-        className={`relative z-10 flex h-full w-full flex-col border-l border-[#E2E2DC] bg-[#F8F8F6] shadow-2xl transition-[max-width] duration-150 ${
-          wideMode ? "max-w-3xl" : "max-w-lg"
-        }`}
+        className={`relative z-10 flex h-full w-full flex-col border-l border-[#E2E2DC] bg-[#F8F8F6] shadow-2xl transition-[max-width] duration-150 ${wideMode ? "max-w-3xl" : "max-w-lg"
+          }`}
       >
         {/* Drag overlay */}
         {draggingFile && (
@@ -618,7 +619,7 @@ export function GlobalAssistantDrawer({
                   <span>MCP</span>
                 </Badge>
               </div>
-              <p className="text-[11px] text-[#141413]/55 truncate">
+              <p className="text-[11px] text-[#52524E] truncate">
                 Charts, Mermaid, DOCX/PDF/Excel &amp; Supabase tools
               </p>
             </div>
@@ -741,9 +742,8 @@ export function GlobalAssistantDrawer({
                 return (
                   <div
                     key={t.id}
-                    className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition ${
-                      isActive ? "border-[#1D4ED8] bg-white" : "border-[#E2E2DC] bg-white/80 hover:bg-white"
-                    }`}
+                    className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition ${isActive ? "border-[#1D4ED8] bg-white" : "border-[#E2E2DC] bg-white/80 hover:bg-white"
+                      }`}
                   >
                     <button
                       type="button"
@@ -755,7 +755,7 @@ export function GlobalAssistantDrawer({
                       className="flex-1 min-w-0 text-left cursor-pointer"
                     >
                       <span className="block font-medium text-[#141413] truncate">{t.title}</span>
-                      <span className="block text-[10px] text-[#141413]/45 tabular-nums">
+                      <span className="block text-[10px] text-[#52524E] tabular-nums">
                         {t.messages.length - 1} msg{t.messages.length - 1 === 1 ? "" : "s"} ·{" "}
                         {new Date(t.updatedAt).toLocaleDateString()}
                       </span>
@@ -766,7 +766,7 @@ export function GlobalAssistantDrawer({
                       onClick={() => handleDeleteThread(t.id)}
                       title="Delete conversation"
                       aria-label="Delete conversation"
-                      className="rounded-md p-1 text-[#141413]/45 hover:bg-red-50 hover:text-red-600 cursor-pointer disabled:opacity-40"
+                      className="rounded-md p-1.5 text-[#52524E] hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 cursor-pointer disabled:opacity-40"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
@@ -806,11 +806,12 @@ export function GlobalAssistantDrawer({
             <div key={m.id} className={`group flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
               {m.role === "user" && editingId === m.id ? (
                 <div className="w-full max-w-[90%] rounded-xl border border-[#1D4ED8] bg-white p-2.5 space-y-2">
-                  <textarea
+                    <textarea
                     rows={3}
                     value={editingText}
                     onChange={(e) => setEditingText(e.target.value)}
-                    className="w-full bg-[#F8F8F6] rounded-lg border border-[#D8D8D0] p-2 text-sm text-[#141413] outline-none focus:border-[#1D4ED8]"
+                    aria-label="Edit message"
+                    className="w-full bg-[#F8F8F6] rounded-lg border border-[#D8D8D0] p-2 text-base sm:text-sm text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/35 focus:border-[#1D4ED8]"
                   />
                   <div className="flex justify-end gap-1.5">
                     <Button type="button" size="sm" variant="outline" onClick={() => setEditingId(null)}>
@@ -829,11 +830,10 @@ export function GlobalAssistantDrawer({
                 </div>
               ) : (
                 <div
-                  className={`rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                    m.role === "user"
-                      ? "max-w-[85%] bg-[#141413] text-white rounded-br-xs whitespace-pre-wrap"
-                      : "w-full max-w-[96%] bg-white border border-[#E2E2DC] text-[#141413] rounded-bl-xs"
-                  }`}
+                  className={`rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user"
+                    ? "max-w-[85%] bg-[#141413] text-white rounded-br-xs whitespace-pre-wrap"
+                    : "w-full max-w-[96%] bg-white border border-[#E2E2DC] text-[#141413] rounded-bl-xs"
+                    }`}
                 >
                   {m.role === "assistant" ? (
                     <ChatMarkdown content={m.content} />
@@ -937,7 +937,7 @@ export function GlobalAssistantDrawer({
                       <span>Regenerate</span>
                     </button>
                   )}
-                  {m.model && <span className="text-[10px] font-mono text-[#141413]/45 px-1">{m.model}</span>}
+                  {m.model && <span className="text-[10px] font-mono text-[#52524E] px-1">{m.model}</span>}
                 </div>
               )}
             </div>
@@ -980,7 +980,7 @@ export function GlobalAssistantDrawer({
           {/* Slash command popover */}
           {filteredCommands.length > 0 && (
             <div className="absolute bottom-full left-3 right-3 mb-2 z-20 rounded-xl border border-[#E2E2DC] bg-white p-1.5 shadow-xl max-h-60 overflow-y-auto">
-              <p className="px-2.5 py-1 text-[10px] font-medium text-[#141413]/50">
+              <p className="px-2.5 py-1 text-[10px] font-medium text-[#52524E]">
                 Quick Commands
               </p>
               {filteredCommands.map((item) => {
@@ -993,7 +993,7 @@ export function GlobalAssistantDrawer({
                       setInput(item.template);
                       textareaRef.current?.focus();
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left hover:bg-[#EFF4FF] transition cursor-pointer"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left hover:bg-[#EFF4FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 transition cursor-pointer"
                   >
                     <span className="flex size-7 items-center justify-center rounded-md bg-[#F8F8F6] border border-[#E2E2DC] text-[#1D4ED8] shrink-0">
                       <Icon className="size-3.5" />
@@ -1001,9 +1001,9 @@ export function GlobalAssistantDrawer({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs font-medium text-[#141413]">{item.cmd}</span>
-                        <span className="text-xs font-medium text-[#141413]/75 truncate">{item.label}</span>
+                        <span className="text-xs font-medium text-[#141413]/85 truncate">{item.label}</span>
                       </div>
-                      <p className="text-[11px] text-[#141413]/50 truncate">{item.desc}</p>
+                      <p className="text-[11px] text-[#52524E] truncate">{item.desc}</p>
                     </div>
                   </button>
                 );
@@ -1021,12 +1021,12 @@ export function GlobalAssistantDrawer({
                 >
                   <Paperclip className="size-3 text-[#1D4ED8]" />
                   <span className="max-w-36 truncate">{att.name}</span>
-                  <span className="text-[10px] text-[#141413]/45 tabular-nums">{formatFileSize(att.sizeBytes)}</span>
+                  <span className="text-[10px] text-[#52524E] tabular-nums">{formatFileSize(att.sizeBytes)}</span>
                   <button
                     type="button"
                     onClick={() => setAttachments((prev) => prev.filter((a) => a.id !== att.id))}
                     aria-label={`Remove ${att.name}`}
-                    className="rounded p-0.5 text-[#141413]/45 hover:bg-[#E7E7E2] hover:text-[#141413] cursor-pointer"
+                    className="rounded p-0.5 text-[#52524E] hover:bg-[#E7E7E2] hover:text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 cursor-pointer"
                   >
                     <X className="size-3" />
                   </button>
@@ -1065,7 +1065,7 @@ export function GlobalAssistantDrawer({
                   ? "Daily prompt limit reached."
                   : "Ask anything, type / for commands, or drop .docx/.csv/.txt…"
               }
-              className="flex-1 bg-transparent py-1 text-sm text-[#141413] placeholder:text-[#141413]/35 outline-none resize-none max-h-36 disabled:opacity-60"
+              className="flex-1 bg-transparent py-1 text-base sm:text-sm text-[#141413] placeholder:text-[#5C5C57]/75 outline-none resize-none max-h-36 disabled:opacity-60"
             />
             <div className="flex items-center gap-1 shrink-0 pb-0.5">
               <button
@@ -1074,7 +1074,7 @@ export function GlobalAssistantDrawer({
                 onClick={() => fileInputRef.current?.click()}
                 title="Attach .docx, .csv, .json, .txt, or code file"
                 aria-label="Attach file"
-                className="inline-flex size-8 items-center justify-center rounded-md border border-[#D8D8D0] bg-white text-[#141413]/70 hover:bg-[#F1F1EE] hover:text-[#141413] transition cursor-pointer disabled:opacity-50"
+                className="inline-flex size-9 sm:size-8 items-center justify-center rounded-md border border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE] hover:text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 transition cursor-pointer disabled:opacity-50"
               >
                 <Paperclip className="size-3.5" />
               </button>
@@ -1087,7 +1087,7 @@ export function GlobalAssistantDrawer({
                 }}
                 title="Slash commands (/chart, /mermaid, /excel, /pdf, /docx)"
                 aria-label="Slash commands"
-                className="inline-flex size-8 items-center justify-center rounded-md border border-[#D8D8D0] bg-white text-[#141413]/70 hover:bg-[#F1F1EE] hover:text-[#141413] transition cursor-pointer disabled:opacity-50"
+                className="inline-flex size-9 sm:size-8 items-center justify-center rounded-md border border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE] hover:text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 transition cursor-pointer disabled:opacity-50"
               >
                 <Slash className="size-3.5" />
               </button>
@@ -1097,7 +1097,7 @@ export function GlobalAssistantDrawer({
                 onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
               />
               {sending ? (
-                <Button type="button" size="sm" variant="destructive" onClick={handleStop} className="h-8 px-3">
+                <Button type="button" size="sm" variant="destructive" onClick={handleStop} className="h-9 sm:h-8 px-3">
                   <Square className="size-3 fill-current" />
                   <span>Stop</span>
                 </Button>
@@ -1107,7 +1107,7 @@ export function GlobalAssistantDrawer({
                   size="sm"
                   variant="accent"
                   disabled={blocked || (!input.trim() && attachments.length === 0)}
-                  className="h-8 px-3"
+                  className="h-9 sm:h-8 px-3"
                 >
                   <AnimatedSendIcon className="size-3.5" />
                   <span>Ask</span>
@@ -1115,10 +1115,10 @@ export function GlobalAssistantDrawer({
               )}
             </div>
           </div>
-          <p className="text-[10px] text-[#141413]/50 px-1">
+          <p className="text-[10px] text-[#52524E] px-1">
             Type <kbd className="font-mono">/</kbd> for shortcuts · Drop{" "}
-            <span className="font-medium text-[#141413]/75">.docx, .csv, .json, .txt</span> · Ask for{" "}
-            <span className="font-medium text-[#141413]/75">charts, Mermaid, DOCX, PDF, Excel</span>
+            <span className="font-medium text-[#141413]">.docx, .csv, .json, .txt</span> · Ask for{" "}
+            <span className="font-medium text-[#141413]">charts, Mermaid, DOCX, PDF, Excel</span>
           </p>
         </form>
       </aside>

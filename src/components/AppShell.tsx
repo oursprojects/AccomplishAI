@@ -267,10 +267,21 @@ export function AppShell({
     navItems.find((i) => isNavActive(i))?.label ?? "Accomplish AI";
 
   return (
-    <div className="relative min-h-dvh flex flex-col md:flex-row bg-[#F8F8F6] text-[#141413]">
+    <div className="relative min-h-dvh flex flex-col md:flex-row bg-[#F8F8F6] text-[#141413] overflow-x-clip">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 rounded-lg bg-[#141413] px-3 py-2 text-xs font-medium text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+      >
+        Skip to main content
+      </a>
+
       {/* Top progress bar during imperative route transitions */}
       {(creatingReport || isNavTransition) && (
-        <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-[#EFF4FF] overflow-hidden">
+        <div
+          role="progressbar"
+          aria-label="Loading page"
+          className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-[#EFF4FF] overflow-hidden"
+        >
           <div className="h-full w-1/2 bg-[#1D4ED8] animate-[pulse_0.9s_ease-in-out_infinite]" />
         </div>
       )}
@@ -282,11 +293,14 @@ export function AppShell({
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation menu"
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[#E2E2DC] bg-white text-[#141413] hover:bg-[#F1F1EE] cursor-pointer"
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[#E2E2DC] bg-white text-[#141413] hover:bg-[#F1F1EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45 cursor-pointer"
           >
             <Menu className="size-4" />
           </button>
-          <Link href="/" className="flex items-center gap-2 min-w-0">
+          <Link
+            href="/"
+            className="flex items-center gap-2 min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45"
+          >
             <Image
               src="/logo.png"
               alt="Accomplish AI"
@@ -311,6 +325,7 @@ export function AppShell({
             onClick={() => setSignOutModalOpen(true)}
             title="Sign out"
             aria-label="Sign out"
+            className="size-10 sm:size-8"
           >
             <LogOut className="size-3.5" />
           </Button>
@@ -321,16 +336,22 @@ export function AppShell({
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div
+            aria-hidden="true"
             className="fixed inset-0 bg-[#141413]/40"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="relative z-10 flex w-72 max-w-[82vw] flex-col justify-between border-r border-[#E2E2DC] bg-[#F1F1EE] p-4 shadow-xl">
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Workspace navigation"
+            className="relative z-10 flex w-72 max-w-[82vw] flex-col justify-between border-r border-[#E2E2DC] bg-[#F1F1EE] p-4 shadow-xl"
+          >
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <Link
                   href="/"
                   onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2.5"
+                  className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45"
                 >
                   <Image
                     src="/logo.png"
@@ -341,14 +362,14 @@ export function AppShell({
                   />
                   <div>
                     <span className="block text-sm font-medium text-[#141413]">Accomplish AI</span>
-                    <span className="block text-[11px] text-[#141413]/55">Weekly Report Workspace</span>
+                    <span className="block text-[11px] text-[#52524E]">Weekly Report Workspace</span>
                   </div>
                 </Link>
                 <button
                   type="button"
                   onClick={() => setMobileOpen(false)}
                   aria-label="Close menu"
-                  className="flex size-8 items-center justify-center rounded-lg text-[#141413]/60 hover:bg-[#E7E7E2] cursor-pointer"
+                  className="flex size-10 items-center justify-center rounded-lg text-[#52524E] hover:bg-[#E7E7E2] hover:text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45 cursor-pointer"
                 >
                   <X className="size-4" />
                 </button>
@@ -359,7 +380,7 @@ export function AppShell({
                 variant="accent"
                 disabled={isShellBusy || (quota ? !quota.canCreateReport : false)}
                 onClick={() => void handleCreateReport()}
-                className="w-full"
+                className="w-full min-h-[44px]"
               >
                 {creatingReport || isNavTransition ? (
                   <Loader2 className="size-3.5 animate-spin" />
@@ -369,7 +390,7 @@ export function AppShell({
                 <span>{creatingReport || isNavTransition ? "Creating…" : "New Report"}</span>
               </Button>
 
-              <nav className={`space-y-1 ${isShellBusy ? "pointer-events-none opacity-60" : ""}`}>
+              <nav aria-label="Main navigation" className={`space-y-1 ${isShellBusy ? "pointer-events-none opacity-60" : ""}`}>
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = isNavActive(item);
@@ -379,13 +400,13 @@ export function AppShell({
                       href={item.href}
                       aria-current={active ? "page" : undefined}
                       onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition duration-150 ${
+                      className={`flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45 ${
                         active
                           ? "bg-white text-[#141413] border border-[#E2E2DC]"
-                          : "text-[#141413]/70 hover:bg-[#E7E7E2]/70 hover:text-[#141413]"
+                          : "text-[#141413]/80 hover:bg-[#E7E7E2]/70 hover:text-[#141413]"
                       }`}
                     >
-                      <Icon active={active} className={`size-4 ${active ? "text-[#1D4ED8]" : "text-[#141413]/45"}`} />
+                      <Icon active={active} className={`size-4 ${active ? "text-[#1D4ED8]" : "text-[#52524E]"}`} />
                       <span>{item.label}</span>
                       <NavPendingSpinner />
                     </Link>
@@ -413,12 +434,12 @@ export function AppShell({
                   setMobileOpen(false);
                   setSignOutModalOpen(true);
                 }}
-                className="w-full"
+                className="w-full min-h-[44px]"
               >
                 <LogOut className="size-3.5" />
                 <span>{signingOut ? "Signing out…" : "Sign out"}</span>
               </Button>
-              <p className="text-center text-[10px] text-[#141413]/50">
+              <p className="text-center text-[10px] text-[#52524E]">
                 Created by Mike Ryno Santiago — DNX Intern
               </p>
             </div>
@@ -428,6 +449,7 @@ export function AppShell({
 
       {/* Desktop sticky sidebar */}
       <aside
+        aria-label="Sidebar navigation"
         className={`relative z-20 hidden md:flex sticky top-0 h-dvh shrink-0 flex-col justify-between border-r border-[#E2E2DC] bg-[#F1F1EE] transition-all duration-150 ${
           collapsed ? "w-[72px] px-2.5 py-4" : "w-60 px-3.5 py-4"
         }`}
@@ -437,7 +459,7 @@ export function AppShell({
             {!collapsed && (
               <Link
                 href="/"
-                className="flex items-center gap-2.5 min-w-0"
+                className="flex items-center gap-2.5 min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45"
               >
                 <Image
                   src="/logo.png"
@@ -450,7 +472,7 @@ export function AppShell({
                   <span className="block text-sm font-medium tracking-tight text-[#141413] truncate">
                     Accomplish AI
                   </span>
-                  <span className="block text-[10px] text-[#141413]/55 truncate">Weekly Report</span>
+                  <span className="block text-[10px] text-[#52524E] truncate">Weekly Report</span>
                 </div>
               </Link>
             )}
@@ -459,7 +481,7 @@ export function AppShell({
               onClick={() => setCollapsed((c) => !c)}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="flex size-8 items-center justify-center rounded-md text-[#141413]/55 hover:bg-[#E7E7E2] hover:text-[#141413] transition cursor-pointer"
+              className="flex size-9 items-center justify-center rounded-md text-[#52524E] hover:bg-[#E7E7E2] hover:text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45 transition cursor-pointer"
             >
               {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
             </button>
@@ -481,7 +503,7 @@ export function AppShell({
             {!collapsed && <span>{creatingReport || isNavTransition ? "Creating…" : "New Report"}</span>}
           </Button>
 
-          <nav className={`space-y-1 ${isShellBusy ? "pointer-events-none opacity-60" : ""}`}>
+          <nav aria-label="Workspace links" className={`space-y-1 ${isShellBusy ? "pointer-events-none opacity-60" : ""}`}>
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isNavActive(item);
@@ -493,13 +515,13 @@ export function AppShell({
                   title={collapsed ? item.label : undefined}
                   className={`flex items-center ${
                     collapsed ? "justify-center px-2" : "gap-3 px-3"
-                  } rounded-lg py-2 text-sm font-medium transition duration-150 ${
+                  } rounded-lg py-2 text-sm font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45 ${
                     active
                       ? "bg-white text-[#141413] border border-[#E2E2DC]"
-                      : "text-[#141413]/70 hover:bg-[#E7E7E2]/70 hover:text-[#141413]"
+                      : "text-[#141413]/80 hover:bg-[#E7E7E2]/70 hover:text-[#141413]"
                   }`}
                 >
-                  <Icon active={active} className={`size-4 shrink-0 ${active ? "text-[#1D4ED8]" : "text-[#141413]/45"}`} />
+                  <Icon active={active} className={`size-4 shrink-0 ${active ? "text-[#1D4ED8]" : "text-[#52524E]"}`} />
                   {!collapsed && <span className="truncate">{item.label}</span>}
                   {!collapsed && <NavPendingSpinner />}
                 </Link>
@@ -536,8 +558,8 @@ export function AppShell({
           </Button>
 
           {!collapsed && (
-            <p className="pt-1 text-center text-[10px] leading-snug text-[#141413]/50">
-              Created by <span className="font-medium text-[#141413]/75">Mike Ryno Santiago</span> — DNX Intern
+            <p className="pt-1 text-center text-[10px] leading-snug text-[#52524E]">
+              Created by <span className="font-medium text-[#141413]">Mike Ryno Santiago</span> — DNX Intern
             </p>
           )}
         </div>
@@ -561,7 +583,11 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-6 pb-[max(5rem,env(safe-area-inset-bottom))]">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 min-w-0 px-3 sm:px-6 py-4 sm:py-6 pb-[max(5rem,env(safe-area-inset-bottom))] focus:outline-none"
+        >
           <div className="swiss-frame mx-auto w-full max-w-[1440px] md:border-x md:border-[#E2E2DC]/75 md:px-5">
             <span className="hidden md:block swiss-corner swiss-corner-tl" aria-hidden="true" />
             <span className="hidden md:block swiss-corner swiss-corner-tr" aria-hidden="true" />
@@ -578,7 +604,7 @@ export function AppShell({
               type="button"
               onClick={() => setGlobalAiOpen(true)}
               aria-label="Open Overall Accomplish AI chat bubble"
-              className="fixed bottom-[max(1.125rem,env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 inline-flex items-center justify-center gap-2 overflow-hidden rounded-full bg-[#1D4ED8] text-white size-12 sm:w-auto sm:h-11 sm:px-4 shadow-lg ring-1 ring-black/10 hover:bg-[#1E40AF] active:scale-[0.98] transition duration-150 cursor-pointer"
+              className="fixed bottom-[max(1.125rem,env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 inline-flex items-center justify-center gap-2 overflow-hidden rounded-full bg-[#1D4ED8] text-white size-12 sm:w-auto sm:h-11 sm:px-4 shadow-lg ring-1 ring-black/10 hover:bg-[#1E40AF] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-2 transition duration-150 cursor-pointer"
             >
               <BorderBeam duration={4.5} colorFrom="#FFFFFF" colorTo="#93C5FD" />
               <AnimatedMessageCircleIcon className="size-4.5 relative z-10" />

@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminLoading() {
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#F8F8F6]">
+    <div className="min-h-dvh flex flex-col md:flex-row bg-[#F8F8F6]">
       <aside className="hidden md:flex w-60 shrink-0 border-r border-[#E2E2DC] bg-[#F1F1EE] p-4">
         <div className="w-full space-y-4">
           <Skeleton className="h-11 w-full rounded-xl" />

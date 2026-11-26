@@ -352,7 +352,7 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                 return (
                   <g key={t}>
                     <line x1={padLeft} y1={y} x2={w - padRight} y2={y} stroke="#E2E2DC" strokeDasharray="3 3" />
-                    <text x={padLeft - 6} y={y + 3} textAnchor="end" className="fill-[#141413]/45 text-[9px] tabular-nums">
+                    <text x={padLeft - 6} y={y + 3} textAnchor="end" className="fill-[#52524E] text-[9px] tabular-nums">
                       {Number.isInteger(val) ? val : val.toFixed(1)}
                     </text>
                   </g>
@@ -369,9 +369,14 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                   return (
                     <g
                       key={i}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`${label}: ${spec.series.map((s) => `${s.name} ${formatVal(Math.max(0, s.values[i] ?? 0), spec.unit)}`).join(", ")}`}
                       onMouseEnter={() => setHoverIdx(i)}
                       onMouseLeave={() => setHoverIdx(null)}
-                      className="cursor-pointer"
+                      onFocus={() => setHoverIdx(i)}
+                      onBlur={() => setHoverIdx(null)}
+                      className="cursor-pointer focus-visible:outline-none"
                     >
                       {spec.series.map((s, sIdx) => {
                         const v = Math.max(0, s.values[i] ?? 0);
@@ -444,9 +449,14 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                       {pts.map((p, i) => (
                         <g
                           key={i}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`${spec.labels[i]}: ${s.name} ${formatVal(p.v, spec.unit)}`}
                           onMouseEnter={() => setHoverIdx(i)}
                           onMouseLeave={() => setHoverIdx(null)}
-                          className="cursor-pointer"
+                          onFocus={() => setHoverIdx(i)}
+                          onBlur={() => setHoverIdx(null)}
+                          className="cursor-pointer focus-visible:outline-none"
                         >
                           <circle
                             cx={p.x}
@@ -473,7 +483,7 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                       x={x}
                       y={h - 10}
                       textAnchor="middle"
-                      className="fill-[#141413]/65 text-[9px] font-medium"
+                      className="fill-[#52524E] text-[9px] font-medium"
                     >
                       {label.length > 10 ? `${label.slice(0, 9)}…` : label}
                     </text>
@@ -482,7 +492,10 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
             </svg>
 
             {/* Interactive Hover Readout */}
-            <div className="flex min-h-5 items-center justify-between rounded-lg bg-white px-2.5 py-1 text-[11px] text-[#141413]/70 border border-[#E2E2DC]">
+            <div
+              aria-live="polite"
+              className="flex min-h-5 items-center justify-between rounded-lg bg-white px-2.5 py-1 text-[11px] text-[#141413]/80 border border-[#E2E2DC]"
+            >
               {hoverIdx !== null ? (
                 <>
                   <span className="font-medium text-[#141413]">{spec.labels[hoverIdx]}</span>
@@ -496,7 +509,7 @@ export function ChatChart({ spec }: { spec: ParsedChartSpec }) {
                   </span>
                 </>
               ) : (
-                <span className="text-[#141413]/45">Hover a bar, point, or slice for exact values</span>
+                <span className="text-[#52524E]">Hover or focus a bar, point, or slice for exact values</span>
               )}
             </div>
           </div>

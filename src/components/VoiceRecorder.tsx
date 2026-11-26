@@ -107,9 +107,10 @@ export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorder
         <button
           type="button"
           disabled={disabled || transcribing}
+          aria-label={recording ? "Stop voice recording" : transcribing ? "Transcribing voice recording" : "Record voice notes"}
           onClick={recording ? stopRecording : startRecording}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition duration-150 cursor-pointer disabled:opacity-60 ${
-            compact ? "px-2.5 py-1.5 text-xs h-8" : "px-4 py-2.5 text-sm"
+          className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45 cursor-pointer disabled:opacity-60 ${
+            compact ? "px-2.5 py-1.5 text-xs h-9 sm:h-8" : "px-4 py-2.5 text-sm min-h-[44px]"
           } ${
             recording
               ? "bg-red-600 text-white hover:bg-red-700"
@@ -119,15 +120,21 @@ export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorder
           {recording ? (
             <Square className="h-3.5 w-3.5 fill-current animate-pulse" />
           ) : (
-            <Mic className={`h-3.5 w-3.5 ${transcribing ? "text-[#C96442] animate-pulse" : "text-[#C96442]"}`} />
+            <Mic className={`h-3.5 w-3.5 text-[#1D4ED8] ${transcribing ? "animate-pulse" : ""}`} />
           )}
           {recording ? `Stop (${mm}:${ss})` : transcribing ? "Transcribing..." : compact ? "Voice" : "Speak Notes"}
         </button>
         {!compact && recording && (
-          <span className="text-xs text-red-600 font-medium">Listening — tap Stop when done</span>
+          <span role="status" aria-live="polite" className="text-xs text-red-600 font-medium">
+            Listening — tap Stop when done
+          </span>
         )}
       </div>
-      {error && <p className="text-[11px] text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="text-[11px] text-red-700">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

@@ -571,11 +571,14 @@ export function AdminClient({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[#3D3D39] mb-1">Primary Chat / Report Model</label>
+              <label htmlFor="admin-text-model" className="block text-xs font-medium text-[#3D3D39] mb-1">
+                Primary Chat / Report Model
+              </label>
               <select
+                id="admin-text-model"
                 value={activeTextModel}
                 onChange={(e) => setActiveTextModel(e.target.value as AllowedTextModel)}
-                className="w-full rounded-xl border border-[#D8D8D0] bg-[#F8F8F6] px-3 py-2 text-xs font-medium text-[#141413] outline-none focus:border-[#1D4ED8]"
+                className="w-full rounded-xl border border-[#D8D8D0] bg-[#F8F8F6] px-3 py-2 text-xs font-medium text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/35 focus:border-[#1D4ED8] cursor-pointer"
               >
                 {ALLOWED_TEXT_MODELS.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -583,20 +586,21 @@ export function AdminClient({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-[#7A7A73]">
+              <p className="mt-1 text-[11px] text-[#52524E]">
                 {ALLOWED_TEXT_MODELS.find((m) => m.id === activeTextModel)?.notes}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#3D3D39] mb-1 flex items-center gap-1">
+              <label htmlFor="admin-stt-model" className="block text-xs font-medium text-[#3D3D39] mb-1 flex items-center gap-1">
                 <Mic className="w-3.5 h-3.5 text-[#1D4ED8]" />
                 Voice Transcription (STT) Model
               </label>
               <select
+                id="admin-stt-model"
                 value={activeSttModel}
                 onChange={(e) => setActiveSttModel(e.target.value as AllowedSttModel)}
-                className="w-full rounded-xl border border-[#D8D8D0] bg-[#F8F8F6] px-3 py-2 text-xs font-medium text-[#141413] outline-none focus:border-[#1D4ED8]"
+                className="w-full rounded-xl border border-[#D8D8D0] bg-[#F8F8F6] px-3 py-2 text-xs font-medium text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/35 focus:border-[#1D4ED8] cursor-pointer"
               >
                 {ALLOWED_STT_MODELS.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -604,7 +608,7 @@ export function AdminClient({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-[#7A7A73]">
+              <p className="mt-1 text-[11px] text-[#52524E]">
                 {ALLOWED_STT_MODELS.find((m) => m.id === activeSttModel)?.notes}
               </p>
             </div>

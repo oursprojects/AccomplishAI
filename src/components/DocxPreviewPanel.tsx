@@ -362,7 +362,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
         {/* Transform-scaled stage so mobile & desktop render identically */}
         <div
           ref={inlineStageRef}
-          className="docx-preview-stage overflow-auto bg-[#ECEAE2] p-3 flex justify-center max-h-[75vh] lg:max-h-[calc(100vh-9.5rem)]"
+          className="docx-preview-stage overflow-auto bg-[#ECEAE2] p-3 flex justify-center max-h-[75dvh] lg:max-h-[calc(100dvh-9.5rem)]"
         >
           <div
             style={{

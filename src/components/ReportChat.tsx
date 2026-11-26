@@ -371,7 +371,7 @@ export function ReportChat({
             }}
             disabled={composerDisabled}
             placeholder="Share your accomplishments or edits… (Enter to send)"
-            className="flex-1 bg-transparent py-1 text-sm text-[#141413] placeholder:text-[#141413]/35 outline-none resize-none max-h-28 disabled:opacity-60"
+            className="flex-1 bg-transparent py-1 text-base sm:text-sm text-[#141413] placeholder:text-[#5C5C57]/75 outline-none resize-none max-h-28 disabled:opacity-60"
           />
 
           <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
@@ -380,8 +380,9 @@ export function ReportChat({
               size="sm"
               variant="outline"
               onClick={onOpenPreview}
-              className="lg:hidden h-8 px-2.5"
+              className="lg:hidden h-9 w-9 p-0 sm:h-8 sm:w-auto sm:px-2.5"
               title="View document preview"
+              aria-label="View document preview"
             >
               <Eye className="size-3.5" />
             </Button>

@@ -241,7 +241,7 @@ export function WorkspaceClient({
         structuredData: nextData,
         ...(serialized ? { chatMessages: serialized } : {}),
       }),
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   function handleUndo() {
@@ -365,7 +365,7 @@ export function WorkspaceClient({
             if (j.error) toast.error(j.error);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 1400);
     return () => window.clearTimeout(timer);
   }, [initialReport.id, title, data, hasChanges]);
@@ -412,7 +412,7 @@ export function WorkspaceClient({
               onChange={(e) => handleTitleChange(e.target.value)}
               placeholder={fallbackTitle}
               aria-label="Report title"
-              className="w-full max-w-md bg-transparent text-sm font-semibold text-[#141413] placeholder:text-[#5C5C57] outline-none border-b border-transparent focus:border-[#1D4ED8] py-0.5 transition"
+              className="w-full max-w-md bg-transparent text-base sm:text-sm font-semibold text-[#141413] placeholder:text-[#5C5C57] border-b border-transparent focus:border-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/25 rounded-xs py-0.5 transition"
             />
           </div>
 
@@ -508,9 +508,8 @@ export function WorkspaceClient({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Main Focus Column: Live 1-Page DOCX Preview (first on desktop left/center or right? Let's place prominent lg:col-span-7 on the left/main area OR responsive order-1 / lg:order-2!) */}
         <div
-          className={`${
-            tab === "preview" ? "block" : "hidden lg:block"
-          } lg:col-span-7 lg:order-2 lg:sticky lg:top-[4.25rem]`}
+          className={`${tab === "preview" ? "block" : "hidden lg:block"
+            } lg:col-span-7 lg:order-2 lg:sticky lg:top-[4.25rem]`}
         >
           <DocxPreviewPanel
             templateId={review.template.id}
@@ -541,9 +540,8 @@ export function WorkspaceClient({
           </Tabs>
 
           <div
-            className={`${tab === "chat" ? "block" : "hidden"} ${
-              desktopLeftMode === "chat" ? "lg:block" : "lg:hidden"
-            }`}
+            className={`${tab === "chat" ? "block" : "hidden"} ${desktopLeftMode === "chat" ? "lg:block" : "lg:hidden"
+              }`}
           >
             <ReportChat
               reportId={initialReport.id}
@@ -562,9 +560,8 @@ export function WorkspaceClient({
           </div>
 
           <div
-            className={`${tab === "edit" ? "block" : "hidden"} ${
-              desktopLeftMode === "edit" ? "lg:block" : "lg:hidden"
-            }`}
+            className={`${tab === "edit" ? "block" : "hidden"} ${desktopLeftMode === "edit" ? "lg:block" : "lg:hidden"
+              }`}
           >
             <ReportEditor
               title={title}
