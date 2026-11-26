@@ -228,7 +228,7 @@ export function DashboardClient({
   const needsProfileSetup = !profile.name_last_first?.trim() || !profile.name_first_last?.trim();
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 pb-8">
+    <div className="mx-auto max-w-6xl space-y-5 pb-8">
       {/* Top welcome & quick action */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
@@ -264,11 +264,11 @@ export function DashboardClient({
               void handleCreateWeekReport(
                 nextWeekPreview
                   ? {
-                      weekStartDate: nextWeekPreview.fromText,
-                      weekEndDate: nextWeekPreview.toText,
-                      title: `Week ${nextWeekPreview.weekNumber}`,
-                      sourceKey: "primary",
-                    }
+                    weekStartDate: nextWeekPreview.fromText,
+                    weekEndDate: nextWeekPreview.toText,
+                    title: `Week ${nextWeekPreview.weekNumber}`,
+                    sourceKey: "primary",
+                  }
                   : { sourceKey: "primary" },
               )
             }
@@ -464,9 +464,8 @@ export function DashboardClient({
                     </span>
                     <div className="w-full flex-1 flex items-end justify-center">
                       <div
-                        className={`w-full max-w-[42px] rounded-t-lg transition-all group-hover:opacity-90 ${
-                          item.ready ? "bg-[#1D4ED8]" : "bg-[#93C5FD]"
-                        }`}
+                        className={`w-full max-w-[42px] rounded-t-lg transition-all group-hover:opacity-90 ${item.ready ? "bg-[#1D4ED8]" : "bg-[#93C5FD]"
+                          }`}
                         style={{ height: `${heightPct}%` }}
                       />
                     </div>
@@ -578,7 +577,7 @@ export function DashboardClient({
             <p className="text-xs text-[#5C5C57]">Click Create Week 1 above to start your first weekly report.</p>
           </div>
         ) : (
-          <div className="divide-y divide-[#E2E2DC]">
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             {reports.slice(0, 4).map((r) => {
               const d = r.structured_data;
               const cat = resolveWeekCategory({
@@ -592,24 +591,24 @@ export function DashboardClient({
               return (
                 <div
                   key={r.id}
-                  className="p-3.5 sm:px-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 hover:bg-[#F8F8F6]/80 transition-colors"
+                  className="rounded-xl border border-[#E2E2DC] bg-[#F8F8F6]/65 p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:border-[#C7D7FE] hover:bg-white transition-colors"
                 >
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="flex flex-wrap items-center gap-2">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm font-semibold text-[#141413] truncate">{titleText}</span>
                       {cat.weekNumber !== null && <Badge variant="accent">Week {cat.weekNumber}</Badge>}
                       <Badge variant={ready ? "success" : "warning"}>{ready ? "Ready" : "Draft"}</Badge>
                       {d.hours_this_week && <Badge variant="outline">{d.hours_this_week} hrs</Badge>}
                     </div>
-                    <p className="inline-flex items-center gap-1 text-xs text-[#5C5C57]">
-                      <Calendar className="h-3 w-3" />
-                      <span>{cat.rangeText}</span>
+                    <p className="inline-flex items-center gap-1 text-xs text-[#52524E]">
+                      <Calendar className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{cat.rangeText}</span>
                     </p>
                   </div>
 
                   <Link
                     href={`/reports/${r.id}`}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#141413] px-3 text-xs font-medium text-white hover:bg-[#2A2A27] transition self-start sm:self-center shrink-0"
+                    className="inline-flex h-9 sm:h-8 items-center justify-center gap-1.5 rounded-lg bg-[#141413] px-3 text-xs font-medium text-white hover:bg-[#2A2A27] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45 transition self-start sm:self-center shrink-0"
                   >
                     <OpenLinkButtonLabel />
                   </Link>

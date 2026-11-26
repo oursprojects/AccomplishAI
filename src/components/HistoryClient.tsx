@@ -508,7 +508,7 @@ export function HistoryClient({
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 pb-8">
+    <div className="mx-auto max-w-6xl space-y-5 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -691,16 +691,16 @@ export function HistoryClient({
       </Card>
 
       {reports.length > 0 && (
-        <div className="space-y-2.5">
+        <Card className="p-3.5 space-y-3">
           {/* Week Category filter pills */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#5C5C57] mr-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#52524E] mr-1">
               Week Category:
             </span>
             <button
               type="button"
               onClick={() => setWeekFilter("all")}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer transition ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 transition ${
                 weekFilter === "all"
                   ? "border-[#1D4ED8] bg-[#EFF4FF] text-[#1E3A8A]"
                   : "border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE]"
@@ -717,7 +717,7 @@ export function HistoryClient({
                   type="button"
                   onClick={() => setWeekFilter(active ? "all" : meta.key)}
                   title={`${meta.rangeText} (${count} report${count === 1 ? "" : "s"})`}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer transition ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 transition ${
                     active
                       ? "border-[#1D4ED8] bg-[#EFF4FF] text-[#1E3A8A]"
                       : "border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE]"
@@ -735,47 +735,47 @@ export function HistoryClient({
             })}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <div className="relative flex-1 min-w-[220px] max-w-md">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#7A7A73]" />
-            <Input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search reports by title, dates, or office..."
-              className="bg-white pl-10 h-9"
-            />
-          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-[#F1F1EE]">
+            <div className="relative flex-1 min-w-[220px] max-w-md">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#52524E]" />
+              <Input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search reports by title, dates, or office..."
+                className="bg-[#F8F8F6] focus:bg-white pl-10 h-9"
+              />
+            </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(["all", "ready", "draft"] as const).map((st) => (
-              <button
-                key={st}
-                type="button"
-                onClick={() => setStatusFilter(st)}
-                className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium capitalize cursor-pointer transition ${
-                  statusFilter === st
-                    ? "border-[#141413] bg-[#141413] text-white"
-                    : "border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE]"
-                }`}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(["all", "ready", "draft"] as const).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setStatusFilter(st)}
+                  className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium capitalize cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 transition ${
+                    statusFilter === st
+                      ? "border-[#141413] bg-[#141413] text-white"
+                      : "border-[#D8D8D0] bg-white text-[#52524E] hover:bg-[#F1F1EE]"
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+
+              <select
+                aria-label="Sort reports"
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as SortMode)}
+                className="h-9 sm:h-8 rounded-lg border border-[#D8D8D0] bg-white px-2.5 text-xs font-medium text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 focus:border-[#1D4ED8] cursor-pointer"
               >
-                {st}
-              </button>
-            ))}
-
-            <select
-              aria-label="Sort reports"
-              value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="h-9 sm:h-8 rounded-lg border border-[#D8D8D0] bg-white px-2.5 text-xs font-medium text-[#141413] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 focus:border-[#1D4ED8] cursor-pointer"
-            >
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="week_asc">By Week Date</option>
-            </select>
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="week_asc">By Week Date</option>
+              </select>
+            </div>
           </div>
-          </div>
-        </div>
+        </Card>
       )}
 
       {reports.length === 0 ? (

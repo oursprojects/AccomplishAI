@@ -397,7 +397,7 @@ export function WorkspaceClient({
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <Link
             href="/"
-            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#D8D8D0] bg-[#F8F8F6] px-2.5 text-xs font-medium text-[#3D3D39] hover:bg-[#F1F1EE] transition shrink-0"
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#D8D8D0] bg-[#F8F8F6] px-2.5 text-xs font-medium text-[#3D3D39] hover:bg-[#F1F1EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/45 transition shrink-0"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Reports</span>

@@ -20,7 +20,7 @@ async function TemplateContent() {
 
   return (
     <AppShell userEmail={user.email ?? ""} quota={quota}>
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-6xl pb-8">
         <TemplateScannerCard initialReview={review} />
       </div>
     </AppShell>

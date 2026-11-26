@@ -10,7 +10,7 @@ export default function TemplateLoading() {
           <Skeleton className="h-9 w-full rounded-xl" />
         </div>
       </aside>
-      <div className="flex-1 p-4 sm:p-6 mx-auto max-w-4xl space-y-4">
+      <div className="flex-1 p-4 sm:p-6 mx-auto w-full max-w-6xl space-y-4">
         <Skeleton className="h-16 rounded-2xl bg-white border border-[#E2E2DC]" />
         <Skeleton className="h-80 rounded-2xl bg-white border border-[#E2E2DC]" />
       </div>

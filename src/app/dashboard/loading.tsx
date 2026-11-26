@@ -11,7 +11,7 @@ export default function DashboardLoading() {
           <Skeleton className="h-9 w-full rounded-xl" />
         </div>
       </aside>
-      <div className="flex-1 p-4 sm:p-6 mx-auto w-full max-w-5xl space-y-4">
+      <div className="flex-1 p-4 sm:p-6 mx-auto w-full max-w-6xl space-y-4">
         <Skeleton className="h-16 rounded-2xl bg-white border border-[#E2E2DC]" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((n) => (

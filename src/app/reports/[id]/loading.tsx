@@ -30,8 +30,8 @@ export default function ReportWorkspaceLoading() {
         <div className="p-4 sm:p-6 space-y-4">
           <Skeleton className="h-14 w-full rounded-2xl bg-white border border-[#E2E2DC]" />
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            <Skeleton className="lg:col-span-6 h-[540px] rounded-2xl bg-white border border-[#E2E2DC]" />
-            <Skeleton className="lg:col-span-6 h-[540px] rounded-2xl bg-[#ECEAE2]/80" />
+            <Skeleton className="lg:col-span-5 h-[540px] rounded-2xl bg-white border border-[#E2E2DC]" />
+            <Skeleton className="lg:col-span-7 h-[540px] rounded-2xl bg-[#ECEAE2]/80" />
           </div>
         </div>
       </div>

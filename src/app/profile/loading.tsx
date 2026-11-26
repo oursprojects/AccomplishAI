@@ -10,8 +10,15 @@ export default function SubpageLoading() {
           <Skeleton className="h-9 w-full rounded-xl" />
         </div>
       </aside>
-      <div className="flex-1 p-4 sm:p-6 mx-auto max-w-xl space-y-4">
-        <Skeleton className="h-[420px] rounded-2xl bg-white border border-[#E2E2DC]" />
+      <div className="flex-1 p-4 sm:p-6 mx-auto w-full max-w-6xl space-y-5">
+        <div className="flex items-center justify-between gap-3">
+          <Skeleton className="h-12 w-72 max-w-full rounded-xl" />
+          <Skeleton className="h-10 w-40 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <Skeleton className="lg:col-span-5 h-[420px] rounded-2xl bg-white border border-[#E2E2DC]" />
+          <Skeleton className="lg:col-span-7 h-[420px] rounded-2xl bg-white border border-[#E2E2DC]" />
+        </div>
       </div>
     </div>
   );

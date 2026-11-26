@@ -382,7 +382,7 @@ export function AdminClient({
   const rpmPct = Math.min(100, Math.round((usageMonitor.requestsLastMinute / 30) * 100));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 pb-8">
+    <div className="mx-auto max-w-6xl space-y-5 pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <Badge variant="accent">

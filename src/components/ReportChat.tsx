@@ -255,7 +255,7 @@ export function ReportChat({
   }
 
   return (
-    <Card className="overflow-hidden flex flex-col">
+    <Card className="overflow-hidden flex flex-col lg:h-[calc(100dvh-13.25rem)] lg:min-h-[460px]">
       {/* Header */}
       <div className="border-b border-[#E2E2DC] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 bg-[#F1F1EE]">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -324,7 +324,7 @@ export function ReportChat({
         role="log"
         aria-live="polite"
         aria-label="Accomplish AI conversation"
-        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 min-h-[260px] max-h-[54dvh] bg-[#F8F8F6]"
+        className="flex-1 min-h-[260px] max-h-[54dvh] lg:max-h-none overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 bg-[#F8F8F6]"
       >
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
