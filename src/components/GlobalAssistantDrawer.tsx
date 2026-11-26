@@ -196,6 +196,7 @@ export function GlobalAssistantDrawer({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [thinkingIdx, setThinkingIdx] = useState(0);
+  const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
@@ -328,6 +329,7 @@ export function GlobalAssistantDrawer({
     const controller = new AbortController();
     abortRef.current = controller;
     setError(null);
+    setQueueNotice(null);
     setSending(true);
 
     try {
@@ -337,7 +339,7 @@ export function GlobalAssistantDrawer({
         signal: controller.signal,
         body: JSON.stringify({
           currentPath: pathname,
-          messages: historyToSend.slice(-24).map((m) => ({ role: m.role, content: m.content })),
+          messages: historyToSend.slice(-60).map((m) => ({ role: m.role, content: m.content })),
           attachments: attachedFiles.map((a) => ({ name: a.name, textContent: a.textContent })),
         }),
       });
@@ -355,7 +357,9 @@ export function GlobalAssistantDrawer({
 
       if (res.status === 429 && attempt < 1) {
         const waitSecs = Math.max(2, Math.min(8, Number(json?.retryAfterSeconds ?? 4)));
+        setQueueNotice(`High concurrent traffic — retrying automatically in ${waitSecs}s...`);
         await new Promise((r) => setTimeout(r, waitSecs * 1000));
+        setQueueNotice(null);
         return runChatTurn(historyToSend, attachedFiles, attempt + 1);
       }
 
@@ -381,6 +385,7 @@ export function GlobalAssistantDrawer({
         router.refresh();
       }
     } catch (err) {
+      setQueueNotice(null);
       if (err instanceof DOMException && err.name === "AbortError") {
         setError("Generation stopped.");
       } else {
@@ -781,11 +786,15 @@ export function GlobalAssistantDrawer({
         {/* Starter suggestions when thread is fresh */}
         {messages.length === 1 && (
           <div className="border-b border-[#E2E2DC] bg-[#F1F1EE]/70 px-4 py-2.5 space-y-1.5 shrink-0">
-            <p className="text-[11px] font-medium text-[#141413]/60">
+            <p className="text-[11px] font-medium text-[#52524E]">
               Suggested prompts
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {STARTER_PROMPTS.map((q) => (
+              {(
+                /^\/reports\/[0-9a-f-]{36}/i.test(pathname)
+                  ? ["Review my currently open report & fill missing sections", ...STARTER_PROMPTS.slice(0, 5)]
+                  : STARTER_PROMPTS
+              ).map((q) => (
                 <button
                   key={q}
                   type="button"
@@ -948,7 +957,9 @@ export function GlobalAssistantDrawer({
             <div className="flex items-start">
               <div className="inline-flex items-center gap-2 rounded-xl rounded-bl-xs border border-[#E2E2DC] bg-white px-3.5 py-2 text-xs text-[#141413]/65">
                 <Loader2 className="size-3.5 animate-spin text-[#1D4ED8]" />
-                <AnimatedShinyText className="text-xs font-medium">{THINKING_PHRASES[thinkingIdx]}</AnimatedShinyText>
+                <AnimatedShinyText className="text-xs font-medium">
+                  {queueNotice ?? THINKING_PHRASES[thinkingIdx]}
+                </AnimatedShinyText>
               </div>
             </div>
           )}

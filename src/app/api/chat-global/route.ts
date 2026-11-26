@@ -8,11 +8,17 @@ import {
   normalizeHolidayMondays,
   parseHoursNumber,
 } from "@/lib/internship-calendar";
-import { groqErrorResponse } from "@/lib/ai/groq";
+import { groqErrorResponse, stripThinkingTags } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage } from "@/lib/ai/chat-tools";
 import { emptyReport, reportDataSchema, type ReportData } from "@/lib/report-schema";
 import { computeReportStatus } from "@/lib/mcp/accomplish-mcp-server";
 import { openAccomplishMcpSession, type AccomplishMcpSession } from "@/lib/mcp/in-memory-bridge";
+
+function looksLikeUnappliedGlobalMutation(reply: string): boolean {
+  return /\b(?:i(?:'ve| have)?\s+)?(?:created|updated|filled|recorded|cleared|deleted|saved|marked|unmarked|added)\b[\s\S]{0,65}\b(?:weekly\s+report|report|accomplishment|holiday|profile|verifier|start\s+date|field(?:s)?)\b/i.test(
+    reply,
+  );
+}
 
 const requestSchema = z.object({
   currentPath: z.string().max(120).optional().default("/"),
@@ -141,6 +147,41 @@ export async function POST(request: Request) {
       existingReports: reportsSnapshot,
     });
 
+    const openReportMatch = body.data.currentPath.match(/^\/reports\/([0-9a-f-]{36})/i);
+    let activeOpenReport: {
+      id: string;
+      title: string;
+      status: ReturnType<typeof computeReportStatus>;
+      structured_data: ReportData;
+    } | null = null;
+    if (openReportMatch) {
+      const openRow = (reportRows ?? []).find((r) => r.id === openReportMatch[1]);
+      const targetRow =
+        openRow ??
+        (
+          await supabase
+            .from("reports")
+            .select("id, title, structured_data")
+            .eq("id", openReportMatch[1])
+            .eq("user_id", user.id)
+            .maybeSingle()
+        ).data;
+      if (targetRow) {
+        const rawSd =
+          targetRow.structured_data && typeof targetRow.structured_data === "object" && !Array.isArray(targetRow.structured_data)
+            ? targetRow.structured_data
+            : {};
+        const parsedRes = reportDataSchema.safeParse(rawSd);
+        const parsed = parsedRes.success ? parsedRes.data : emptyReport();
+        activeOpenReport = {
+          id: targetRow.id,
+          title: targetRow.title,
+          status: computeReportStatus(parsed),
+          structured_data: parsed,
+        };
+      }
+    }
+
     const systemPrompt = `You are **Overall Accomplish AI** — a full ChatGPT-grade general AI assistant AND the system-wide AccomplishAI workspace agent connected to Supabase via **MCP tools**.
 
 Current page: ${body.data.currentPath}
@@ -159,6 +200,11 @@ Schedule preview (holidays skipped): ${JSON.stringify(
       })),
     )}
 Saved Reports snapshot (${reportsSnapshot.length}): ${JSON.stringify(reportsSnapshot)}
+${
+  activeOpenReport
+    ? `Currently open report in editor (${activeOpenReport.id}): ${JSON.stringify(activeOpenReport)}`
+    : ""
+}
 
 CAPABILITIES & BEHAVIOR:
 1. **Full ChatGPT-Style General Intelligence:** Answer ANY question across any topic just like ChatGPT — software engineering, debugging, SQL, TypeScript/React/Python code, math, writing/emails, brainstorming, interview/OJT advice, Tagalog↔English translation, explanations, checklists, and study help. Never refuse a general question just because it isn't about a report.
@@ -227,6 +273,8 @@ CAPABILITIES & BEHAVIOR:
     let updatedReport: { id: string; structuredData: ReportData } | undefined;
     let mutated = false;
     let usedModel = "";
+    let forcedToolRetryUsed = false;
+    let nextToolChoice: "auto" | "required" = "auto";
 
     mcpSession = await openAccomplishMcpSession({
       supabase,
@@ -249,11 +297,13 @@ CAPABILITIES & BEHAVIOR:
       const { completion, model } = await groqChatWithTools({
         messages: loopMessages,
         tools: mcpSession.groqTools,
-        toolChoice: "auto",
+        toolChoice: nextToolChoice,
         temperature: 0.35,
         maxTokens: 2400,
         preferredModel: usedModel || aiSettings.activeTextModel,
+        reasoningEffort: "medium",
       });
+      nextToolChoice = "auto";
       usedModel = model;
 
       const msg = completion.choices[0]?.message;
@@ -261,7 +311,19 @@ CAPABILITIES & BEHAVIOR:
 
       const toolCalls = msg.tool_calls ?? [];
       if (toolCalls.length === 0) {
-        const reply = (msg.content ?? "").trim() || "Done! Checked your workspace via MCP.";
+        const draftReply = stripThinkingTags(msg.content ?? "");
+        if (!mutated && !forcedToolRetryUsed && looksLikeUnappliedGlobalMutation(draftReply)) {
+          forcedToolRetryUsed = true;
+          loopMessages.push({ role: "assistant", content: draftReply });
+          loopMessages.push({
+            role: "system",
+            content:
+              "You described creating or modifying Supabase data without calling an MCP tool. Call the appropriate MCP tool now before replying.",
+          });
+          nextToolChoice = "required";
+          continue;
+        }
+        const reply = draftReply || "Done! Checked your workspace via MCP.";
 
         await supabase.from("prompt_usage_logs").insert({
           user_id: user.id,

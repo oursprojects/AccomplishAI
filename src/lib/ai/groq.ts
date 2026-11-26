@@ -23,6 +23,21 @@ export class MissingGroqKeyError extends Error {
   }
 }
 
+export type ReasoningEffort = "low" | "medium" | "high";
+
+/** Strips accidental `<think>...</think>` blocks emitted by reasoning fallback models. */
+export function stripThinkingTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+}
+
+function parseJsonFlexible<T>(raw: string): T {
+  const cleaned = stripThinkingTags(raw)
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  return JSON.parse(cleaned || "{}") as T;
+}
+
 /** Run a JSON-mode chat completion with load balancing and automatic fallback across active Groq models. */
 export async function groqJson<T = unknown>(opts: {
   system: string;
@@ -30,6 +45,7 @@ export async function groqJson<T = unknown>(opts: {
   temperature?: number;
   maxTokens?: number;
   preferredModel?: string;
+  reasoningEffort?: ReasoningEffort;
 }): Promise<{ data: T; usage?: Groq.CompletionUsage; model: string }> {
   const all = [GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS];
   const models = opts.preferredModel
@@ -45,7 +61,7 @@ export async function groqJson<T = unknown>(opts: {
         model: m,
         temperature: opts.temperature ?? 0.2,
         max_completion_tokens: opts.maxTokens ?? 2048,
-        ...(supportsReasoningEffort ? { reasoning_effort: "low" as const } : {}),
+        ...(supportsReasoningEffort ? { reasoning_effort: opts.reasoningEffort ?? ("low" as const) } : {}),
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: opts.system },
@@ -56,7 +72,7 @@ export async function groqJson<T = unknown>(opts: {
   });
 
   const content = res.choices[0]?.message?.content ?? "{}";
-  return { data: JSON.parse(content) as T, usage: res.usage, model };
+  return { data: parseJsonFlexible<T>(content), usage: res.usage, model };
 }
 
 export type GroqMessage = Groq.Chat.Completions.ChatCompletionMessageParam;
@@ -70,6 +86,7 @@ export async function groqChatWithTools(opts: {
   temperature?: number;
   maxTokens?: number;
   preferredModel?: string;
+  reasoningEffort?: ReasoningEffort;
 }): Promise<{ completion: Groq.Chat.Completions.ChatCompletion; model: string }> {
   const all = [GROQ_TEXT_MODEL, ...GROQ_TEXT_FALLBACK_MODELS];
   const models = opts.preferredModel
@@ -85,7 +102,7 @@ export async function groqChatWithTools(opts: {
         model: m,
         temperature: opts.temperature ?? 0.2,
         max_completion_tokens: opts.maxTokens ?? 1500,
-        ...(supportsReasoningEffort ? { reasoning_effort: "low" as const } : {}),
+        ...(supportsReasoningEffort ? { reasoning_effort: opts.reasoningEffort ?? ("low" as const) } : {}),
         messages: opts.messages,
         ...(opts.tools?.length
           ? { tools: opts.tools, tool_choice: opts.toolChoice ?? ("auto" as const) }

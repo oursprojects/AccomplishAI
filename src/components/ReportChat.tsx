@@ -7,6 +7,7 @@ import {
   Eraser,
   Eye,
   Loader2,
+  Square,
   Undo2,
 } from "lucide-react";
 import type { QuotaStatus } from "@/lib/admin";
@@ -19,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChatMarkdown } from "./ChatMarkdown";
+import { VoiceRecorder } from "./VoiceRecorder";
 
 export interface ChatTurn {
   id: string;
@@ -83,6 +85,7 @@ export function ReportChat({
   const [error, setError] = useState<string | null>(null);
   const [failedRetryPayload, setFailedRetryPayload] = useState<ChatTurn[] | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -107,16 +110,57 @@ export function ReportChat({
   }
 
   const missing = getMissingSummary(data);
+  const hasAnyTasks = DAYS.some((d) => data[`${d}_accomplishments`].trim().length > 0);
+  const missingReflections =
+    !data.new_trainings.trim() && !data.problems_encountered.trim() && !data.solutions_done.trim();
+
+  const quickPrompts: Array<{ label: string; prompt: string }> = [];
+  if (hasAnyTasks) {
+    quickPrompts.push({
+      label: "Polish past tense",
+      prompt: "Review my Monday-Friday tasks and polish any grammar or tense into formal past-tense report bullets.",
+    });
+    if (missingReflections) {
+      quickPrompts.push({
+        label: "Draft reflections",
+        prompt:
+          "Based on my daily tasks, draft concise realistic new trainings, problems encountered, and solutions done in the report.",
+      });
+    }
+    if (!data.hours_this_week.trim() || !data.total_hours_worked.trim()) {
+      quickPrompts.push({
+        label: "Compute hours",
+        prompt: "Calculate and fill my hours this week and cumulative total hours worked.",
+      });
+    }
+  } else {
+    quickPrompts.push({
+      label: "Fill week dates & profile",
+      prompt: "Auto-fill my report dates from my internship calendar and profile defaults.",
+    });
+    quickPrompts.push({
+      label: "Check what's missing",
+      prompt: "Check which fields are currently missing in this report.",
+    });
+  }
+
   const quotaBlocked = !quota.allowed;
   const contextCount = messages.length;
   const composerDisabled = sending || quotaBlocked;
   void maxChatMessages;
 
+  function handleStop() {
+    abortRef.current?.abort();
+  }
+
   async function submitHistory(nextHistory: ChatTurn[], attempt = 0): Promise<void> {
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const res = await fetch("/api/chat-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           reportId,
           messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
@@ -167,12 +211,20 @@ export function ReportChat({
     } catch (err) {
       setQueueNotice(null);
       setFailedRetryPayload(nextHistory);
-      setError(err instanceof Error ? err.message : "Failed to send message.");
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Generation stopped.");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to send message.");
+      }
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
     }
   }
 
-  async function sendMessage() {
-    const text = input.trim();
+  async function sendMessage(overrideText?: string) {
+    const text = (overrideText ?? input).trim();
     if (!text || composerDisabled) return;
 
     setError(null);
@@ -181,7 +233,7 @@ export function ReportChat({
     const userTurn: ChatTurn = { id: `u-${crypto.randomUUID()}`, role: "user", content: text };
     const nextHistory = [...messages, userTurn];
     onMessagesChange(nextHistory);
-    setInput("");
+    if (!overrideText) setInput("");
     setSending(true);
     try {
       await submitHistory(nextHistory, 0);
@@ -272,7 +324,7 @@ export function ReportChat({
         role="log"
         aria-live="polite"
         aria-label="Accomplish AI conversation"
-        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 min-h-[260px] max-h-[54vh] bg-[#F8F8F6]"
+        className="flex-1 overflow-y-auto px-3.5 sm:px-4 py-3.5 space-y-3 min-h-[260px] max-h-[54dvh] bg-[#F8F8F6]"
       >
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
@@ -357,8 +409,24 @@ export function ReportChat({
           e.preventDefault();
           void sendMessage();
         }}
-        className="border-t border-[#E2E2DC] bg-white p-2.5"
+        className="border-t border-[#E2E2DC] bg-white p-2.5 space-y-2"
       >
+        {quickPrompts.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {quickPrompts.slice(0, 3).map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                disabled={composerDisabled}
+                onClick={() => void sendMessage(item.prompt)}
+                className="rounded-md border border-[#D8D8D0] bg-[#F8F8F6] px-2.5 py-1 text-[11px] font-medium text-[#141413] hover:border-[#C7D7FE] hover:bg-[#EFF4FF] hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]/40 transition cursor-pointer disabled:opacity-50"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-end gap-2 rounded-lg border border-[#D8D8D0] bg-[#F8F8F6] px-2.5 py-1.5 focus-within:border-[#1D4ED8] focus-within:bg-white transition duration-150">
           <textarea
             rows={2}
@@ -371,11 +439,16 @@ export function ReportChat({
               }
             }}
             disabled={composerDisabled}
-            placeholder="Share your accomplishments or edits… (Enter to send)"
+            placeholder="Share notes in English or Tagalog… (Enter to send)"
             className="flex-1 bg-transparent py-1 text-base sm:text-sm text-[#141413] placeholder:text-[#5C5C57]/75 outline-none resize-none max-h-28 disabled:opacity-60"
           />
 
           <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
+            <VoiceRecorder
+              compact
+              disabled={composerDisabled}
+              onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
+            />
             <Button
               type="button"
               size="sm"
@@ -387,16 +460,23 @@ export function ReportChat({
             >
               <Eye className="size-3.5" />
             </Button>
-            <Button
-              type="submit"
-              size="sm"
-              variant="accent"
-              disabled={composerDisabled || !input.trim()}
-              className="h-8 px-3"
-            >
-              <AnimatedSendIcon className="size-3.5" />
-              <span>{sending ? "…" : "Send"}</span>
-            </Button>
+            {sending ? (
+              <Button type="button" size="sm" variant="destructive" onClick={handleStop} className="h-9 sm:h-8 px-3">
+                <Square className="size-3 fill-current" />
+                <span>Stop</span>
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="sm"
+                variant="accent"
+                disabled={composerDisabled || !input.trim()}
+                className="h-9 sm:h-8 px-3"
+              >
+                <AnimatedSendIcon className="size-3.5" />
+                <span>Send</span>
+              </Button>
+            )}
           </div>
         </div>
       </form>

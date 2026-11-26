@@ -9,7 +9,7 @@ import {
   parseHoursNumber,
   resolveWeekNumber,
 } from "@/lib/internship-calendar";
-import { groqErrorResponse } from "@/lib/ai/groq";
+import { groqErrorResponse, stripThinkingTags } from "@/lib/ai/groq";
 import { groqChatWithTools, type GroqMessage } from "@/lib/ai/chat-tools";
 import { computeReportStatus } from "@/lib/mcp/accomplish-mcp-server";
 import { openAccomplishMcpSession, type AccomplishMcpSession } from "@/lib/mcp/in-memory-bridge";
@@ -152,15 +152,20 @@ export async function POST(request: Request) {
           r.structured_data && typeof r.structured_data === "object" && !Array.isArray(r.structured_data)
             ? (r.structured_data as Record<string, unknown>)
             : {};
+        const dateFrom = String(sd.date_from ?? "");
+        const dateTo = String(sd.date_to ?? "");
+        const monIso = getReportWeekMondayIso(dateFrom, dateTo) ?? r.created_at.slice(0, 10);
         return {
           id: r.id,
           title: r.title,
-          date_from: String(sd.date_from ?? ""),
-          date_to: String(sd.date_to ?? ""),
+          date_from: dateFrom,
+          date_to: dateTo,
+          monIso,
           hours_this_week: String(sd.hours_this_week ?? ""),
           total_hours_worked: String(sd.total_hours_worked ?? ""),
         };
-      });
+      })
+      .sort((a, b) => b.monIso.localeCompare(a.monIso));
 
     const occupiedWeekMondays = new Map<string, string>();
     for (const prev of previousReports) {
@@ -211,9 +216,11 @@ CORE BEHAVIOR & STRICT RULES:
 4. **Always Execute Real MCP Tools:**
    - Whenever the user asks to **add, fill, translate, edit, update, replace, remove, delete, or clear** anything on the report, **ALWAYS call \`set_report_fields\` or \`clear_report_fields\`** BEFORE replying.
    - Whenever the user asks about past weeks' reports or total OJT progress, call \`list_reports\` or \`get_ojt_hours_summary\` so answers come straight from Supabase.
-5. **Strictly Past-Tense & Task-Focused Only:**
+5. **Strictly Past-Tense, Bilingual & Task-Focused Only:**
+   - Translate ALL Tagalog, Taglish, or shorthand notes cleanly into crisp formal English **past-tense** work tasks (no Filipino words, slang, or filler left inside the report fields).
    - Every item in \`mon_accomplishments\`–\`fri_accomplishments\` MUST begin with an English **past-tense** action verb (e.g., *Attended, Assisted, Built, Configured, Created, Debugged, Designed, Developed, Implemented, Integrated, Merged, Prepared, Published, Redesigned, Refined, Reviewed, Tested, Updated*) and describe **ONLY accomplished work tasks**.
    - **NEVER** use present tense or \`-ing\` verbs. **NEVER** include arrival times, departure/dismissal times (*"Arrived 7:00 AM"*, *"Went home at 9 PM"*, *"Dismissed at 4:30 PM"*), lunch breaks, or boarding-house/commute notes.
+   - Unless hours are explicitly overridden, compute \`hours_this_week\` from \`worked_days × ${profile?.default_daily_hours ?? 8}\` and \`total_hours_worked\` = \`${prevTotalNum} + hours_this_week\`.
 6. **Verify Before Clearing (No Fake Re-Clears):**
    - If the requested field(s) are **already \`""\`**, DO NOT pretend you cleared them and DO NOT show a table of cleared items—simply reply warmly that those fields are **already cleared / empty**.
 7. **Concise & Table-Fit:** Keep tool values plain text (no \`**\`, \`*\`, or \`-\` bullets), formalized into crisp **past-tense** English:
@@ -269,6 +276,7 @@ CORE BEHAVIOR & STRICT RULES:
         temperature: 0.2,
         maxTokens: 1500,
         preferredModel: usedModel || aiSettings.activeTextModel,
+        reasoningEffort: "medium",
       });
       nextToolChoice = "auto";
       usedModel = model;
@@ -278,7 +286,7 @@ CORE BEHAVIOR & STRICT RULES:
 
       const toolCalls = msg.tool_calls ?? [];
       if (toolCalls.length === 0) {
-        const draftReply = (msg.content ?? "").trim();
+        const draftReply = stripThinkingTags(msg.content ?? "");
 
         if (!didMutateThisTurn && !forcedToolRetryUsed && looksLikeUnappliedMutation(draftReply)) {
           forcedToolRetryUsed = true;

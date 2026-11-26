@@ -953,9 +953,18 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
       const holidayMondays = ctx.holidayMondays ?? normalizeHolidayMondays(ctx.user.user_metadata?.holiday_mondays);
       const targetHours = profile?.target_ojt_hours ?? 486;
 
+      // Sort chronologically by parsed week Monday ISO, falling back to created_at
+      const sortedRows = [...(rows ?? [])].sort((a, b) => {
+        const aSd = reportDataSchema.parse(a.structured_data ?? {});
+        const bSd = reportDataSchema.parse(b.structured_data ?? {});
+        const aKey = getReportWeekMondayIso(aSd.date_from, aSd.date_to) ?? a.created_at.slice(0, 10);
+        const bKey = getReportWeekMondayIso(bSd.date_from, bSd.date_to) ?? b.created_at.slice(0, 10);
+        return aKey.localeCompare(bKey);
+      });
+
       let runningSum = 0;
       let maxTotal = 0;
-      const weeklyTimeline = (rows ?? []).map((r, idx) => {
+      const weeklyTimeline = sortedRows.map((r, idx) => {
         const sd = reportDataSchema.parse(r.structured_data ?? {});
         const wHrs = parseHoursNumber(sd.hours_this_week) ?? 0;
         const tHrs = parseHoursNumber(sd.total_hours_worked);
@@ -964,10 +973,16 @@ export function createAccomplishMcpServer(ctx: AccomplishMcpSessionState): McpSe
         const cumulative = tHrs !== null ? Math.max(tHrs, runningSum) : runningSum;
         const status = computeReportStatus(sd);
         const daysWorked = DAYS.filter((d) => sd[`${d}_accomplishments`].trim().length > 0).length;
+        const cat = resolveWeekCategory({
+          dateFrom: sd.date_from,
+          dateTo: sd.date_to,
+          startDateIso: profile?.internship_start_date ?? null,
+          holidayMondays,
+        });
 
         return {
           report_id: r.id,
-          weekLabel: r.title?.trim() || `Week ${idx + 1}`,
+          weekLabel: r.title?.trim() || (cat.weekNumber ? `Week ${cat.weekNumber}` : `Week ${idx + 1}`),
           date_from: sd.date_from,
           date_to: sd.date_to,
           days_worked: daysWorked,
