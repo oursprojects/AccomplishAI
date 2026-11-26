@@ -276,6 +276,9 @@ export async function PATCH(request: Request) {
         );
       if (error) throw new Error(error.message);
     } else if (body.action === "update_member") {
+      if (body.userId === user.id && body.isBlocked) {
+        return jsonError(400, "Admins cannot pause or block their own account.");
+      }
       const { error } = await supabase
         .from("user_quotas")
         .update({

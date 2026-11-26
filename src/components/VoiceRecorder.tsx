@@ -27,6 +27,7 @@ export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorder
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const unmountedRef = useRef(false);
 
   useEffect(() => {
     if (!recording) return;
@@ -35,11 +36,30 @@ export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorder
   }, [recording]);
 
   useEffect(() => {
+    unmountedRef.current = false;
     return () => {
-      recorderRef.current?.stop();
+      unmountedRef.current = true;
+      if (recorderRef.current && recorderRef.current.state !== "inactive") {
+        recorderRef.current.stop();
+      }
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  async function uploadAudio(blob: Blob, ext: string, attempt = 0): Promise<void> {
+    const form = new FormData();
+    form.append("audio", new File([blob], `voice-note.${ext}`, { type: blob.type || "audio/webm" }));
+    const res = await fetch("/api/transcribe", { method: "POST", body: form });
+    const json = await parseJsonResponse<{ text?: string; error?: string; retryAfterSeconds?: number }>(res);
+    if (res.status === 429 && attempt < 1 && !unmountedRef.current) {
+      const waitMs = Math.max(2, Math.min(8, Number(json?.retryAfterSeconds ?? 4))) * 1000;
+      await new Promise((r) => setTimeout(r, waitMs));
+      if (unmountedRef.current) return;
+      return uploadAudio(blob, ext, attempt + 1);
+    }
+    if (!res.ok) throw new Error(json?.error ?? `Transcription failed (HTTP ${res.status}).`);
+    if (json?.text && !unmountedRef.current) onTranscript(json.text);
+  }
 
   async function startRecording() {
     setError(null);
@@ -50,6 +70,10 @@ export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorder
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (unmountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       streamRef.current = stream;
       const mimeType = pickAudioMime();
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
@@ -62,23 +86,24 @@ export function VoiceRecorder({ onTranscript, disabled, compact }: VoiceRecorder
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
+        if (unmountedRef.current) return;
         const type = recorder.mimeType || "audio/webm";
         const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
         const blob = new Blob(chunksRef.current, { type });
-        if (blob.size === 0) return;
+        if (blob.size < 400) {
+          setError("Recording too short — speak for at least 1 second.");
+          return;
+        }
 
         setTranscribing(true);
         try {
-          const form = new FormData();
-          form.append("audio", new File([blob], `voice-note.${ext}`, { type }));
-          const res = await fetch("/api/transcribe", { method: "POST", body: form });
-          const json = await parseJsonResponse<{ text?: string; error?: string }>(res);
-          if (!res.ok) throw new Error(json?.error ?? `Transcription failed (HTTP ${res.status}).`);
-          if (json?.text) onTranscript(json.text);
+          await uploadAudio(blob, ext, 0);
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Could not transcribe audio.");
+          if (!unmountedRef.current) {
+            setError(err instanceof Error ? err.message : "Could not transcribe audio.");
+          }
         } finally {
-          setTranscribing(false);
+          if (!unmountedRef.current) setTranscribing(false);
         }
       };
 

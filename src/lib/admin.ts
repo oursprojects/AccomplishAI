@@ -58,10 +58,15 @@ export function isAdminUser(
   return Boolean(user?.email_confirmed_at) && isAdminEmail(user?.email);
 }
 
+/** Current calendar date in Asia/Manila (UTC+08:00) as YYYY-MM-DD. */
+export function getManilaTodayIso(now = new Date()): string {
+  const manilaMs = now.getTime() + 8 * 60 * 60 * 1000;
+  return new Date(manilaMs).toISOString().slice(0, 10);
+}
+
 /** Midnight of the current calendar day in Asia/Manila (UTC+08:00), as an ISO timestamp. */
 export function getManilaDayStartIso(now = new Date()): string {
-  const manilaMs = now.getTime() + 8 * 60 * 60 * 1000;
-  const manilaDate = new Date(manilaMs).toISOString().slice(0, 10);
+  const manilaDate = getManilaTodayIso(now);
   return new Date(`${manilaDate}T00:00:00+08:00`).toISOString();
 }
 

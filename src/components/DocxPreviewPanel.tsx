@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
-import { Check, Copy, Download, FileText, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
-import { fetchCachedTemplateBytes, warmDocxPreview } from "@/lib/docx/client-cache";
+import { Check, Copy, Download, FileText, Maximize2, RefreshCw, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { fetchCachedTemplateBytes, invalidateTemplateCache, warmDocxPreview } from "@/lib/docx/client-cache";
 import { defaultReportFileName, DOCX_MIME, fillTemplate } from "@/lib/docx/fill";
 import { enhanceCsuPreviewChrome, PAPER_DIMENSIONS, type PaperSize } from "@/lib/docx/csu-template-chrome";
 import { resolveTemplateTexts, type DetectedField } from "@/lib/docx/types";
@@ -43,6 +43,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
   const hasRenderedOnceRef = useRef<boolean>(false);
 
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const paperSize: PaperSize = "letter";
@@ -127,7 +128,7 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
     return () => {
       cancelled = true;
     };
-  }, [templateId, templateVersion, targetKey]);
+  }, [templateId, templateVersion, targetKey, reloadNonce]);
 
   const computeFitZoom = useCallback(
     (stageEl: HTMLDivElement | null, maxCap: number) => {
@@ -256,17 +257,24 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
 
   function confirmDownload(e: React.FormEvent) {
     e.preventDefault();
-    if (!templateBytesRef.current) return;
-    const filled = latestFilledRef.current ?? fillTemplate(templateBytesRef.current, data, fields, customTexts);
-    const cleaned = customFileName
-      .trim()
-      .replace(/[<>:"/\\|?*]+/g, "-")
-      .replace(/\.docx$/i, "");
-    const finalName = `${cleaned || defaultReportFileName(data, reportTitle)}.docx`;
-    const copy = new Uint8Array(filled);
-    saveAs(new Blob([copy], { type: DOCX_MIME }), finalName);
-    setDownloadModalOpen(false);
-    toast.success(`Downloaded ${finalName}`);
+    if (!templateBytesRef.current) {
+      toast.error("Template is still loading — please wait or retry preview.");
+      return;
+    }
+    try {
+      const filled = latestFilledRef.current ?? fillTemplate(templateBytesRef.current, data, fields, customTexts);
+      const cleaned = customFileName
+        .trim()
+        .replace(/[<>:"/\\|?*]+/g, "-")
+        .replace(/\.docx$/i, "");
+      const finalName = `${cleaned || defaultReportFileName(data, reportTitle)}.docx`;
+      const copy = new Uint8Array(filled);
+      saveAs(new Blob([copy], { type: DOCX_MIME }), finalName);
+      setDownloadModalOpen(false);
+      toast.success(`Downloaded ${finalName}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not generate .docx download.");
+    }
   }
 
   return (
@@ -354,8 +362,25 @@ export function DocxPreviewPanel({ templateId, templateVersion, fields, data, re
         </div>
 
         {error && (
-          <div className="m-3.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
-            {error}
+          <div
+            role="alert"
+            className="m-3.5 flex items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+          >
+            <span>{error}</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                setError(null);
+                setLoadedKey(null);
+                invalidateTemplateCache(templateId);
+                setReloadNonce((n) => n + 1);
+              }}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>Retry</span>
+            </Button>
           </div>
         )}
 

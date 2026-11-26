@@ -15,7 +15,9 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { emptyReport, type ReportData } from "@/lib/report-schema";
+import { emptyReport, DAYS, type ReportData } from "@/lib/report-schema";
+import { parseJsonResponse } from "@/lib/client-json";
+import { parseHoursNumber } from "@/lib/internship-calendar";
 import type { Profile } from "@/lib/supabase/database.types";
 import type { TemplateReview } from "@/lib/templates/pipeline";
 import type { QuotaStatus } from "@/lib/admin";
@@ -178,14 +180,14 @@ export function WorkspaceClient({
           templateId: review?.template.id,
         }),
       });
-      const json = (await res.json()) as {
+      const json = await parseJsonResponse<{
         structuredData?: ReportData;
         quota?: QuotaStatus;
         error?: string;
-      };
-      if (json.quota) setQuota(json.quota);
-      if (!res.ok || !json.structuredData) {
-        throw new Error(json.error ?? "Failed to fill report from notes.");
+      }>(res);
+      if (json?.quota) setQuota(json.quota);
+      if (!res.ok || !json?.structuredData) {
+        throw new Error(json?.error ?? `Failed to fill report from notes (HTTP ${res.status}).`);
       }
       pushUndoSnapshot(title, data);
       const merged: ReportData = {
@@ -193,6 +195,21 @@ export function WorkspaceClient({
         date_from: json.structuredData.date_from || data.date_from,
         date_to: json.structuredData.date_to || data.date_to,
       };
+      if (!merged.total_hours_worked.trim() && merged.hours_this_week.trim()) {
+        const weekNum = parseHoursNumber(merged.hours_this_week);
+        const prevNum = parseHoursNumber(previousTotalHours) ?? 0;
+        if (weekNum !== null) {
+          merged.total_hours_worked = String(prevNum + weekNum);
+        }
+      }
+      if (profile.default_verifier?.trim()) {
+        const upperVerifier = profile.default_verifier.trim().toUpperCase();
+        for (const d of DAYS) {
+          if (merged[`${d}_accomplishments`].trim() && !merged[`${d}_verified_by`].trim()) {
+            merged[`${d}_verified_by`] = upperVerifier;
+          }
+        }
+      }
       setData(merged);
       setQuickNotesOpen(false);
       setQuickNotesText("");
@@ -278,8 +295,10 @@ export function WorkspaceClient({
           })),
         }),
       });
-      const json = (await res.json()) as { review?: TemplateReview; error?: string };
-      if (!res.ok || !json.review) throw new Error(json.error ?? "Could not confirm template.");
+      const json = await parseJsonResponse<{ review?: TemplateReview; error?: string }>(res);
+      if (!res.ok || !json?.review) {
+        throw new Error(json?.error ?? `Could not confirm template (HTTP ${res.status}).`);
+      }
       setReview(json.review);
       toast.success("Template confirmed and saved.");
     } catch (err) {
@@ -316,8 +335,10 @@ export function WorkspaceClient({
           chatMessages: serializedMsgs,
         }),
       });
-      const json = (await res.json()) as { report?: { id: string }; error?: string };
-      if (!res.ok || !json.report) throw new Error(json.error ?? "Could not save report.");
+      const json = await parseJsonResponse<{ report?: { id: string }; error?: string }>(res);
+      if (!res.ok || !json?.report) {
+        throw new Error(json?.error ?? `Could not save report (HTTP ${res.status}).`);
+      }
 
       savedStateRef.current = { title: title.trim(), data };
       setSavedSnapshot(formSnapshotOf(title.trim(), data));
@@ -344,6 +365,64 @@ export function WorkspaceClient({
     void persistReportPatch(title, data, freshMsgs);
   }
 
+  const latestDraftRef = useRef({ title, data, hasChanges });
+  const offlineWarnedRef = useRef(false);
+  useEffect(() => {
+    latestDraftRef.current = { title, data, hasChanges };
+  }, [title, data, hasChanges]);
+
+  // Guard against closing tab before unsaved edits sync, and keepalive-flush on pagehide + retry when online
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!latestDraftRef.current.hasChanges) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    const onPageHide = () => {
+      const snap = latestDraftRef.current;
+      if (!snap.hasChanges) return;
+      void fetch(`/api/reports/${initialReport.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
+          title: snap.title.trim(),
+          structuredData: snap.data,
+        }),
+      }).catch(() => {});
+    };
+    const onOnline = () => {
+      const snap = latestDraftRef.current;
+      if (!snap.hasChanges) return;
+      offlineWarnedRef.current = false;
+      void fetch(`/api/reports/${initialReport.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: snap.title.trim(),
+          structuredData: snap.data,
+        }),
+      })
+        .then((r) => {
+          if (r.ok) {
+            savedStateRef.current = { title: snap.title.trim(), data: snap.data };
+            setSavedSnapshot(formSnapshotOf(snap.title.trim(), snap.data));
+            toast.success("Back online — synced pending report edits.");
+          }
+        })
+        .catch(() => {});
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [initialReport.id]);
+
   // Auto-save debounced edits for this specific report
   useEffect(() => {
     if (!hasChanges) return;
@@ -358,14 +437,20 @@ export function WorkspaceClient({
       })
         .then(async (r) => {
           if (r.ok) {
+            offlineWarnedRef.current = false;
             savedStateRef.current = { title: title.trim(), data };
             setSavedSnapshot(formSnapshotOf(title.trim(), data));
           } else {
-            const j = (await r.json().catch(() => ({}))) as { error?: string };
-            if (j.error) toast.error(j.error);
+            const j = await parseJsonResponse<{ error?: string }>(r);
+            if (j?.error) toast.error(j.error);
           }
         })
-        .catch(() => { });
+        .catch(() => {
+          if (!offlineWarnedRef.current) {
+            offlineWarnedRef.current = true;
+            toast.error("Network offline or interrupted — edits will sync when connection returns.");
+          }
+        });
     }, 1400);
     return () => window.clearTimeout(timer);
   }, [initialReport.id, title, data, hasChanges]);

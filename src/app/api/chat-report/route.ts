@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { checkBurstRateLimit, getQuotaAndAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { checkBurstRateLimit, getManilaTodayIso, getQuotaAndAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import {
   buildInternshipWeeks,
   getReportWeekMondayIso,
@@ -184,7 +184,7 @@ export async function POST(request: Request) {
 
     const systemPrompt = `You are **Accomplish AI**, a friendly, helpful assistant dedicated strictly to helping a student intern complete their official 1-page **"2026 Weekly Accomplishment Report"** (.docx). You are connected to the user's Supabase database through AccomplishAI's built-in **MCP tools** (\`list_reports\`, \`get_ojt_hours_summary\`, \`get_report_fields\`, \`set_report_fields\`, \`clear_report_fields\`, \`save_profile_defaults\`).
 
-Today's date: ${new Date().toISOString().slice(0, 10)}
+Today's date (Asia/Manila): ${getManilaTodayIso()}
 User profile defaults: ${JSON.stringify({
       name_last_first: profile?.name_last_first ?? "",
       name_first_last: profile?.name_first_last ?? "",

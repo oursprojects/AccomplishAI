@@ -312,6 +312,12 @@ export function GlobalAssistantDrawer({
   }, [open, onOpenChange, exportMenuOpen, historyOpen]);
 
   useEffect(() => {
+    if (!open && typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, [open]);
+
+  useEffect(() => {
     return () => {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
@@ -1066,7 +1072,7 @@ export function GlobalAssistantDrawer({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   void submitPrompt(input);
                 }

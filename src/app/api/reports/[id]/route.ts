@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { jsonError, parseJsonBody, safeServerError } from "@/lib/api-utils";
 import { getUser } from "@/lib/supabase/server";
-import { getReportWeekMondayIso, normalizeDateToLongFormat, resolveWeekCategory } from "@/lib/internship-calendar";
+import {
+  getReportWeekMondayIso,
+  normalizeDateToLongFormat,
+  normalizeHolidayMondays,
+  resolveWeekCategory,
+} from "@/lib/internship-calendar";
 import { reportDataStrictSchema, type ReportData } from "@/lib/report-schema";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -121,6 +126,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
           dateFrom: normalizedData.date_from,
           dateTo: normalizedData.date_to,
           startDateIso: profile?.internship_start_date,
+          holidayMondays: normalizeHolidayMondays(user.user_metadata?.holiday_mondays),
         });
         return jsonError(
           409,

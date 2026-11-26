@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays, PenLine, Save, UserRound } from "lucide-react";
+import { parseJsonResponse } from "@/lib/client-json";
 import type { Profile } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -38,6 +39,16 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
 
   const hasChanges = JSON.stringify(form) !== JSON.stringify(savedBaseline);
 
+  useEffect(() => {
+    if (!hasChanges) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasChanges]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!hasChanges || saving) return;
@@ -48,8 +59,10 @@ export function ProfileForm({ initial }: { initial: EditableProfile }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const json = (await res.json()) as { profile?: EditableProfile; error?: string };
-      if (!res.ok || !json.profile) throw new Error(json.error ?? "Failed to save profile.");
+      const json = await parseJsonResponse<{ profile?: EditableProfile; error?: string }>(res);
+      if (!res.ok || !json?.profile) {
+        throw new Error(json?.error ?? `Failed to save profile (HTTP ${res.status}).`);
+      }
       setForm(json.profile);
       setSavedBaseline(json.profile);
       toast.success("Profile & internship calendar defaults saved.");

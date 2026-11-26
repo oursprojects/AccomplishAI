@@ -57,16 +57,25 @@ export async function readChatAttachment(file: File): Promise<AttachedChatFile> 
   let text = "";
 
   if (lower.endsWith(".docx")) {
-    const { default: PizZip } = await import("pizzip");
-    const buf = await file.arrayBuffer();
-    const zip = new PizZip(buf);
-    const docXml = zip.file("word/document.xml")?.asText();
-    if (!docXml) {
-      throw new Error(`Could not read document text inside "${file.name}".`);
+    try {
+      const { default: PizZip } = await import("pizzip");
+      const buf = await file.arrayBuffer();
+      const zip = new PizZip(buf);
+      const docXml = zip.file("word/document.xml")?.asText();
+      if (!docXml) {
+        throw new Error(`Could not find document text inside "${file.name}".`);
+      }
+      text = extractDocxXmlText(docXml);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("document text inside")) throw err;
+      throw new Error(`Could not read "${file.name}" — it may be corrupted or password-protected.`);
     }
-    text = extractDocxXmlText(docXml);
   } else {
     text = await file.text();
+    const replacementCount = (text.match(/\uFFFD/g) ?? []).length;
+    if (text.includes("\u0000") || replacementCount > Math.max(12, Math.floor(text.length * 0.05))) {
+      throw new Error(`"${file.name}" appears to be binary. Attach .docx, .csv, .json, .txt, or code files instead.`);
+    }
   }
 
   const trimmed = text.trim();

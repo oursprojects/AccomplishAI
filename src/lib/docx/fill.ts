@@ -13,6 +13,12 @@ import {
 import { cellParagraphs, childElements, descendants, firstChild, parseXml, serializeXml, textOf, W_NS } from "./xml";
 
 const BULLET_PREFIX = /^\s*(?:[-*•▪◦·–—]|\d+[.)])\s+/;
+// XML 1.0 forbids NUL and C0 control chars except HT (\x09), LF (\x0A), CR (\x0D)
+const INVALID_XML_CONTROL_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
+
+function stripInvalidXmlChars(text: string): string {
+  return text.replace(INVALID_XML_CONTROL_RE, "");
+}
 
 const UPPERCASE_NAME_KEYS = new Set<string>([
   "intern_name_last_first",
@@ -26,7 +32,7 @@ const UPPERCASE_NAME_KEYS = new Set<string>([
 
 /** Split a newline-separated field into clean bullet items. */
 export function toLines(value: string): string[] {
-  return value
+  return stripInvalidXmlChars(value)
     .split(/\r?\n/)
     .map((l) => l.replace(BULLET_PREFIX, "").trim())
     .filter(Boolean);
@@ -41,7 +47,7 @@ export function toLines(value: string): string[] {
 export function buildRenderData(data: Partial<ReportData>, fields: ReadonlyArray<Pick<DetectedField, "key" | "kind">>) {
   const out: Record<string, string | string[]> = {};
   for (const k of REPORT_KEYS) {
-    let val = (data[k] ?? "").trim();
+    let val = stripInvalidXmlChars(data[k] ?? "").trim();
     if (k === "date_from" || k === "date_to") {
       val = normalizeDateToLongFormat(val);
     } else if (UPPERCASE_NAME_KEYS.has(k)) {
@@ -102,7 +108,7 @@ function replaceParagraphPlainText(doc: Document, p: Element, nextText: string) 
   if (rPr) r.appendChild(rPr);
   const t = doc.createElementNS(W_NS, "w:t");
   t.setAttribute("xml:space", "preserve");
-  t.appendChild(doc.createTextNode(nextText));
+  t.appendChild(doc.createTextNode(stripInvalidXmlChars(nextText)));
   r.appendChild(t);
   p.appendChild(r);
 }

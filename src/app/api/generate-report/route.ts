@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { checkBurstRateLimit, getQuotaAndAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { checkBurstRateLimit, getManilaTodayIso, getQuotaAndAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import { normalizeDateToLongFormat } from "@/lib/internship-calendar";
 import { sanitizeAccomplishmentLines } from "@/lib/report-task-format";
 import { groqErrorResponse, groqJson } from "@/lib/ai/groq";
@@ -89,7 +89,7 @@ STRICT ACCOMPLISHED-TASK, PAST-TENSE & TABLE-FIT RULES (the entire report MUST f
       : "";
 
   const userPayload = {
-    today: new Date().toISOString().slice(0, 10),
+    today: getManilaTodayIso(),
     profile_defaults: {
       intern_name_last_first: profile?.name_last_first ?? "",
       intern_name_first_last: profile?.name_first_last ?? "",

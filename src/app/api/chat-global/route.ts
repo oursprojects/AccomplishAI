@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { checkBurstRateLimit, getQuotaAndAiSettings, getUserQuotaStatus } from "@/lib/admin";
+import { checkBurstRateLimit, getManilaTodayIso, getQuotaAndAiSettings, getUserQuotaStatus } from "@/lib/admin";
 import {
   buildInternshipWeeks,
   inferNextWeekRange,
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
     const systemPrompt = `You are **Overall Accomplish AI** — a full ChatGPT-grade general AI assistant AND the system-wide AccomplishAI workspace agent connected to Supabase via **MCP tools**.
 
 Current page: ${body.data.currentPath}
-Today's date: ${new Date().toISOString().slice(0, 10)}
+Today's date (Asia/Manila): ${getManilaTodayIso()}
 User account: ${user.email ?? ""} (${quotaBefore.isAdmin ? "Admin" : "Intern"})
 Profile defaults: ${JSON.stringify(profile ?? {})}
 OJT Progress: ${completedHours} / ${targetOjtHours} hours completed (${Math.max(0, targetOjtHours - completedHours)} hrs remaining)
