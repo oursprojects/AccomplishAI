@@ -22,6 +22,7 @@ import {
   AnimatedFileTextIcon,
   AnimatedMessageCircleIcon,
   AnimatedShieldIcon,
+  AnimatedTemplateIcon,
   AnimatedUserIcon,
 } from "@/components/icons/AnimatedIcons";
 import { BorderBeam } from "@/components/magicui/border-beam";
@@ -50,7 +51,7 @@ interface NavItem {
 const BASE_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: AnimatedDashboardIcon },
   { href: "/", label: "My Reports", icon: AnimatedFileTextIcon, matchPrefix: "/reports" },
-  { href: "/template", label: "Template", icon: AnimatedFileTextIcon },
+  { href: "/template", label: "Template", icon: AnimatedTemplateIcon },
   { href: "/profile", label: "Profile", icon: AnimatedUserIcon },
 ];
 

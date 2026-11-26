@@ -49,6 +49,39 @@ export function AnimatedFileTextIcon({ className = "size-4", active = false }: A
   );
 }
 
+/** Animated Template blueprint/layout grid icon (distinct from FileText reports). */
+export function AnimatedTemplateIcon({ className = "size-4", active = false }: AnimatedIconProps) {
+  const [hovered, setHovered] = useState(false);
+  const trigger = hovered || active;
+  return (
+    <motion.svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      animate={trigger ? { scale: 1.06 } : { scale: 1 }}
+      transition={SPRING}
+    >
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <motion.path
+        d="M3 9h18"
+        animate={trigger ? { pathLength: [0.2, 1] } : { pathLength: 1 }}
+        transition={{ duration: 0.25 }}
+      />
+      <motion.path
+        d="M9 21V9"
+        animate={trigger ? { pathLength: [0.2, 1] } : { pathLength: 1 }}
+        transition={{ duration: 0.28, delay: 0.05 }}
+      />
+    </motion.svg>
+  );
+}
+
 /** Animated Dashboard grid icon whose tiles stagger subtly on hover/active. */
 export function AnimatedDashboardIcon({ className = "size-4", active = false }: AnimatedIconProps) {
   const [hovered, setHovered] = useState(false);

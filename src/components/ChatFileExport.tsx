@@ -117,7 +117,7 @@ export function ChatFileExport({ spec }: { spec: ChatFileSpec }) {
               {downloadingFormat === fmt ? (
                 <Loader2 className="size-3 animate-spin text-[#1D4ED8]" />
               ) : (
-                <Icon className="size-3 text-[#141413]/55" />
+                <Icon className="size-3 text-[#52524E]" />
               )}
               <span>{meta.ext.toUpperCase()}</span>
             </button>

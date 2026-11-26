@@ -6,6 +6,7 @@ import {
   Database,
   Eraser,
   Eye,
+  Loader2,
   Undo2,
 } from "lucide-react";
 import type { QuotaStatus } from "@/lib/admin";
@@ -332,7 +333,7 @@ export function ReportChat({
         {sending && (
           <div className="flex items-start">
             <div className="inline-flex items-center gap-2 rounded-xl rounded-bl-xs border border-[#E2E2DC] bg-white px-3.5 py-2 text-xs">
-              <ReportPenIcon className="size-3.5 text-[#1D4ED8]" />
+              <Loader2 className="size-3.5 animate-spin text-[#1D4ED8]" />
               <AnimatedShinyText>{queueNotice ?? THINKING_PHRASES[thinkingIdx]}</AnimatedShinyText>
             </div>
           </div>

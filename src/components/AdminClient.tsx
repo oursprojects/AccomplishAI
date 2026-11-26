@@ -20,6 +20,7 @@ import {
   UserPlus,
   Users,
   X,
+  Zap,
 } from "lucide-react";
 import {
   ALLOWED_STT_MODELS,
@@ -416,7 +417,7 @@ export function AdminClient({
         <Card className="p-4">
           <div className="flex items-center justify-between text-xs font-medium text-[#5C5C57]">
             <span>API Calls Today (Manila)</span>
-            <Activity className="w-4 h-4 text-[#1D4ED8]" />
+            <Zap className="w-4 h-4 text-[#1D4ED8]" />
           </div>
           <p className="mt-1 text-2xl font-bold text-[#141413]">
             {usageMonitor.requestsToday} <span className="text-xs font-normal text-[#7A7A73]">/ 1,000 RPD</span>

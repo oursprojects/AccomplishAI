@@ -9,6 +9,7 @@ import {
   Database,
   Download,
   ExternalLink,
+  FileCode2,
   FileSpreadsheet,
   FileText,
   FileType2,
@@ -690,7 +691,7 @@ export function GlobalAssistantDrawer({
                       onClick={() => void handleExportThread("md")}
                       className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-[#F1F1EE] cursor-pointer"
                     >
-                      <FileText className="size-3.5 text-[#141413]/65" />
+                      <FileCode2 className="size-3.5 text-[#52524E]" />
                       <span>Export Markdown</span>
                     </button>
                   </div>
@@ -806,7 +807,7 @@ export function GlobalAssistantDrawer({
             <div key={m.id} className={`group flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
               {m.role === "user" && editingId === m.id ? (
                 <div className="w-full max-w-[90%] rounded-xl border border-[#1D4ED8] bg-white p-2.5 space-y-2">
-                    <textarea
+                  <textarea
                     rows={3}
                     value={editingText}
                     onChange={(e) => setEditingText(e.target.value)}
